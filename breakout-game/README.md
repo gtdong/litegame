@@ -18,6 +18,8 @@ Classic Breakout: keep the ball in play and clear every brick.
 
 - The bounce angle depends on **where the ball hits the paddle** — the further from centre, the sharper the angle
 - Missing the ball costs one life; you start with 3
+- After a miss the game pauses and tells you how many lives are left — click "Serve again" or press Space to continue
+- Losing all three lives ends the game and shows the final score
 - The ball speeds up on every level
 
 ## Run

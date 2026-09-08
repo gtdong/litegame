@@ -142,6 +142,10 @@
     ready:   { en: 'Ready?', zh: '准备好了吗？' },
     readySub:{ en: 'Press start, or hit space to launch', zh: '点击开始，或按空格发小球' },
     start:   { en: 'Start', zh: '开始游戏' },
+    missed:  { en: 'Missed!', zh: '没接住！' },
+    missedSub:{ en: '{n} lives left — put the ball back in play', zh: '剩余 {n} 条命，点击重新发球' },
+    missedSubOne:{ en: 'Last life — put the ball back in play', zh: '只剩最后 1 条命，点击重新发球' },
+    serve:   { en: 'Serve again', zh: '重新发球' },
     lvTitle: { en: 'Level {n}', zh: '第 {n} 关' },
     lvSub:   { en: 'The ball is faster now, stay sharp', zh: '球速变快了，小心点' },
     cont:    { en: 'Continue', zh: '继续' },
@@ -263,6 +267,11 @@
     if (kind === 'ready') { msg = T.t('ready'); sub = T.t('readySub'); btn = T.t('start'); }
     else if (kind === 'level') { msg = T.t('lvTitle', { n: level }); sub = T.t('lvSub'); btn = T.t('cont'); }
     else if (kind === 'paused') { msg = T.t('paused'); sub = T.t('pausedSub'); btn = T.t('cont'); }
+    else if (kind === 'missed') {
+      msg = T.t('missed');
+      sub = lives === 1 ? T.t('missedSubOne') : T.t('missedSub', { n: lives });
+      btn = T.t('serve');
+    }
     else if (kind === 'over') { msg = T.t('over'); sub = T.t('overSub', { n: score }); btn = T.t('again'); }
     else if (kind === 'cleared') { msg = T.t('clear'); sub = T.t('clearSub', { n: score, m: level + 1 }); btn = T.t('next'); }
 
@@ -333,16 +342,28 @@
       break;   // one brick per frame keeps the bounce predictable
     }
 
-    // Bottom edge: lose a life.
+    // Bottom edge: the ball was missed, so one life is gone.
     if (ball.y - ball.r > H) {
       lives--;
       updateHud();
+
+      // Park the ball back on the paddle so the next serve starts cleanly.
+      ball.stuck = true;
+      ball.x = paddle.x + paddle.w / 2;
+      ball.y = PADDLE_Y - BALL_R - 1;
+      draw();
+
+      cancelAnimationFrame(rafId);
+      rafId = 0;
+
       if (lives <= 0) {
         state = 'over';
         showOverlay('over');
-        return;
+      } else {
+        // Back to 'ready' so clicking the board / pressing space serves again.
+        state = 'ready';
+        showOverlay('missed');
       }
-      ball.stuck = true;
       return;
     }
 
