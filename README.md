@@ -1,12 +1,12 @@
 # litegame
 
-**[简体中文](README.md)** · [English](README.en.md)
+[简体中文](README.zh.md) · **[English](README.md)**
 
 ---
 
-AI 生成的 HTML5 小游戏合集，零依赖，用浏览器打开 `index.html` 即可玩。
+A collection of AI-generated HTML5 mini games. Zero dependencies — just open `index.html` in a browser.
 
-## 游戏列表
+## Games
 
-- [snake-game/](snake-game/) — 贪吃蛇
-- [gomoku-game/](gomoku-game/) — 五子棋（禁手规则）
+- [snake-game/](snake-game/) — Snake
+- [gomoku-game/](gomoku-game/) — Gomoku (Renju forbidden-move rules)
