@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>打地鼠</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --panel: #ffffff;
+    --border: #dfe3e8;
+    --text: #1f2328;
+    --muted: #6b7280;
+    --accent: #3b6ef5;
+    --good: #2e7d32;
+    --danger: #e24b4a;
+    --hole: #6b4a2f;
+    --grass: #7cb342;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    margin: 0;
+    padding: 24px 16px 40px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+  }
+
+  h1 { margin: 0 0 4px; font-size: 30px; letter-spacing: -.02em; }
+  .tip { margin: 0 0 18px; font-size: 13px; color: var(--muted); }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+    box-shadow: 0 1px 2px rgba(16,24,40,.05), 0 4px 12px rgba(16,24,40,.06);
+  }
+
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .stat {
+    background: #2f3640;
+    color: #ffd66b;
+    font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 18px;
+    font-weight: 700;
+    padding: 5px 10px;
+    border-radius: 4px;
+    min-width: 58px;
+    text-align: center;
+  }
+
+  button {
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--text);
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 13px;
+    cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); color: var(--accent); }
+  button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  /* 3×3 grass field with holes */
+  #field {
+    display: grid;
+    grid-template-columns: repeat(3, 110px);
+    gap: 12px;
+    padding: 14px;
+    margin: 0 auto;
+    background: linear-gradient(160deg, #8bc34a, var(--grass));
+    border-radius: 12px;
+    touch-action: manipulation;
+  }
+
+  .hole {
+    position: relative;
+    height: 110px;
+    cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="34" height="34"><text y="26" font-size="28">🔨</text></svg>') 6 6, pointer;
+  }
+
+  .hole::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    bottom: 6px;
+    width: 84px;
+    height: 26px;
+    transform: translateX(-50%);
+    background: var(--hole);
+    border-radius: 50%;
+    box-shadow: inset 0 4px 6px rgba(0,0,0,.45);
+  }
+
+  .mole {
+    position: absolute;
+    left: 50%;
+    bottom: 12px;
+    transform: translateX(-50%) translateY(80%);
+    width: 76px;
+    height: 76px;
+    font-size: 58px;
+    line-height: 76px;
+    text-align: center;
+    transition: transform .12s ease-out;
+    pointer-events: none; /* clicks land on the hole */
+    z-index: 1;
+  }
+  .mole.up { transform: translateX(-50%) translateY(0); }
+
+  .mole.hit { animation: pop .18s ease-out; }
+  @keyframes pop {
+    0%   { transform: translateX(-50%) translateY(0) scale(1); }
+    50%  { transform: translateX(-50%) translateY(0) scale(1.25); }
+    100% { transform: translateX(-50%) translateY(80%) scale(1); }
+  }
+
+  #status {
+    margin-top: 14px;
+    font-size: 15px;
+    font-weight: 700;
+    min-height: 22px;
+  }
+  #status.win { color: var(--good); }
+  #status.lose { color: var(--danger); }
+
+  @media (max-width: 560px) {
+    #field { grid-template-columns: repeat(3, 86px); gap: 8px; }
+    .hole { height: 86px; }
+    .hole::after { width: 64px; height: 20px; }
+    .mole { width: 58px; height: 58px; font-size: 42px; line-height: 58px; bottom: 10px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="lang-switch" data-lang-switch></div>
+
+<h1 data-i18n="title"></h1>
+<p class="tip" data-i18n="tip"></p>
+
+<div class="panel">
+  <div class="bar">
+    <button id="lv1" class="active" data-i18n="lv1"></button>
+    <button id="lv2" data-i18n="lv2"></button>
+    <button id="lv3" data-i18n="lv3"></button>
+    <button id="btnNew" data-i18n="restart"></button>
+    <div class="stat" id="score">0</div>
+    <div class="stat" id="time">30</div>
+  </div>
+  <div id="field"></div>
+  <div id="status"></div>
+</div>
+
+<script src="../assets/i18n.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var T = LiteI18N.create({
+    title:   { en: 'Whack-a-Mole', zh: '打地鼠' },
+    tip: {
+      en: 'Whack moles with the hammer before they hide! Bombs cost you 3 points — 30 seconds per round.',
+      zh: '趁地鼠缩回去之前敲中它们！炸弹扣 3 分，每局 30 秒。'
+    },
+    lv1:     { en: 'Slow', zh: '悠闲' },
+    lv2:     { en: 'Normal', zh: '正常' },
+    lv3:     { en: 'Fast', zh: '疯狂' },
+    restart: { en: 'New game', zh: '重新开始' },
+    clickGo: { en: 'Press "New game" to start', zh: '点「重新开始」开局' },
+    go:      { en: 'Go!', zh: '开始！' },
+    timeUp:  { en: "Time's up! Score: {n}", zh: '时间到！得分：{n}' }
+  });
+
+  // Difficulty: spawn interval and how long a mole stays up (ms).
+  var LEVELS = {
+    lv1: { every: 950, up: 1100 },
+    lv2: { every: 700, up: 800 },
+    lv3: { every: 480, up: 560 }
+  };
+  var ROUND = 30; // seconds
+
+  var fieldEl = document.getElementById('field');
+  var scoreEl = document.getElementById('score');
+  var timeEl = document.getElementById('time');
+  var statusEl = document.getElementById('status');
+
+  var holes = [];   // { el, moleEl, occupant: null | { kind } }
+  var playing = false;
+  var score, timeLeft;
+  var spawnTimer, tickTimer;
+  var lastResult;
+  var currentLevel = 'lv1';
+
+  /* ---------- setup ---------- */
+
+  function buildField() {
+    fieldEl.innerHTML = '';
+    holes = [];
+    var frag = document.createDocumentFragment();
+    for (var i = 0; i < 9; i++) {
+      var hole = document.createElement('div');
+      hole.className = 'hole';
+      hole.dataset.idx = String(i);
+
+      var mole = document.createElement('div');
+      mole.className = 'mole';
+      mole.textContent = '🐹';
+      hole.appendChild(mole);
+
+      frag.appendChild(hole);
+      holes.push({ el: hole, moleEl: mole, occupant: null });
+    }
+    fieldEl.appendChild(frag);
+  }
+
+  function newGame() {
+    stopTimers();
+    hideAll();
+
+    score = 0;
+    timeLeft = ROUND;
+    playing = true;
+    lastResult = null;
+    scoreEl.textContent = '0';
+    timeEl.textContent = String(ROUND);
+    statusEl.textContent = T.t('go');
+    statusEl.className = 'win';
+
+    var cfg = LEVELS[currentLevel];
+    spawnTimer = setInterval(spawnOne, cfg.every);
+    tickTimer = setInterval(function () {
+      timeLeft--;
+      timeEl.textContent = String(Math.max(0, timeLeft));
+      if (timeLeft <= 0) endRound();
+    }, 1000);
+  }
+
+  function stopTimers() {
+    if (spawnTimer) { clearInterval(spawnTimer); spawnTimer = null; }
+    if (tickTimer) { clearInterval(tickTimer); tickTimer = null; }
+  }
+
+  /* ---------- mole lifecycle ---------- */
+
+  function freeHoles() {
+    return holes.filter(function (h) { return !h.occupant; });
+  }
+
+  function spawnOne() {
+    var free = freeHoles();
+    if (!free.length) return;
+    var hole = free[Math.floor(Math.random() * free.length)];
+
+    // ~15% of spawns are bombs.
+    var kind = Math.random() < 0.15 ? 'bomb' : 'mole';
+    hole.occupant = { kind: kind };
+    hole.moleEl.textContent = kind === 'bomb' ? '💣' : '🐹';
+    hole.moleEl.classList.add('up');
+
+    var cfg = LEVELS[currentLevel];
+    setTimeout(function () {
+      // Recheck: the occupant may have been whacked and replaced meanwhile.
+      if (hole.occupant && hole.occupant.kind === kind) despawn(hole, false);
+    }, cfg.up);
+  }
+
+  function despawn(hole, whacked) {
+    hole.occupant = null;
+    if (whacked) {
+      hole.moleEl.classList.add('hit');
+      var el = hole.moleEl;
+      setTimeout(function () {
+        el.classList.remove('up', 'hit');
+      }, 180);
+    } else {
+      hole.moleEl.classList.remove('up');
+    }
+  }
+
+  function hideAll() {
+    holes.forEach(function (h) {
+      h.occupant = null;
+      h.moleEl.classList.remove('up', 'hit');
+    });
+  }
+
+  /* ---------- interaction ---------- */
+
+  function whack(i) {
+    if (!playing) return;
+    var hole = holes[i];
+    if (!hole.occupant) return;
+
+    if (hole.occupant.kind === 'bomb') {
+      score = Math.max(0, score - 3);
+      despawn(hole, false);
+      hole.moleEl.textContent = '💥';
+      setTimeout(function () { if (!hole.occupant) hole.moleEl.textContent = '🐹'; }, 300);
+    } else {
+      score++;
+      despawn(hole, true);
+    }
+    scoreEl.textContent = String(score);
+  }
+
+  function endRound() {
+    playing = false;
+    stopTimers();
+    hideAll();
+    lastResult = { score: score };
+    statusEl.textContent = T.t('timeUp', { n: score });
+    statusEl.className = score >= 20 ? 'win' : 'lose';
+  }
+
+  /* ---------- input wiring ---------- */
+
+  fieldEl.addEventListener('click', function (ev) {
+    var hole = ev.target.closest('.hole');
+    if (!hole) return;
+    whack(parseInt(hole.dataset.idx, 10));
+  });
+
+  document.getElementById('btnNew').addEventListener('click', newGame);
+  [['lv1'], ['lv2'], ['lv3']].forEach(function (pair) {
+    var id = pair[0];
+    document.getElementById(id).addEventListener('click', function () {
+      currentLevel = id;
+      ['lv1', 'lv2', 'lv3'].forEach(function (k) {
+        document.getElementById(k).classList.toggle('active', k === id);
+      });
+      newGame();
+    });
+  });
+
+  T.onChange(function () {
+    if (lastResult) statusEl.textContent = T.t('timeUp', { n: lastResult.score });
+    else if (!playing) statusEl.textContent = T.t('clickGo');
+  });
+
+  // Initialize the game first, then apply the language (project convention).
+  buildField();
+  statusEl.textContent = T.t('clickGo');
+  T.start();
+})();
+</script>
+</body>
+</html>

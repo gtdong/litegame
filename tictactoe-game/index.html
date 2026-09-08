@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>井字棋</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --panel: #ffffff;
+    --border: #dfe3e8;
+    --text: #1f2328;
+    --muted: #6b7280;
+    --accent: #3b6ef5;
+    --good: #2e7d32;
+    --danger: #e24b4a;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    margin: 0;
+    padding: 24px 16px 40px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+  }
+
+  h1 { margin: 0 0 4px; font-size: 30px; letter-spacing: -.02em; }
+  .tip { margin: 0 0 18px; font-size: 13px; color: var(--muted); }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+    box-shadow: 0 1px 2px rgba(16,24,40,.05), 0 4px 12px rgba(16,24,40,.06);
+  }
+
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .stat {
+    background: #2f3640;
+    color: #9fd0ff;
+    font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 16px;
+    font-weight: 700;
+    padding: 5px 10px;
+    border-radius: 4px;
+    min-width: 54px;
+    text-align: center;
+  }
+
+  button {
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--text);
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 13px;
+    cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); color: var(--accent); }
+  button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  #board {
+    display: grid;
+    grid-template-columns: repeat(3, 90px);
+    gap: 6px;
+    margin: 0 auto;
+    touch-action: manipulation;
+  }
+
+  .cell {
+    width: 90px;
+    height: 90px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: #fafbfc;
+    font-size: 44px;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+    user-select: none;
+    color: var(--accent);
+    transition: background .12s ease;
+  }
+  .cell:hover:empty { background: #eef2ff; }
+  .cell.o { color: var(--danger); }
+  .cell.winCell { background: #e6f4e8 !important; color: var(--good) !important; }
+
+  #status {
+    margin-top: 14px;
+    font-size: 15px;
+    font-weight: 700;
+    min-height: 22px;
+    text-align: center;
+  }
+  #status.win { color: var(--good); }
+  #status.lose { color: var(--danger); }
+
+  @media (max-width: 560px) {
+    #board { grid-template-columns: repeat(3, 72px); }
+    .cell { width: 72px; height: 72px; font-size: 36px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="lang-switch" data-lang-switch></div>
+
+<h1 data-i18n="title"></h1>
+<p class="tip" data-i18n="tip"></p>
+
+<div class="panel">
+  <div class="bar">
+    <select id="mode">
+      <option value="ai" selected data-i18n="modeAi"></option>
+      <option value="human" data-i18n="modeHuman"></option>
+    </select>
+    <select id="level">
+      <option value="easy" data-i18n="lvEasy"></option>
+      <option value="hard" selected data-i18n="lvHard"></option>
+    </select>
+    <button id="btnNew" data-i18n="restart"></button>
+    <div class="stat" id="scoreX">0</div>
+    <div class="stat" id="scoreO">0</div>
+  </div>
+  <div id="board"></div>
+  <div id="status"></div>
+</div>
+
+<script src="../assets/i18n.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var T = LiteI18N.create({
+    title:     { en: 'Tic-Tac-Toe', zh: '井字棋' },
+    tip: {
+      en: 'Get three in a row — horizontally, vertically or diagonally. You play X.',
+      zh: '横、竖或斜连成三子即获胜，你执 X 先行。'
+    },
+    modeAi:    { en: 'vs Computer', zh: '人机对战' },
+    modeHuman: { en: 'Two players', zh: '双人对战' },
+    lvEasy:    { en: 'Easy', zh: '简单' },
+    lvHard:    { en: 'Hard', zh: '困难' },
+    restart:   { en: 'New round', zh: '新一局' },
+    yourTurn:  { en: 'Your turn (X)', zh: '轮到你了（X）' },
+    p1Turn:    { en: 'Player X to move', zh: '轮到玩家 X' },
+    p2Turn:    { en: 'Player O to move', zh: '轮到玩家 O' },
+    aiThinking:{ en: 'Computer is thinking…', zh: '电脑思考中…' },
+    youWin:    { en: 'You win! 🎉', zh: '你赢了！🎉' },
+    xWin:      { en: 'Player X wins! 🎉', zh: '玩家 X 获胜！🎉' },
+    oWin:      { en: 'Player O wins! 🎉', zh: '玩家 O 获胜！🎉' },
+    aiWin:     { en: 'Computer wins! Try again.', zh: '电脑赢了，再来一局！' },
+    draw:      { en: "It's a draw.", zh: '平局。' }
+  });
+
+  // The eight lines that win the game.
+  var LINES = [
+    [0,1,2],[3,4,5],[6,7,8],
+    [0,3,6],[1,4,7],[2,5,8],
+    [0,4,8],[2,4,6]
+  ];
+
+  var boardEl = document.getElementById('board');
+  var statusEl = document.getElementById('status');
+  var modeEl = document.getElementById('mode');
+  var levelEl = document.getElementById('level');
+  var scoreXEl = document.getElementById('scoreX');
+  var scoreOEl = document.getElementById('scoreO');
+
+  var board;        // array of 'X' | 'O' | null
+  var cellsEl = []; // button elements
+  var turn;         // 'X' always starts
+  var over;
+  var lock;         // blocks input while the AI "thinks"
+  var score = { X: 0, O: 0 };
+  var lastStatusKey;    // re-translate the banner on language switch
+  var lastWinLine = null;
+
+  /* ---------- setup ---------- */
+
+  function newRound() {
+    board = [null, null, null, null, null, null, null, null, null];
+    turn = 'X';
+    over = false;
+    lock = false;
+    lastWinLine = null;
+    statusEl.className = '';
+    boardEl.querySelectorAll('.cell').forEach(function (el) {
+      el.textContent = '';
+      el.className = 'cell';
+    });
+    paintStatus();
+  }
+
+  function buildBoard() {
+    boardEl.innerHTML = '';
+    var frag = document.createDocumentFragment();
+    for (var i = 0; i < 9; i++) {
+      var el = document.createElement('button');
+      el.className = 'cell';
+      el.dataset.idx = String(i);
+      cellsEl[i] = el;
+      frag.appendChild(el);
+    }
+    boardEl.appendChild(frag);
+  }
+
+  /* ---------- rules ---------- */
+
+  function winnerOf(b) {
+    for (var i = 0; i < LINES.length; i++) {
+      var L = LINES[i];
+      if (b[L[0]] && b[L[0]] === b[L[1]] && b[L[1]] === b[L[2]]) {
+        return { mark: b[L[0]], line: L };
+      }
+    }
+    return null;
+  }
+
+  function movesLeft(b) {
+    var out = [];
+    for (var i = 0; i < 9; i++) if (!b[i]) out.push(i);
+    return out;
+  }
+
+  /* ---------- AI ---------- */
+
+  // Hard: unbeatable minimax. Easy: 60% optimal move, 40% random.
+  function bestMove(b, mark) {
+    var empty = movesLeft(b);
+    if (!empty.length) return -1;
+
+    if (levelEl.value === 'easy' && Math.random() < 0.4) {
+      return empty[Math.floor(Math.random() * empty.length)];
+    }
+
+    var best = -Infinity, choice = empty[0];
+    empty.forEach(function (i) {
+      b[i] = mark;
+      var v = minimax(b, mark === 'X' ? 'O' : 'X', mark, 1);
+      b[i] = null;
+      if (v > best) { best = v; choice = i; }
+    });
+    return choice;
+  }
+
+  // depth is used so the AI prefers faster wins and slower losses.
+  function minimax(b, current, me, depth) {
+    var w = winnerOf(b);
+    if (w) return w.mark === me ? 10 - depth : depth - 10;
+    var empty = movesLeft(b);
+    if (!empty.length) return 0;
+
+    if (current === me) {
+      var best = -Infinity;
+      empty.forEach(function (i) {
+        b[i] = current;
+        best = Math.max(best, minimax(b, current === 'X' ? 'O' : 'X', me, depth + 1));
+        b[i] = null;
+      });
+      return best;
+    } else {
+      var worst = Infinity;
+      empty.forEach(function (i) {
+        b[i] = current;
+        worst = Math.min(worst, minimax(b, current === 'X' ? 'O' : 'X', me, depth + 1));
+        b[i] = null;
+      });
+      return worst;
+    }
+  }
+
+  /* ---------- game flow ---------- */
+
+  function place(i, mark) {
+    board[i] = mark;
+    var el = cellsEl[i];
+    el.textContent = mark;
+    if (mark === 'O') el.classList.add('o');
+  }
+
+  function humanClick(i) {
+    if (over || lock || board[i]) return;
+    var vsAi = modeEl.value === 'ai';
+    if (vsAi && turn === 'O') return; // not your move
+
+    place(i, turn);
+    if (finishOrContinue()) return;
+
+    turn = turn === 'X' ? 'O' : 'X';
+    paintStatus();
+
+    if (vsAi && turn === 'O') aiMove();
+  }
+
+  function aiMove() {
+    lock = true;
+    statusEl.textContent = T.t('aiThinking');
+    statusEl.className = '';
+    setTimeout(function () {
+      var i = bestMove(board, 'O');
+      lock = false;
+      if (over || i < 0) return;
+      place(i, 'O');
+      if (finishOrContinue()) return;
+      turn = 'X';
+      paintStatus();
+    }, 350);
+  }
+
+  // Returns true when the round ended (win or draw).
+  function finishOrContinue() {
+    var w = winnerOf(board);
+    if (w) {
+      over = true;
+      score[w.mark]++;
+      updateScore();
+      lastWinLine = w.line;
+      highlightWin(w.line);
+      var vsAi = modeEl.value === 'ai';
+      if (vsAi) {
+        lastStatusKey = w.mark === 'X' ? 'youWin' : 'aiWin';
+        statusEl.className = w.mark === 'X' ? 'win' : 'lose';
+      } else {
+        lastStatusKey = w.mark === 'X' ? 'xWin' : 'oWin';
+        statusEl.className = w.mark === 'X' ? 'win' : 'lose';
+      }
+      statusEl.textContent = T.t(lastStatusKey);
+      return true;
+    }
+    if (!movesLeft(board).length) {
+      over = true;
+      lastStatusKey = 'draw';
+      statusEl.textContent = T.t('draw');
+      return true;
+    }
+    return false;
+  }
+
+  function highlightWin(line) {
+    line.forEach(function (i) {
+      cellsEl[i].classList.add('winCell');
+    });
+  }
+
+  function updateScore() {
+    scoreXEl.textContent = String(score.X);
+    scoreOEl.textContent = String(score.O);
+  }
+
+  function paintStatus() {
+    var vsAi = modeEl.value === 'ai';
+    lastStatusKey = vsAi ? 'yourTurn' : (turn === 'X' ? 'p1Turn' : 'p2Turn');
+    statusEl.textContent = T.t(lastStatusKey);
+  }
+
+  /* ---------- input wiring ---------- */
+
+  boardEl.addEventListener('click', function (ev) {
+    var el = ev.target.closest('.cell');
+    if (!el) return;
+    humanClick(parseInt(el.dataset.idx, 10));
+  });
+
+  document.getElementById('btnNew').addEventListener('click', newRound);
+  modeEl.addEventListener('change', newRound);
+  levelEl.addEventListener('change', newRound);
+
+  T.onChange(function () {
+    if (lastStatusKey && !over) statusEl.textContent = T.t(lastStatusKey);
+    else if (lastStatusKey) statusEl.textContent = T.t(lastStatusKey);
+  });
+
+  // Initialize the game first, then apply the language (project convention).
+  buildBoard();
+  newRound();
+  T.start();
+})();
+</script>
+</body>
+</html>

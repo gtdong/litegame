@@ -214,8 +214,20 @@ function smoke(dir) {
     env.fireWin('keydown', ev);
   }));
 
-  Object.keys(env.els).forEach(id => poke(`click #${id}`,
-    () => env.els[id].fire('click', {})));
+  // Fire on the element itself and on its classed children, because delegated
+  // handlers (board.addEventListener('click') + ev.target.closest('.cell'))
+  // need a realistic ev.target to be exercised at all.
+  Object.keys(env.els).forEach(id => {
+    const el = env.els[id];
+    poke(`click #${id}`, () =>
+      el.fire('click', { target: el, button: 0, preventDefault() {} }));
+    el.children.forEach((c, ci) => {
+      if (c && c._cls && c._cls.size) {
+        poke(`click #${id} > .${[...c._cls].join('.')} #${ci}`, () =>
+          el.fire('click', { target: c, button: 0, preventDefault() {} }));
+      }
+    });
+  });
 
   for (let i = 0; i < 40; i++) poke('frame', () => env.step());
 

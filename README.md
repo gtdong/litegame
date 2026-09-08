@@ -16,4 +16,7 @@ Play online: <https://litegame-hub.github.io/>
 - [2048-game](2048-game) — 2048 (slide and merge)
 - [minesweeper-game](minesweeper-game) — Minesweeper (three difficulties)
 - [breakout-game](breakout-game) — Breakout (paddle and bricks)
+- [memory-game](memory-game) — Memory Match (flip and pair)
+- [tictactoe-game](tictactoe-game) — Tic-Tac-Toe (vs AI or two players)
+- [whackmole-game](whackmole-game) — Whack-a-Mole (timed rounds)
 

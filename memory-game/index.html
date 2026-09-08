@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>记忆翻牌</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --panel: #ffffff;
+    --border: #dfe3e8;
+    --text: #1f2328;
+    --muted: #6b7280;
+    --accent: #3b6ef5;
+    --good: #2e7d32;
+    --card-back: #3b6ef5;
+    --card-face: #eef2ff;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    margin: 0;
+    padding: 24px 16px 40px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+  }
+
+  h1 { margin: 0 0 4px; font-size: 30px; letter-spacing: -.02em; }
+  .tip { margin: 0 0 18px; font-size: 13px; color: var(--muted); }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+    box-shadow: 0 1px 2px rgba(16,24,40,.05), 0 4px 12px rgba(16,24,40,.06);
+  }
+
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .stat {
+    background: #2f3640;
+    color: #ffd66b;
+    font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 16px;
+    font-weight: 700;
+    padding: 5px 10px;
+    border-radius: 4px;
+    min-width: 70px;
+    text-align: center;
+  }
+
+  button {
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--text);
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 13px;
+    cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); color: var(--accent); }
+  button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  /* Card grid: back is a solid tile, face shows the emoji */
+  #board {
+    display: grid;
+    gap: 8px;
+    margin: 0 auto;
+    touch-action: manipulation;
+  }
+
+  .card {
+    width: 64px;
+    height: 64px;
+    border: 0;
+    border-radius: 8px;
+    padding: 0;
+    background: var(--card-back);
+    font-size: 30px;
+    line-height: 1;
+    cursor: pointer;
+    user-select: none;
+    transition: transform .15s ease, background .15s ease;
+    box-shadow: inset 0 -3px 0 rgba(0,0,0,.18), inset 0 2px 0 rgba(255,255,255,.25);
+    /* Keep emoji invisible while face-down */
+    color: transparent;
+    overflow: hidden;
+  }
+  .card:hover { transform: translateY(-2px); }
+
+  .card.face { background: var(--card-face); color: var(--text); cursor: default; }
+
+  .card.done {
+    background: #e6f4e8;
+    color: var(--good);
+    cursor: default;
+    box-shadow: none;
+    opacity: .8;
+  }
+
+  .card.wrong { background: #fde8e8; color: var(--text); }
+
+  #status {
+    margin-top: 14px;
+    font-size: 15px;
+    font-weight: 700;
+    min-height: 22px;
+  }
+  #status.win { color: var(--good); }
+
+  @media (max-width: 560px) {
+    .card { width: 52px; height: 52px; font-size: 24px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="lang-switch" data-lang-switch></div>
+
+<h1 data-i18n="title"></h1>
+<p class="tip" data-i18n="tip"></p>
+
+<div class="panel">
+  <div class="bar">
+    <button id="lv4" class="active" data-i18n="lv4"></button>
+    <button id="lv6" data-i18n="lv6"></button>
+    <button id="lv8" data-i18n="lv8"></button>
+    <button id="btnNew" data-i18n="restart"></button>
+    <div class="stat" id="moves">0</div>
+    <div class="stat" id="timer">0s</div>
+  </div>
+  <div id="board"></div>
+  <div id="status"></div>
+</div>
+
+<script src="../assets/i18n.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var T = LiteI18N.create({
+    title:   { en: 'Memory Match', zh: '记忆翻牌' },
+    tip: {
+      en: 'Flip two cards at a time and match every pair in as few moves as you can',
+      zh: '每次翻开两张牌，用最少的步数配对所有成对的牌'
+    },
+    lv4:     { en: '4×4', zh: '4×4' },
+    lv6:     { en: '6×5', zh: '6×5' },
+    lv8:     { en: '8×5', zh: '8×5' },
+    restart: { en: 'New game', zh: '重新开始' },
+    moves:   { en: '{n} moves', zh: '{n} 步' },
+    won:     { en: 'Cleared in {n} moves · {sec}s!', zh: '通关！{n} 步 · 用时 {sec} 秒！' }
+  });
+
+  // Emoji pairs; larger boards take more distinct symbols from the front.
+  var SYMBOLS = ['🍎','🍌','🍇','🍒','🥕','🌽','🐶','🐱','🐼','🦊','🐸','🐙',
+                 '🚗','✈️','⚽','🏀','🎸','🎲','🌞','🌙'];
+
+  var LEVELS = { lv4: { cols: 4, rows: 4 }, lv6: { cols: 6, rows: 5 }, lv8: { cols: 8, rows: 5 } };
+
+  var boardEl = document.getElementById('board');
+  var movesEl = document.getElementById('moves');
+  var timerEl = document.getElementById('timer');
+  var statusEl = document.getElementById('status');
+
+  var cells;        // { sym, el, done } per card, laid out row by row
+  var cols, rows;
+  var first;        // currently flipped first card (not yet resolved)
+  var lock;         // true while showing a mismatched pair
+  var moves;
+  var matched;
+  var seconds;
+  var timerId;
+  var over;
+  var lastResult;
+
+  /* ---------- setup ---------- */
+
+  function newGame(levelId) {
+    var cfg = LEVELS[levelId || 'lv4'];
+    cols = cfg.cols;
+    rows = cfg.rows;
+
+    var pairs = cols * rows / 2;
+    var pool = SYMBOLS.slice(0, pairs);
+
+    // Build the deck: each symbol twice, then Fisher-Yates shuffle.
+    var deck = [];
+    pool.forEach(function (s) { deck.push(s, s); });
+    for (var i = deck.length - 1; i > 0; i--) {
+      var k = Math.floor(Math.random() * (i + 1));
+      var t = deck[i]; deck[i] = deck[k]; deck[k] = t;
+    }
+
+    cells = deck.map(function (sym) { return { sym: sym, el: null, done: false }; });
+    first = null;
+    lock = false;
+    moves = 0;
+    matched = 0;
+    seconds = 0;
+    over = false;
+    lastResult = null;
+    stopTimer();
+
+    statusEl.textContent = '';
+    statusEl.className = '';
+    movesEl.textContent = '0';
+    timerEl.textContent = '0s';
+
+    boardEl.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
+    boardEl.innerHTML = '';
+    var frag = document.createDocumentFragment();
+    cells.forEach(function (cell, i) {
+      var el = document.createElement('button');
+      el.className = 'card';
+      el.dataset.idx = String(i);
+      el.textContent = cell.sym; // hidden while face-down via transparent color
+      cell.el = el;
+      frag.appendChild(el);
+    });
+    boardEl.appendChild(frag);
+  }
+
+  /* ---------- timer ---------- */
+
+  function startTimer() {
+    if (timerId) return;
+    timerId = setInterval(function () {
+      seconds++;
+      timerEl.textContent = seconds + 's';
+    }, 1000);
+  }
+
+  function stopTimer() {
+    if (timerId) { clearInterval(timerId); timerId = null; }
+  }
+
+  /* ---------- core ---------- */
+
+  function flip(i) {
+    if (over || lock) return;
+    var cell = cells[i];
+    if (cell.done || cell === first) return;
+
+    startTimer();
+    cell.el.classList.add('face');
+
+    if (!first) { first = cell; return; }
+
+    moves++;
+    movesEl.textContent = String(moves);
+
+    if (first.sym === cell.sym) {
+      // Match: lock both cards as done and keep looking.
+      first.done = true;
+      cell.done = true;
+      first.el.classList.remove('face');
+      cell.el.classList.remove('face');
+      first.el.classList.add('done');
+      cell.el.classList.add('done');
+      first = null;
+      matched++;
+      if (matched === cells.length / 2) win();
+    } else {
+      // Mismatch: flash both, flip back after a short pause.
+      var a = first, b = cell;
+      first = null;
+      lock = true;
+      a.el.classList.add('wrong');
+      b.el.classList.add('wrong');
+      setTimeout(function () {
+        a.el.classList.remove('face', 'wrong');
+        b.el.classList.remove('face', 'wrong');
+        lock = false;
+      }, 700);
+    }
+  }
+
+  function win() {
+    over = true;
+    stopTimer();
+    lastResult = { moves: moves, seconds: seconds };
+    statusEl.textContent = T.t('won', { n: moves, sec: seconds });
+    statusEl.className = 'win';
+  }
+
+  /* ---------- input wiring ---------- */
+
+  boardEl.addEventListener('click', function (ev) {
+    var el = ev.target.closest('.card');
+    if (!el) return;
+    flip(parseInt(el.dataset.idx, 10));
+  });
+
+  document.getElementById('btnNew').addEventListener('click', function () {
+    newGame(currentLevel());
+  });
+  [['lv4'], ['lv6'], ['lv8']].forEach(function (pair) {
+    var id = pair[0];
+    document.getElementById(id).addEventListener('click', function () {
+      setActiveLevel(id);
+      newGame(id);
+    });
+  });
+
+  function currentLevel() {
+    var ids = ['lv4', 'lv6', 'lv8'];
+    for (var i = 0; i < ids.length; i++) {
+      if (document.getElementById(ids[i]).classList.contains('active')) return ids[i];
+    }
+    return 'lv4';
+  }
+
+  function setActiveLevel(id) {
+    ['lv4', 'lv6', 'lv8'].forEach(function (k) {
+      document.getElementById(k).classList.toggle('active', k === id);
+    });
+  }
+
+  T.onChange(function () {
+    if (!lastResult) return;
+    statusEl.textContent = T.t('won', { n: lastResult.moves, sec: lastResult.seconds });
+  });
+
+  // Initialize the game first, then apply the language (project convention).
+  newGame('lv4');
+  T.start();
+})();
+</script>
+</body>
+</html>
