@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>litegame — HTML5 mini games</title>
+<style>
+  /* Base tokens: light theme */
+  :root {
+    --bg: #f7f8fa;
+    --card: #ffffff;
+    --border: #e3e6ea;
+    --text: #1f2328;
+    --muted: #6b7280;
+    --accent: #3b6ef5;
+    --shadow: 0 1px 2px rgba(16, 24, 40, .05), 0 4px 12px rgba(16, 24, 40, .06);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 48px 24px 64px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 900px; margin: 0 auto; }
+
+  /* Language switch, left aligned to match the READMEs */
+  .lang {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    font-size: 14px;
+    margin-bottom: 28px;
+  }
+  .lang a {
+    color: var(--muted);
+    text-decoration: none;
+    padding: 3px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--card);
+  }
+  .lang a:hover { color: var(--accent); border-color: var(--accent); }
+  .lang a.active { color: #fff; background: var(--accent); border-color: var(--accent); }
+
+  header h1 {
+    margin: 0 0 8px;
+    font-size: 32px;
+    letter-spacing: -.02em;
+  }
+  header p {
+    margin: 0 0 36px;
+    color: var(--muted);
+    font-size: 16px;
+  }
+
+  /* Game cards */
+  .games {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 18px;
+  }
+  .card {
+    display: flex;
+    flex-direction: column;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 22px;
+    text-decoration: none;
+    color: inherit;
+    box-shadow: var(--shadow);
+    transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+  }
+  .card:hover {
+    transform: translateY(-3px);
+    border-color: var(--accent);
+    box-shadow: 0 6px 20px rgba(59, 110, 245, .16);
+  }
+  .card .icon { font-size: 34px; line-height: 1; margin-bottom: 12px; }
+  .card h2 { margin: 0 0 6px; font-size: 18px; }
+  .card p { margin: 0 0 16px; color: var(--muted); font-size: 14px; flex: 1; }
+  .card .go {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent);
+  }
+
+  footer {
+    margin-top: 44px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 13px;
+  }
+  footer a { color: var(--accent); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+
+  /* Hide the inactive language block */
+  [data-lang] { display: none; }
+  [data-lang].on { display: block; }
+  [data-lang].inline { display: inline; }
+  [data-lang].inline.on { display: inline; }
+
+  @media (max-width: 520px) {
+    body { padding: 32px 16px 48px; }
+    header h1 { font-size: 26px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="lang">
+    <a href="#" data-switch="en" class="active">English</a>
+    <a href="#" data-switch="zh">简体中文</a>
+  </div>
+
+  <header>
+    <h1>
+      <span data-lang="en" class="inline on">litegame</span>
+      <span data-lang="zh" class="inline">litegame</span>
+    </h1>
+    <p>
+      <span data-lang="en" class="inline on">A collection of HTML5 mini games. Zero dependencies — just click and play.</span>
+      <span data-lang="zh" class="inline">HTML5 小游戏合集，零依赖，点开即玩。</span>
+    </p>
+  </header>
+
+  <div class="games">
+
+    <a class="card" href="snake-game/">
+      <div class="icon">🐍</div>
+      <h2>
+        <span data-lang="en" class="inline on">Snake</span>
+        <span data-lang="zh" class="inline">贪吃蛇</span>
+      </h2>
+      <p>
+        <span data-lang="en" class="inline on">Eat food, grow longer, don't hit the wall or yourself. Keyboard or swipe controls.</span>
+        <span data-lang="zh" class="inline">吃食物变长，别撞墙、别咬到自己。支持键盘与滑动操作。</span>
+      </p>
+      <div class="go">
+        <span data-lang="en" class="inline on">Play →</span>
+        <span data-lang="zh" class="inline">开始游戏 →</span>
+      </div>
+    </a>
+
+    <a class="card" href="gomoku-game/">
+      <div class="icon">⚫</div>
+      <h2>
+        <span data-lang="en" class="inline on">Gomoku</span>
+        <span data-lang="zh" class="inline">五子棋</span>
+      </h2>
+      <p>
+        <span data-lang="en" class="inline on">Five in a row on a 15×15 board, with Renju forbidden-move rules. Play against a friend or the AI.</span>
+        <span data-lang="zh" class="inline">15×15 棋盘连成五子，含三三 / 四四 / 长连禁手。支持双人对战与人机对战。</span>
+      </p>
+      <div class="go">
+        <span data-lang="en" class="inline on">Play →</span>
+        <span data-lang="zh" class="inline">开始游戏 →</span>
+      </div>
+    </a>
+
+    <a class="card" href="xiangqi-game/">
+      <div class="icon">♟️</div>
+      <h2>
+        <span data-lang="en" class="inline on">Chinese Chess</span>
+        <span data-lang="zh" class="inline">中国象棋</span>
+      </h2>
+      <p>
+        <span data-lang="en" class="inline on">Xiangqi against a built-in engine with three difficulty levels. Undo, export and more.</span>
+        <span data-lang="zh" class="inline">与内置引擎对战，三档难度可选。支持悔棋、导出棋谱等。</span>
+      </p>
+      <div class="go">
+        <span data-lang="en" class="inline on">Play →</span>
+        <span data-lang="zh" class="inline">开始游戏 →</span>
+      </div>
+    </a>
+
+  </div>
+
+  <footer>
+    <span data-lang="en" class="inline on">Built for fun · <a href="https://github.com/gtdong/litegame">View source on GitHub</a></span>
+    <span data-lang="zh" class="inline">随便玩玩 · <a href="https://github.com/gtdong/litegame">在 GitHub 查看源码</a></span>
+  </footer>
+
+</div>
+
+<script>
+  // Language switch: remembers the choice in localStorage, falls back to the browser locale.
+  (function () {
+    var blocks = document.querySelectorAll('[data-lang]');
+    var links  = document.querySelectorAll('[data-switch]');
+
+    function apply(lang) {
+      blocks.forEach(function (el) {
+        el.classList.toggle('on', el.getAttribute('data-lang') === lang);
+      });
+      links.forEach(function (a) {
+        a.classList.toggle('active', a.getAttribute('data-switch') === lang);
+      });
+      document.documentElement.lang = lang;
+    }
+
+    var saved = null;
+    try { saved = localStorage.getItem('litegame_lang'); } catch (e) {}
+    var auto = (navigator.language || '').toLowerCase().indexOf('zh') === 0 ? 'zh' : 'en';
+    apply(saved || auto);
+
+    links.forEach(function (a) {
+      a.addEventListener('click', function (ev) {
+        ev.preventDefault();
+        var lang = a.getAttribute('data-switch');
+        apply(lang);
+        try { localStorage.setItem('litegame_lang', lang); } catch (e) {}
+      });
+    });
+  })();
+</script>
+</body>
+</html>
