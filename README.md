@@ -6,7 +6,7 @@
 
 A collection of AI-generated HTML5 mini games. Zero dependencies — just open `index.html` in a browser.
 
-Play online: <https://gtdong.github.io/>
+Play online: <https://litegame-hub.github.io/>
 
 ## Games
 
