@@ -22,3 +22,5 @@ The classic 2048: slide tiles to merge equal numbers and reach 2048.
 ## Run
 
 Just open `index.html` in a browser. Zero dependencies.
+
+The game has a built-in English / 简体中文 switch at the top; your choice is remembered in `localStorage`.

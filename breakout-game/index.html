@@ -97,32 +97,63 @@
 </head>
 <body>
 
-<h1>打砖块</h1>
-<p class="tip">鼠标移动 / ← → 键 / 手指拖动 控制挡板<br>挡住小球，打掉所有砖块</p>
+<div class="lang-switch" data-lang-switch></div>
+
+<h1 data-i18n="title"></h1>
+<p class="tip" data-i18n-html="tip"></p>
 
 <div class="panel">
   <div class="hud">
-    <div>得分 <b id="score">0</b></div>
-    <div>生命 <b id="lives">3</b> · 关卡 <b id="level">1</b></div>
+    <div><span data-i18n="score"></span> <b id="score">0</b></div>
+    <div><span data-i18n="lives"></span> <b id="lives">3</b> · <span data-i18n="level"></span> <b id="level">1</b></div>
     <div class="right">
-      <button id="btnPause">暂停</button>
-      <button id="btnNew">重新开始</button>
+      <button id="btnPause" data-i18n="pause"></button>
+      <button id="btnNew" data-i18n="restart"></button>
     </div>
   </div>
 
   <div class="stage">
     <canvas id="cv" width="480" height="320"></canvas>
     <div id="overlay">
-      <div class="msg" id="ovMsg">准备好了吗？</div>
-      <div class="sub" id="ovSub">点击开始</div>
-      <button id="ovBtn">开始游戏</button>
+      <div class="msg" id="ovMsg"></div>
+      <div class="sub" id="ovSub"></div>
+      <button id="ovBtn"></button>
     </div>
   </div>
 </div>
 
+<script src="../assets/i18n.js"></script>
 <script>
 (function () {
   'use strict';
+
+  var T = LiteI18N.create({
+    title:   { en: 'Breakout', zh: '打砖块' },
+    tip: {
+      en: 'Move the mouse / press ← → / drag your finger to steer the paddle<br>Keep the ball alive and clear every brick',
+      zh: '鼠标移动 / ← → 键 / 手指拖动 控制挡板<br>挡住小球，打掉所有砖块'
+    },
+    score:   { en: 'Score', zh: '得分' },
+    lives:   { en: 'Lives', zh: '生命' },
+    level:   { en: 'Level', zh: '关卡' },
+    pause:   { en: 'Pause', zh: '暂停' },
+    resume:  { en: 'Resume', zh: '继续' },
+    restart: { en: 'New game', zh: '重新开始' },
+    ready:   { en: 'Ready?', zh: '准备好了吗？' },
+    readySub:{ en: 'Press start, or hit space to launch', zh: '点击开始，或按空格发小球' },
+    start:   { en: 'Start', zh: '开始游戏' },
+    lvTitle: { en: 'Level {n}', zh: '第 {n} 关' },
+    lvSub:   { en: 'The ball is faster now, stay sharp', zh: '球速变快了，小心点' },
+    cont:    { en: 'Continue', zh: '继续' },
+    paused:  { en: 'Paused', zh: '已暂停' },
+    pausedSub:{ en: 'Click to resume', zh: '点击继续' },
+    over:    { en: 'Game over', zh: '游戏结束' },
+    overSub: { en: 'Final score {n}', zh: '最终得分 {n}' },
+    again:   { en: 'Play again', zh: '再来一局' },
+    clear:   { en: 'Level clear!', zh: '过关！' },
+    clearSub:{ en: 'Score {n} — on to level {m}', zh: '得分 {n}，进入第 {m} 关' },
+    next:    { en: 'Next level', zh: '下一关' }
+  });
 
   var W = 480, H = 320;
   var PADDLE_W = 84, PADDLE_H = 10, PADDLE_Y = H - 26;
@@ -148,6 +179,7 @@
   var ROW_COLORS = ['#e24b4a', '#ef9f27', '#639922', '#378add', '#7f77dd'];
 
   var paddle, ball, bricks, score, lives, level, state, rafId;
+  var overlayKind;   // which overlay is showing, so it can be re-translated
   var keys = { left: false, right: false };
 
   /* ---------- canvas scaling ---------- */
@@ -203,7 +235,7 @@
     level = 1;
     resetRound();
     updateHud();
-    showOverlay('准备好了吗？', '点击开始，或按空格发小球', '开始游戏');
+    showOverlay('ready');
     state = 'ready';
   }
 
@@ -211,7 +243,7 @@
     level++;
     resetRound();
     updateHud();
-    showOverlay('第 ' + level + ' 关', '球速变快了，小心点', '继续');
+    showOverlay('level');
     state = 'ready';
   }
 
@@ -223,7 +255,17 @@
     levelEl.textContent = level;
   }
 
-  function showOverlay(msg, sub, btn) {
+  // Overlay content is derived from the game state so it can be re-translated.
+  function showOverlay(kind) {
+    overlayKind = kind;
+    var msg, sub, btn;
+
+    if (kind === 'ready') { msg = T.t('ready'); sub = T.t('readySub'); btn = T.t('start'); }
+    else if (kind === 'level') { msg = T.t('lvTitle', { n: level }); sub = T.t('lvSub'); btn = T.t('cont'); }
+    else if (kind === 'paused') { msg = T.t('paused'); sub = T.t('pausedSub'); btn = T.t('cont'); }
+    else if (kind === 'over') { msg = T.t('over'); sub = T.t('overSub', { n: score }); btn = T.t('again'); }
+    else if (kind === 'cleared') { msg = T.t('clear'); sub = T.t('clearSub', { n: score, m: level + 1 }); btn = T.t('next'); }
+
     ovMsgEl.textContent = msg;
     ovSubEl.textContent = sub;
     ovBtnEl.textContent = btn;
@@ -231,6 +273,7 @@
   }
 
   function hideOverlay() {
+    overlayKind = null;
     overlayEl.classList.add('hide');
   }
 
@@ -296,7 +339,7 @@
       updateHud();
       if (lives <= 0) {
         state = 'over';
-        showOverlay('游戏结束', '最终得分 ' + score, '再来一局');
+        showOverlay('over');
         return;
       }
       ball.stuck = true;
@@ -306,7 +349,7 @@
     // Cleared the level.
     if (!bricks.some(function (b) { return b.alive; })) {
       state = 'cleared';
-      showOverlay('过关！', '得分 ' + score + '，进入第 ' + (level + 1) + ' 关', '下一关');
+      showOverlay('cleared');
       cancelAnimationFrame(rafId);
       rafId = 0;
     }
@@ -358,7 +401,7 @@
     cancelAnimationFrame(rafId);
     rafId = 0;
     state = 'paused';
-    showOverlay('已暂停', '点击继续', '继续');
+    showOverlay('paused');
   }
 
   /* ---------- input ---------- */
@@ -411,12 +454,12 @@
   });
 
   btnPause.addEventListener('click', function () {
-    if (state === 'playing') { pause(); btnPause.textContent = '继续'; }
-    else if (state === 'paused') { start(); btnPause.textContent = '暂停'; }
+    if (state === 'playing') { pause(); btnPause.textContent = T.t('resume'); }
+    else if (state === 'paused') { start(); btnPause.textContent = T.t('pause'); }
   });
 
   document.getElementById('btnNew').addEventListener('click', function () {
-    btnPause.textContent = '暂停';
+    btnPause.textContent = T.t('pause');
     newGame();
   });
 
@@ -429,7 +472,13 @@
     draw();
   });
 
+  T.onChange(function () {
+    if (overlayKind) showOverlay(overlayKind);
+    btnPause.textContent = (state === 'paused') ? T.t('resume') : T.t('pause');
+  });
+
   setupCanvas();
+  T.start();
   newGame();
 })();
 </script>

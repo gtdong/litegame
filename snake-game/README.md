@@ -18,3 +18,5 @@ Classic Snake on a 24x24 grid.
 - Each food is worth 10 points; the snake grows and speeds up slightly
 - Hitting a wall or the snake's own body ends the game
 - The best score is stored in localStorage under the key `snake_best_score`
+
+The game has a built-in English / 简体中文 switch at the top; your choice is remembered in `localStorage`.

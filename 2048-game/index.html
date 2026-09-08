@@ -135,28 +135,31 @@
 </head>
 <body>
 
+<div class="lang-switch" data-lang-switch></div>
+
 <h1>2048</h1>
 
 <div class="top">
-  <div class="hint">方向键 或 滑动 移动方块<br>相同数字合并，凑出 2048</div>
+  <div class="hint" data-i18n-html="hint"></div>
   <div class="scores">
-    <div class="score-box"><div class="label">得分</div><div class="value" id="score">0</div></div>
-    <div class="score-box"><div class="label">最高</div><div class="value" id="best">0</div></div>
+    <div class="score-box"><div class="label" data-i18n="score"></div><div class="value" id="score">0</div></div>
+    <div class="score-box"><div class="label" data-i18n="best"></div><div class="value" id="best">0</div></div>
   </div>
 </div>
 
 <div class="bar">
-  <button id="btnNew">重新开始</button>
-  <button id="btnUndo">撤销一步</button>
+  <button id="btnNew" data-i18n="restart"></button>
+  <button id="btnUndo" data-i18n="undo"></button>
 </div>
 
 <div id="board">
   <div id="overlay">
     <div class="msg" id="overlayMsg"></div>
-    <button id="overlayBtn">再来一局</button>
+    <button id="overlayBtn"></button>
   </div>
 </div>
 
+<script src="../assets/i18n.js"></script>
 <script>
 (function () {
   'use strict';
@@ -164,6 +167,21 @@
   var SIZE = 4;
   var TARGET = 2048;
   var STORE_KEY = 'game2048_best';
+
+  var T = LiteI18N.create({
+    hint: {
+      en: 'Arrow keys or swipe to move tiles<br>Merge equal numbers to reach 2048',
+      zh: '方向键 或 滑动 移动方块<br>相同数字合并，凑出 2048'
+    },
+    score:   { en: 'Score', zh: '得分' },
+    best:    { en: 'Best', zh: '最高' },
+    restart: { en: 'New game', zh: '重新开始' },
+    undo:    { en: 'Undo', zh: '撤销一步' },
+    win:     { en: 'You win!', zh: '你赢了！' },
+    over:    { en: 'Game over', zh: '游戏结束' },
+    keep:    { en: 'Keep going', zh: '继续挑战' },
+    again:   { en: 'Play again', zh: '再来一局' }
+  });
 
   var boardEl = document.getElementById('board');
   var scoreEl = document.getElementById('score');
@@ -352,10 +370,10 @@
 
     if (reachedTarget()) {
       state = 'won';
-      showOverlay('你赢了！', true);
+      showOverlay('won', true);
     } else if (!movesAvailable()) {
       state = 'over';
-      showOverlay('游戏结束', false);
+      showOverlay('over', false);
     }
   }
 
@@ -447,9 +465,9 @@
     bestEl.textContent = best;
   }
 
-  function showOverlay(msg, keepPlaying) {
-    overlayMsgEl.textContent = msg;
-    overlayBtnEl.textContent = keepPlaying ? '继续挑战' : '再来一局';
+  function showOverlay(kind, keepPlaying) {
+    overlayMsgEl.textContent = kind === 'won' ? T.t('win') : T.t('over');
+    overlayBtnEl.textContent = keepPlaying ? T.t('keep') : T.t('again');
     overlayEl.dataset.keep = keepPlaying ? '1' : '0';
     overlayEl.classList.add('show');
   }
@@ -539,7 +557,13 @@
 
   window.addEventListener('resize', function () { render(); });
 
+  T.onChange(function () {
+    if (state === 'won') showOverlay('won', true);
+    else if (state === 'over') showOverlay('over', false);
+  });
+
   best = loadBest();
+  T.start();
   newGame();
 })();
 </script>

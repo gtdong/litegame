@@ -139,11 +139,13 @@
 </head>
 <body>
 
+  <div class="lang-switch" data-lang-switch></div>
+
   <!-- Topbar: current score / best score -->
   <div class="topbar">
-    <span><span class="label">分数</span><span class="value score" id="score">0</span></span>
-    <span class="hint" id="hint">方向键 / WASD 移动 · 空格暂停</span>
-    <span><span class="label">最高分</span><span class="value best" id="best">0</span></span>
+    <span><span class="label" data-i18n="score"></span><span class="value score" id="score">0</span></span>
+    <span class="hint" id="hint" data-i18n="hint"></span>
+    <span><span class="label" data-i18n="best"></span><span class="value best" id="best">0</span></span>
   </div>
 
   <!-- Game area -->
@@ -152,34 +154,54 @@
 
     <!-- Start screen -->
     <div class="overlay" id="startOverlay">
-      <h1>贪吃蛇</h1>
-      <p class="sub">
-        <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> 或 <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 控制方向<br>
-        手机上直接滑动屏幕即可转向
-      </p>
-      <button class="btn" id="startBtn">开始游戏</button>
-      <p class="key-hint">按 <kbd>Enter</kbd> 也可以开始</p>
+      <h1 data-i18n="title"></h1>
+      <p class="sub" data-i18n-html="startSub"></p>
+      <button class="btn" id="startBtn" data-i18n="start"></button>
+      <p class="key-hint" data-i18n-html="startKey"></p>
     </div>
 
     <!-- Game over screen -->
     <div class="overlay hidden" id="gameOverOverlay">
-      <h1>游戏结束</h1>
+      <h1 data-i18n="over"></h1>
       <div class="final-score" id="finalScore">0</div>
-      <div class="record-tip hidden" id="recordTip">🎉 新纪录！</div>
-      <p class="sub" id="finalBest">最高分：0</p>
-      <button class="btn" id="restartBtn">再来一局</button>
-      <p class="key-hint">按 <kbd>Enter</kbd> 重新开始</p>
+      <div class="record-tip hidden" id="recordTip" data-i18n="record"></div>
+      <p class="sub" id="finalBest"></p>
+      <button class="btn" id="restartBtn" data-i18n="again"></button>
+      <p class="key-hint" data-i18n-html="againKey"></p>
     </div>
 
     <!-- Pause screen -->
     <div class="overlay hidden" id="pauseOverlay">
-      <h1>已暂停</h1>
-      <p class="key-hint">按 <kbd>空格</kbd> 继续</p>
+      <h1 data-i18n="paused"></h1>
+      <p class="key-hint" data-i18n-html="pausedKey"></p>
     </div>
   </div>
 
+<script src="../assets/i18n.js"></script>
 <script>
 (function () {
+  'use strict';
+
+  var T = LiteI18N.create({
+    score:     { en: 'Score', zh: '分数' },
+    best:      { en: 'Best', zh: '最高分' },
+    hint:      { en: 'Arrows / WASD to move · Space to pause', zh: '方向键 / WASD 移动 · 空格暂停' },
+    title:     { en: 'Snake', zh: '贪吃蛇' },
+    startSub: {
+      en: 'Use <kbd>&uarr;</kbd><kbd>&darr;</kbd><kbd>&larr;</kbd><kbd>&rarr;</kbd> or <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> to steer<br>On mobile just swipe to turn',
+      zh: '<kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> 或 <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 控制方向<br>手机上直接滑动屏幕即可转向'
+    },
+    start:     { en: 'Start', zh: '开始游戏' },
+    startKey:  { en: 'Or press <kbd>Enter</kbd>', zh: '按 <kbd>Enter</kbd> 也可以开始' },
+    over:      { en: 'Game over', zh: '游戏结束' },
+    record:    { en: 'New record!', zh: '🎉 新纪录！' },
+    bestLine:  { en: 'Best: {n}', zh: '最高分：{n}' },
+    again:     { en: 'Play again', zh: '再来一局' },
+    againKey:  { en: 'Press <kbd>Enter</kbd> to restart', zh: '按 <kbd>Enter</kbd> 重新开始' },
+    paused:    { en: 'Paused', zh: '已暂停' },
+    pausedKey: { en: 'Press <kbd>Space</kbd> to resume', zh: '按 <kbd>空格</kbd> 继续' }
+  });
+
   'use strict';
 
   /* ============================================================
@@ -340,7 +362,7 @@
     updateHud();
 
     finalScoreEl.textContent = state.score;
-    finalBestEl.textContent = '最高分：' + state.best;
+    finalBestEl.textContent = T.t('bestLine', { n: state.best });
     gameOverOverlay.classList.remove('hidden');
   }
 
@@ -614,6 +636,11 @@
     render();
   }
 
+  T.onChange(function () {
+    finalBestEl.textContent = T.t('bestLine', { n: state.best });
+  });
+
+  T.start();
   init();
 })();
 </script>

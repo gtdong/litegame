@@ -18,3 +18,5 @@
 - 每吃一个食物得 10 分，蛇身变长、速度略微提升
 - 撞墙或撞到自身即结束
 - 最高分保存在浏览器 localStorage（键名 `snake_best_score`）
+
+游戏顶部自带「English / 简体中文」切换，选择会记在 `localStorage` 里，下次打开自动沿用。

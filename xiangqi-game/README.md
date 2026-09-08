@@ -24,3 +24,5 @@ Player-vs-computer Chinese chess on a 10x9 board, powered by a built-in negamax 
 
 - Pure front-end, zero dependencies, no network requests — the AI runs entirely in the browser
 - Notation uses spectator coordinates: files 1-9 left to right, ranks 1-10 bottom to top
+
+The game has a built-in English / 简体中文 switch at the top; your choice is remembered in `localStorage`.

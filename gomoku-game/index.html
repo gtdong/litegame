@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-page-node-id="ka0CtAAHttL1LfIl5X4Qz1">
-<head data-page-node-id="9DZQiM28x1Hsg7oNxSE6V0">
-<meta charset="UTF-8" data-page-node-id="1T2YP5jbFDBaTOpByyMcJ3">
-<meta name="viewport" content="width=device-width, initial-scale=1" data-page-node-id="gLSzWlqrNyHJ5VUU3NutYZ">
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>五子棋 · 禁手规则</title>
 <style>
   :root{
@@ -52,66 +52,69 @@
     box-shadow:0 2px 10px rgba(16,24,40,.15)}
 </style>
 </head>
-<body data-page-node-id="b9g2jP9D4bMNyXzHi1NRs5">
-<div class="app" data-page-node-id="gDvEviRLpou4ZEqelupemb">
-  <h1 data-page-node-id="9RmlCUUAyGEuWsZm5ELSlY">五子棋 · 禁手规则（Renju）</h1>
-  <div class="sub" data-page-node-id="PvdWdqYaScCc4gqjUcETvC">黑棋先行，受三三 / 四四 / 长连禁手限制；白棋无禁手，六连以上同样获胜。</div>
+<body>
 
-  <main data-page-node-id="JaEHxNHmD4CFtg7vXAWE1s">
-    <div class="board-card" data-page-node-id="NFow67z5H3P0RNCfkRY5vU">
-      <canvas id="board" data-page-node-id="CjKq4MxhcfoJ1DG47dEDrK"></canvas>
-      <div class="banner" id="banner" data-page-node-id="CKVI4uvyJHGTa4WQE47qEM"><span id="bannerText" data-page-node-id="g8KR1VFkHnw2XYUHetGcVR"></span></div>
+<div class="lang-switch" data-lang-switch></div>
+<div class="app">
+  <h1 data-i18n="title"></h1>
+  <div class="sub" data-i18n="subtitle"></div>
+
+  <main>
+    <div class="board-card">
+      <canvas id="board"></canvas>
+      <div class="banner" id="banner"><span id="bannerText"></span></div>
     </div>
 
-    <aside class="panel" data-page-node-id="AaCYTo9eZPOhBzEaowzfMf">
-      <div class="turn" data-page-node-id="m98tOPfO1DR5LHLuXvNiiU"><span class="disc b" id="turnDisc" data-page-node-id="MzvplCyaFZquNwI2XczIg5"></span><span id="turnText" data-page-node-id="MEkIxiIRaggGVkUPaosKBW">黑方落子</span></div>
-      <div class="meta" id="meta" data-page-node-id="k6fPbYce6tyDmnYgdIrqUD">第 1 手 · 无落子</div>
+    <aside class="panel">
+      <div class="turn"><span class="disc b" id="turnDisc"></span><span id="turnText"></span></div>
+      <div class="meta" id="meta"></div>
 
-      <hr data-page-node-id="Tz8JLerVcCMLJu3aajFlQH">
-      <div class="row" data-page-node-id="Rw8Ygps3OFeFzSRUGD2a88">
-        <label data-page-node-id="GyjHuVY9yBltaFpCnUT06E">对战模式</label>
-        <select id="mode" data-page-node-id="SN251NFs7SNGP0dxFybFTR">
-          <option value="pvp" data-page-node-id="lNCxWDcbyBKObREgBzLD5x">双人对战</option>
-          <option value="ai" selected data-page-node-id="RwGJk3rR0VbebhhsRENVSf">人机对战</option>
+      <hr>
+      <div class="row">
+        <label data-i18n="mode"></label>
+        <select id="mode">
+          <option value="pvp" data-i18n="modePvp"></option>
+          <option value="ai" selected data-i18n="modeAi"></option>
         </select>
       </div>
-      <div class="row" id="aiSideRow" data-page-node-id="1EMz5DA0MXXSAfFCfMijJf">
-        <label data-page-node-id="wosB04MUSyXgCx8vSMH5xY">电脑执子</label>
-        <select id="aiSide" data-page-node-id="zFftrhQEZkt4auKEfD8qS8">
-          <option value="2" selected data-page-node-id="MaRU8IsGE9POCBzw8Yqinz">白棋（玩家先手）</option>
-          <option value="1" data-page-node-id="sNj1WqUN9bmIAI2d1Bu8yh">黑棋（电脑先手）</option>
+      <div class="row" id="aiSideRow">
+        <label data-i18n="aiColor"></label>
+        <select id="aiSide">
+          <option value="2" selected data-i18n="aiWhite"></option>
+          <option value="1" data-i18n="aiBlack"></option>
         </select>
       </div>
-      <div class="row" data-page-node-id="BKBrN6sbiHHAdtBuKQgGqH">
-        <label data-page-node-id="AXMcVwgmQLzZgrDcWcyx4b">禁手处理</label>
-        <select id="foulMode" data-page-node-id="ucLTHI8RntTE69uLhXcu1V">
-          <option value="ban" selected data-page-node-id="3FOqIId11hV6VjVoWzpsbp">禁手点禁止落子</option>
-          <option value="lose" data-page-node-id="dDkuoKHcaA0eEAqY7Fgxqv">落禁手即判负</option>
-          <option value="off" data-page-node-id="T3QIMiscLu1Bi7fWqzHaUA">关闭禁手</option>
+      <div class="row">
+        <label data-i18n="foul"></label>
+        <select id="foulMode">
+          <option value="ban" selected data-i18n="foulBan"></option>
+          <option value="lose" data-i18n="foulLoseOpt"></option>
+          <option value="off" data-i18n="foulOff"></option>
         </select>
       </div>
 
-      <div class="btns" data-page-node-id="NDu10Joi9ODCfQ01tjOxDv">
-        <button id="btnUndo" data-page-node-id="aG0AReu2mWBpr38ipYWqO4">悔棋</button>
-        <button id="btnReset" class="primary" data-page-node-id="DtwT3HvXWxkpYeMjyrLWQZ">重新开始</button>
+      <div class="btns">
+        <button id="btnUndo" data-i18n="undo"></button>
+        <button id="btnReset" class="primary" data-i18n="restart"></button>
       </div>
-      <div class="toast info" id="toast" data-page-node-id="YfHrMA4TS5qAnAjltlGNp0">提示：黑方悬停禁手点会显示红色叉号。</div>
+      <div class="toast info" id="toast"></div>
 
-      <hr data-page-node-id="8sFBosdkxLyxQrZUOIed2y">
-      <details data-page-node-id="oQ25titZV4u52Z2t5Dw8Zd">
-        <summary data-page-node-id="oZVPc8tsjFN7ttQkaj39qB">禁手规则说明</summary>
-        <ul data-page-node-id="x6zC6DHNGFcBGUY7zmnBes">
-          <li data-page-node-id="DLBdo5tkGcl89pRj81pQyb"><b data-page-node-id="vSDIhP9XrJmkhGuN7tkcE0">三三禁手</b>：一子落下同时形成两个「活三」。</li>
-          <li data-page-node-id="tamlcdGnXacrho2LyMyShO"><b data-page-node-id="MFZpqJHPS1znMOWDI6S1TU">四四禁手</b>：一子落下同时形成两个「四」（活四或冲四）。</li>
-          <li data-page-node-id="6F1HrTJA3jyQy0JE9uSmdj"><b data-page-node-id="2YaI83qOp43t3Ol2TrMCoY">长连禁手</b>：一子落下形成六子以上相连。</li>
-          <li data-page-node-id="AOKCMXslh4lYhC0nGmHPxb">黑棋「四三」合法，成五优先于禁手（长连除外）。</li>
-          <li data-page-node-id="uL4G3VgLzx4OtryxM9t2pL">本实现未处理递归禁手（因禁手点导致的假三）。</li>
+      <hr>
+      <details>
+        <summary data-i18n="rulesTitle"></summary>
+        <ul>
+          <li data-i18n-html="rule33"></li>
+          <li data-i18n-html="rule44"></li>
+          <li data-i18n-html="ruleLong"></li>
+          <li data-i18n="rule43"></li>
+          <li data-i18n="ruleNote"></li>
         </ul>
       </details>
     </aside>
   </main>
 </div>
 
+<script src="../assets/i18n.js"></script>
 <script id="gomoku-engine">
 /* ================= Rules engine (can be required directly by Node for tests) ================= */
 const SIZE = 15;
@@ -232,6 +235,69 @@ if (typeof module !== 'undefined' && module.exports){
 </script>
 
 <script>
+var T = LiteI18N.create({
+  title:     { en: 'Gomoku · Renju rules', zh: '五子棋 · 禁手规则（Renju）' },
+  subtitle: {
+    en: 'Black moves first and is bound by the double-three / double-four / overline fouls. White has no fouls and wins with six or more in a row too.',
+    zh: '黑棋先行，受三三 / 四四 / 长连禁手限制；白棋无禁手，六连以上同样获胜。'
+  },
+  mode:      { en: 'Mode', zh: '对战模式' },
+  modePvp:   { en: 'Two players', zh: '双人对战' },
+  modeAi:    { en: 'Vs computer', zh: '人机对战' },
+  aiColor:   { en: 'Computer plays', zh: '电脑执子' },
+  aiWhite:   { en: 'White (you move first)', zh: '白棋（玩家先手）' },
+  aiBlack:   { en: 'Black (computer first)', zh: '黑棋（电脑先手）' },
+  foul:      { en: 'Forbidden moves', zh: '禁手处理' },
+  foulBan:   { en: 'Blocked on foul points', zh: '禁手点禁止落子' },
+  foulLoseOpt: { en: 'Playing a foul loses', zh: '落禁手即判负' },
+  foulOff:   { en: 'Disabled', zh: '关闭禁手' },
+  undo:      { en: 'Undo', zh: '悔棋' },
+  restart:   { en: 'New game', zh: '重新开始' },
+  rulesTitle:{ en: 'Renju forbidden-move rules', zh: '禁手规则说明' },
+  rule33: {
+    en: '<b>Double-three</b>: one stone creates two open threes at once.',
+    zh: '<b>三三禁手</b>：一子落下同时形成两个「活三」。'
+  },
+  rule44: {
+    en: '<b>Double-four</b>: one stone creates two fours at once (open four or rush four).',
+    zh: '<b>四四禁手</b>：一子落下同时形成两个「四」（活四或冲四）。'
+  },
+  ruleLong: {
+    en: '<b>Overline</b>: one stone makes six or more in a row.',
+    zh: '<b>长连禁手</b>：一子落下形成六子以上相连。'
+  },
+  rule43: {
+    en: 'A black "four-three" is legal, and five in a row outranks a foul except the overline.',
+    zh: '黑棋「四三」合法，成五优先于禁手（长连除外）。'
+  },
+  ruleNote: {
+    en: 'Recursive fouls (a false three caused by a forbidden point) are not handled.',
+    zh: '本实现未处理递归禁手（因禁手点导致的假三）。'
+  },
+  black:     { en: 'Black', zh: '黑方' },
+  white:     { en: 'White', zh: '白方' },
+  blackTurn: { en: 'Black to move', zh: '黑方落子' },
+  whiteTurn: { en: 'White to move', zh: '白方落子' },
+  blackWin:  { en: 'Black wins', zh: '黑方获胜' },
+  whiteWin:  { en: 'White wins', zh: '白方获胜' },
+  finished:  { en: 'Game over', zh: '对局结束' },
+  winText:   { en: '{side}', zh: '{side}' },
+  moveLine:  { en: 'Move {n} · last {last}', zh: '第 {n} 手 · 最近 {last}' },
+  noMove:    { en: 'none', zh: '无落子' },
+  winByFoul: { en: '{side} wins (black {foul})', zh: '{side}获胜（黑方{foul}）' },
+  foulLong:  { en: 'overline', zh: '长连禁手' },
+  foul44:    { en: 'double-four', zh: '四四禁手' },
+  foul33:    { en: 'double-three', zh: '三三禁手' },
+  foulBlock: { en: 'Forbidden for black: {foul}, cannot play here', zh: '黑棋禁手：{foul}，此点不能落子' },
+  fiveWin:   { en: '{side} wins with five in a row!', zh: '{side}五连获胜！' },
+  foulLoseMsg: { en: 'Black {foul}, black loses', zh: '黑方{foul}，判负' },
+  thinking:  { en: 'Computer is thinking…', zh: '电脑思考中…' },
+  draw:      { en: 'No moves left, draw', zh: '无子可下，和棋' },
+  newGame:   { en: 'New game, black moves first', zh: '新局开始，黑方先行' },
+  undone:    { en: 'Move taken back', zh: '已悔棋' },
+  hint:      { en: 'Hovering a forbidden point shows a red cross for black.', zh: '提示：黑方悬停禁手点会显示红色叉号。' }
+});
+
 /* ================= UI and AI ================= */
 const CELL = 36, PAD = 26, W = PAD * 2 + CELL * (SIZE - 1);
 const canvas = document.getElementById('board');
@@ -333,7 +399,7 @@ function drawStone(x, y, color, alpha){
 }
 
 /* ---------- Interaction ---------- */
-const FOUL_NAME = { 'long':'长连禁手', 'double-four':'四四禁手', 'double-three':'三三禁手' };
+const FOUL_KEY = { 'long':'foulLong', 'double-four':'foul44', 'double-three':'foul33' };
 
 function toast(msg, type){
   const t = el('toast');
@@ -346,15 +412,18 @@ function coordText(x, y){ return COLS[x] + (y + 1); }
 function updateUI(){
   el('turnDisc').className = 'disc ' + (state.turn === BLACK ? 'b' : 'w');
   el('turnText').textContent = state.over
-    ? (state.winner ? (state.winner === BLACK ? '黑方获胜' : '白方获胜') : '对局结束')
-    : (state.turn === BLACK ? '黑方落子' : '白方落子');
-  el('meta').textContent = '第 ' + (history.length + 1) + ' 手 · 最近 ' +
-    (state.last ? coordText(state.last[0], state.last[1]) : '无落子');
+    ? (state.winner ? (state.winner === BLACK ? T.t('blackWin') : T.t('whiteWin')) : T.t('finished'))
+    : (state.turn === BLACK ? T.t('blackTurn') : T.t('whiteTurn'));
+  el('meta').textContent = T.t('moveLine', {
+    n: history.length + 1,
+    last: state.last ? coordText(state.last[0], state.last[1]) : T.t('noMove')
+  });
   el('aiSideRow').style.display = state.mode === 'ai' ? '' : 'none';
   const banner = el('banner');
   if (state.over && state.winner){
-    el('bannerText').textContent = (state.winner === BLACK ? '黑方' : '白方') + '获胜' +
-      (state.foulReason ? '（黑方' + FOUL_NAME[state.foulReason] + '）' : '');
+    el('bannerText').textContent = state.foulReason
+      ? T.t('winByFoul', { side: state.winner === BLACK ? T.t('black') : T.t('white'), foul: T.t(FOUL_KEY[state.foulReason]) })
+      : T.t('winText', { side: state.winner === BLACK ? T.t('blackWin') : T.t('whiteWin') });
     banner.classList.add('show');
   } else banner.classList.remove('show');
 }
@@ -367,7 +436,7 @@ function tryMove(x, y){
   const res = checkMove(board, x, y, color);
 
   if (color === BLACK && state.foulMode === 'ban' && res.foul){
-    toast('黑棋禁手：' + FOUL_NAME[res.foul] + '，此点不能落子', 'danger');
+    toast(T.t('foulBlock', { foul: T.t(FOUL_KEY[res.foul]) }), 'danger');
     return;
   }
   place(x, y, color, res);
@@ -380,13 +449,13 @@ function place(x, y, color, res){
 
   if (res.win){
     state.over = true; state.winner = color;
-    toast((color === BLACK ? '黑方' : '白方') + '五连获胜！', 'good');
+    toast(T.t('fiveWin', { side: color === BLACK ? T.t('black') : T.t('white') }), 'good');
   } else if (color === BLACK && state.foulMode === 'lose' && res.foul){
     state.over = true; state.winner = WHITE; state.foulReason = res.foul;
-    toast('黑方' + FOUL_NAME[res.foul] + '，判负', 'danger');
+    toast(T.t('foulLoseMsg', { foul: T.t(FOUL_KEY[res.foul]) }), 'danger');
   } else {
     state.turn = 3 - color;
-    toast(state.mode === 'ai' && state.turn === state.aiColor ? '电脑思考中…' : '', 'info');
+    toast(state.mode === 'ai' && state.turn === state.aiColor ? T.t('thinking') : '', 'info');
   }
   draw(); updateUI();
 
@@ -396,7 +465,7 @@ function place(x, y, color, res){
       const mv = aiMove();
       state.thinking = false;
       if (mv) place(mv.x, mv.y, state.aiColor, checkMove(board, mv.x, mv.y, state.aiColor));
-      else { state.over = true; toast('无子可下，和棋', 'info'); updateUI(); }
+      else { state.over = true; toast(T.t('draw'), 'info'); updateUI(); }
       draw();
     }, 220);
   }
@@ -412,7 +481,7 @@ function rebuild(){
 
 function reset(){
   history = []; rebuild(); draw(); updateUI();
-  toast('新局开始，黑方先行', 'info');
+  toast(T.t('newGame'), 'info');
   if (state.mode === 'ai' && state.aiColor === BLACK){
     state.thinking = true;
     setTimeout(() => {
@@ -430,7 +499,7 @@ function undo(){
   if (state.mode === 'ai' && history.length && history[history.length - 1].color === state.aiColor)
     history.pop();
   rebuild(); draw(); updateUI();
-  toast('已悔棋', 'info');
+  toast(T.t('undone'), 'info');
 }
 
 /* ---------- AI ---------- */
@@ -511,7 +580,13 @@ el('foulMode').addEventListener('change', e => { state.foulMode = e.target.value
 el('btnUndo').addEventListener('click', undo);
 el('btnReset').addEventListener('click', reset);
 
+T.onChange(function () {
+  updateUI();
+  if (!state.over) toast(T.t('hint'), 'info');
+});
+
 reset();
+T.start();
 </script>
 </body>
 </html>

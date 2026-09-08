@@ -150,17 +150,19 @@
 </head>
 <body>
 
-<h1>扫雷</h1>
-<p class="tip">左键翻开 · 右键插旗（手机长按）· 数字表示周围 8 格的地雷数</p>
+<div class="lang-switch" data-lang-switch></div>
+
+<h1 data-i18n="title"></h1>
+<p class="tip" data-i18n="tip"></p>
 
 <div class="panel">
   <div class="bar">
     <select id="level">
-      <option value="easy">初级 9×9 / 10 雷</option>
-      <option value="medium" selected>中级 16×16 / 40 雷</option>
-      <option value="hard">高级 30×16 / 99 雷</option>
+      <option value="easy" data-i18n="levelEasy"></option>
+      <option value="medium" selected data-i18n="levelMedium"></option>
+      <option value="hard" data-i18n="levelHard"></option>
     </select>
-    <button id="btnNew">重新开始</button>
+    <button id="btnNew" data-i18n="restart"></button>
     <div class="stat" id="mineCount">040</div>
     <div class="stat" id="timer">000</div>
   </div>
@@ -168,9 +170,24 @@
   <div id="status"></div>
 </div>
 
+<script src="../assets/i18n.js"></script>
 <script>
 (function () {
   'use strict';
+
+  var T = LiteI18N.create({
+    title:       { en: 'Minesweeper', zh: '扫雷' },
+    tip: {
+      en: 'Left click to reveal · right click to flag (long-press on mobile) · numbers count the mines around',
+      zh: '左键翻开 · 右键插旗（手机长按）· 数字表示周围 8 格的地雷数'
+    },
+    levelEasy:   { en: 'Easy 9×9 / 10 mines', zh: '初级 9×9 / 10 雷' },
+    levelMedium: { en: 'Medium 16×16 / 40 mines', zh: '中级 16×16 / 40 雷' },
+    levelHard:   { en: 'Hard 30×16 / 99 mines', zh: '高级 30×16 / 99 雷' },
+    restart:     { en: 'New game', zh: '重新开始' },
+    lost:        { en: 'Boom! Hit "New game" to try again', zh: '踩雷了！点「重新开始」再来一局' },
+    won:         { en: 'Cleared in {sec}s', zh: '通关！用时 {sec} 秒' }
+  });
 
   var LEVELS = {
     easy:   { rows: 9,  cols: 9,  mines: 10 },
@@ -193,6 +210,7 @@
   var seconds;
   var timerId;
   var pressTimer;   // long-press detector for touch flagging
+  var lastResult;   // outcome of the finished round, so it can be re-translated
 
   /* ---------- setup ---------- */
 
@@ -214,6 +232,7 @@
 
     started = false;
     over = false;
+    lastResult = null;
     flags = 0;
     opened = 0;
     seconds = 0;
@@ -389,7 +408,8 @@
     });
 
     cells[boomIdx].el.classList.add('boom');
-    statusEl.textContent = '踩雷了！点「重新开始」再来一局';
+    lastResult = { kind: 'lose' };
+    statusEl.textContent = T.t('lost');
     statusEl.className = 'lose';
   }
 
@@ -406,7 +426,8 @@
     });
 
     updateCounters();
-    statusEl.textContent = '通关！用时 ' + seconds + ' 秒';
+    lastResult = { kind: 'win', seconds: seconds };
+    statusEl.textContent = T.t('won', { sec: seconds });
     statusEl.className = 'win';
   }
 
@@ -451,6 +472,13 @@
   document.getElementById('btnNew').addEventListener('click', newGame);
   levelEl.addEventListener('change', newGame);
 
+  T.onChange(function () {
+    if (!lastResult) return;
+    if (lastResult.kind === 'lose') statusEl.textContent = T.t('lost');
+    else statusEl.textContent = T.t('won', { sec: lastResult.seconds });
+  });
+
+  T.start();
   newGame();
 })();
 </script>

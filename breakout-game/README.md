@@ -23,3 +23,5 @@ Classic Breakout: keep the ball in play and clear every brick.
 ## Run
 
 Just open `index.html` in a browser. Zero dependencies.
+
+The game has a built-in English / 简体中文 switch at the top; your choice is remembered in `localStorage`.

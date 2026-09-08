@@ -22,3 +22,5 @@ Gomoku on a 15x15 board with player-vs-player and player-vs-AI modes, implementi
 - White has no forbidden moves and also wins with six or more in a row
 
 Fouls can be handled in three ways: block the point (default) / lose on the foul / disabled.
+
+The game has a built-in English / 简体中文 switch at the top; your choice is remembered in `localStorage`.

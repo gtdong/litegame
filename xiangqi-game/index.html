@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-page-node-id="r9lGJwxaHpMwvuHtI5xykC">
-<head data-page-node-id="Xn2kuAfPcUwmbKibfYv0dR">
-<meta charset="UTF-8" data-page-node-id="Zv8OnvCGbRDSz7db6yRNnx">
-<meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="uB8H35J6EJr5tH5mztOgtK">
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>中国象棋 · 人机对战</title>
 <style>
   :root { --wood:#e8c99b; --wood2:#d4a86a; --ink:#5a3a1a; }
@@ -60,29 +60,88 @@
   .tip { color: #cbd5c0; font-size: 12px; margin-top: 10px; }
 </style>
 </head>
-<body data-page-node-id="C3be8lsav95MEEQG3PzHkf">
-<h1 data-page-node-id="HWG7SRjPXqIYmmYxLM8AqV">中国象棋 · 人机对战</h1>
-<div class="toolbar" data-page-node-id="w8ZFXFxQqGTwn3u6hFGWYz">
-  <button id="btnNew" data-page-node-id="yBv9IU0OPqDYoy36ZEfxl6">重新开始</button>
-  <button id="btnUndo" data-page-node-id="rapEwyKRBELX09GyzLOaPt">悔棋</button>
-  <button id="btnExport" data-page-node-id="SDMiPMkKi7OdAnCQUBICWD">导出棋谱</button>
-  <label style="color:#f5e6c8;font-size:14px;" data-page-node-id="QSBsdHKE8hY6vxBQqtNdrY">难度
-    <select id="selLevel" data-page-node-id="Jqe7pXtWCd8dLhrCPNdaO4">
-      <option value="1" data-page-node-id="VNwzvl2tHeDaYYLYNUD28z">新手</option>
-      <option value="3" selected data-page-node-id="iy6jo4SUsKQoqyyb1qcEgp">普通</option>
-      <option value="4" data-page-node-id="BDFDUMTxpPn2Ela5JkdIcj">高手</option>
+<body>
+<div class="lang-switch" data-lang-switch></div>
+<h1 data-i18n="title"></h1>
+<div class="toolbar">
+  <button id="btnNew" data-i18n="restart"></button>
+  <button id="btnUndo" data-i18n="undo"></button>
+  <button id="btnExport" data-i18n="export"></button>
+  <label style="color:#f5e6c8;font-size:14px;"><span data-i18n="level"></span>
+    <select id="selLevel">
+      <option value="1" data-i18n="lv1"></option>
+      <option value="3" selected data-i18n="lv3"></option>
+      <option value="4" data-i18n="lv4"></option>
     </select>
   </label>
-  <label style="color:#f5e6c8;font-size:14px;" data-page-node-id="mj0yGejgg5wLfIz8ZZIuMV">
-    <input type="checkbox" id="chkAI" style="vertical-align:middle" data-page-node-id="XzrypEzbCU1HwXLYxAJPXZ"> AI先手(黑)
+  <label style="color:#f5e6c8;font-size:14px;">
+    <input type="checkbox" id="chkAI" style="vertical-align:middle"> <span data-i18n="aiFirst"></span>
   </label>
 </div>
-<div id="status" data-page-node-id="Rv5r1Fmx2fW36SIwtwuMvQ">红方走棋</div>
-<div id="boardWrap" data-page-node-id="UfMNfYZTJ27LAmryk4WL88"><canvas id="cv" data-page-node-id="ZNawwNgihaJRghInJblCSN"></canvas><div id="thinkOverlay" data-page-node-id="QEJMNIvtL977TDWtM1PPGj"><div class="box" data-page-node-id="6yuqaAmUYpGDG396MF3uC9"><div class="spinner" data-page-node-id="BxqSgbn9XFw8Tm2hHzMCoz"></div><span id="thinkText" data-page-node-id="BlOMpbLOqkXXzQIWEn8GpE">AI思考中…</span></div></div></div>
-<div class="tip" data-page-node-id="cTZSIKHJSRafdMHiwXtTd2">点击棋子选中，再点击目标位置落子。你执红，电脑执黑。规则：连续将军3次判负（长将）。点「导出棋谱」保存对局记录。</div>
+<div id="status"></div>
+<div id="boardWrap"><canvas id="cv"></canvas><div id="thinkOverlay"><div class="box"><div class="spinner"></div><span id="thinkText"></span></div></div></div>
+<div class="tip" data-i18n="tip"></div>
 
+<script src="../assets/i18n.js"></script>
 <script>
 "use strict";
+
+/* ---------- Bilingual UI copy ---------- */
+var T = LiteI18N.create({
+  title:    { en: 'Chinese Chess · vs computer', zh: '中国象棋 · 人机对战' },
+  restart:  { en: 'New game', zh: '重新开始' },
+  undo:     { en: 'Undo', zh: '悔棋' },
+  export:   { en: 'Export', zh: '导出棋谱' },
+  level:    { en: 'Level', zh: '难度' },
+  lv1:      { en: 'Rookie', zh: '新手' },
+  lv3:      { en: 'Normal', zh: '普通' },
+  lv4:      { en: 'Master', zh: '高手' },
+  aiFirst:  { en: 'AI first (black)', zh: 'AI先手(黑)' },
+  tip: {
+    en: 'Click a piece to select it, then click a target square. You play red, the computer plays black. Checking three times in a row loses (perpetual check). Use "Export" to save the game record.',
+    zh: '点击棋子选中，再点击目标位置落子。你执红，电脑执黑。规则：连续将军3次判负（长将）。点「导出棋谱」保存对局记录。'
+  },
+  red:      { en: 'Red', zh: '红方' },
+  black:    { en: 'Black', zh: '黑方' },
+  redShort: { en: 'R', zh: '红' },
+  blackShort:{ en: 'B', zh: '黑' },
+  redTurn:  { en: 'Red to move', zh: '红方走棋' },
+  redTurnUndo: { en: 'Red to move (move taken back)', zh: '红方走棋（已悔棋）' },
+  thinking: { en: 'Computer is thinking…', zh: '电脑思考中…' },
+  thinkingIcon: { en: 'Computer is thinking…', zh: '💻 电脑思考中…' },
+  redWin:   { en: 'Red wins!', zh: '红方胜！' },
+  check:    { en: '{side} is in check!', zh: '{side}被将军！' },
+  perpLose: {
+    en: 'Perpetual check: {loser} checked 3 times in a row (illegal), {winner} wins!',
+    zh: '长将判负：{loser}连续将军3次（违规），{winner}胜！'
+  },
+  gameEnd: {
+    en: 'Game over: {loser} is {reason}, {winner} wins!',
+    zh: '对局结束：{loser}{reason}，{winner}胜！'
+  },
+  mated:    { en: 'checkmated', zh: '被将死' },
+  stalemate:{ en: 'stalemated (no legal move)', zh: '无路可走(困毙)' },
+  perpWarn: {
+    en: 'Perpetual check: you are already checking continuously, this move is not allowed (the same move cannot check 3 times in a row)',
+    zh: '长将违规：你已连续将军，不能再走这步（同一步棋不能连续将军3次）'
+  },
+  noLegal:  { en: 'That piece has no legal move', zh: '该棋子无合法走法' },
+  diffChanged: { en: 'Level set to: {name}', zh: '难度已切换为：{name}' },
+  noRecord: { en: 'No moves yet, play a few first', zh: '尚无对局记录，先走几步' },
+  recTitle: { en: 'Chinese chess game record\n', zh: '中国象棋 人机对战 棋谱\n' },
+  recTime:  { en: 'Generated: ', zh: '生成时间：' },
+  recLevel: { en: 'Level: ', zh: '难度：' },
+  recSides: { en: ' — you play red, computer plays black\n', zh: ' ｜ 你执红，电脑执黑\n' },
+  recCoords:{
+    en: 'Coordinates: files 1-9 left to right, ranks 1-10 bottom to top (red back rank is rank 1)\n',
+    zh: '坐标说明：列1-9从左到右，行1-10从下到上（红方底线为行1）\n'
+  },
+  recResult:{ en: 'Result: ', zh: '结果：' },
+  exported: { en: 'Record exported ({n} moves)', zh: '棋谱已导出（{n}手）' },
+  capture:  { en: ' x', zh: ' 吃' }
+});
+
+
 /* ================= Basic data ================= */
 const ROWS = 10, COLS = 9, N = 90;
 const RED = 'r', BLACK = 'b';
@@ -553,7 +612,7 @@ let aiThinking = false;
 
 /* Thinking overlay: spinner animation plus a cover that blocks input while thinking */
 function showThinking(text) {
-  document.getElementById('thinkText').textContent = text || '电脑思考中…';
+  document.getElementById('thinkText').textContent = text || T.t('thinking');
   document.getElementById('thinkOverlay').style.display = 'flex';
 }
 function hideThinking() {
@@ -569,9 +628,9 @@ function recordMove(m, mover, cap) {
   const [fr,fc] = rc(m.from), [tr,tc] = rc(m.to);
   const fcV = fc+1, frV = 10-fr, tcV = tc+1, trV = 10-tr;
   const capName = cap ? CN[cap.color][cap.t] : null;
-  const side = mover === RED ? '红' : '黑';
+  const side = mover === RED ? T.t('redShort') : T.t('blackShort');
   const n = moveLog.length + 1;
-  const text = `${n}. ${side}${name} (${fcV},${frV})→(${tcV},${trV})` + (capName ? ` 吃${capName}` : '');
+  const text = `${n}. ${side}${name} (${fcV},${frV})→(${tcV},${trV})` + (capName ? T.t('capture') + capName : '');
   moveLog.push({ n, side, name, text });
 }
 
@@ -588,10 +647,10 @@ function newGame() {
   lastMove = null; gameOver = false; history = []; checking = -1;
   checkStreakMover = null; checkStreakCount = 0; // Reset the perpetual-check counter
   moveLog = [];                                  // Reset the notation
-  setStatus('红方走棋');
+  setStatus(T.t('redTurn'));
   draw();
   if (document.getElementById('chkAI').checked) {
-    aiThinking = true; setStatus('电脑思考中…'); showThinking('💻 电脑思考中…');
+    aiThinking = true; setStatus(T.t('thinking')); showThinking(T.t('thinkingIcon'));
     setTimeout(aiMove, 200);
   }
 }
@@ -612,9 +671,9 @@ function afterMove(m, cap, mover) {
     else { checkStreakMover = mover; checkStreakCount = 1; }
     if (checkStreakCount >= 3) { // Perpetual check is a violation: loss
       gameOver = true;
-      const loser = mover===RED ? '红方' : '黑方';
-      const winner = mover===RED ? '黑方' : '红方';
-      setStatus('长将判负：' + loser + '连续将军3次（违规），' + winner + '胜！');
+      const loser = mover===RED ? T.t('red') : T.t('black');
+      const winner = mover===RED ? T.t('black') : T.t('red');
+      setStatus(T.t('perpLose', { loser: loser, winner: winner }));
       draw();
       return;
     }
@@ -628,21 +687,25 @@ function afterMove(m, cap, mover) {
   const moves = legalMoves(board, turn);
   if (!moves.length) {
     gameOver = true;
-    const loserName = turn===RED ? '红方' : '黑方';
-    const winnerName = turn===RED ? '黑方' : '红方';
-    setStatus(`对局结束：${loserName}${checking>=0 ? '被将死' : '无路可走(困毙)'}，${winnerName}胜！`);
+    const loserName = turn===RED ? T.t('red') : T.t('black');
+    const winnerName = turn===RED ? T.t('black') : T.t('red');
+    setStatus(T.t('gameEnd', {
+      loser: loserName,
+      reason: checking >= 0 ? T.t('mated') : T.t('stalemate'),
+      winner: winnerName
+    }));
     draw();
     return;
   }
   if (checking >= 0) {
-    setStatus((turn===RED ? '红方' : '黑方') + '被将军！');
+    setStatus(T.t('check', { side: turn===RED ? T.t('red') : T.t('black') }));
   } else {
-    setStatus(turn===RED ? '红方走棋' : '电脑思考中…');
+    setStatus(turn===RED ? T.t('redTurn') : T.t('thinking'));
   }
   draw();
   if (!gameOver && turn===BLACK) {
     aiThinking = true;
-    showThinking('💻 电脑思考中…');
+    showThinking(T.t('thinkingIcon'));
     setTimeout(aiMove, 120);
   }
 }
@@ -650,12 +713,12 @@ function afterMove(m, cap, mover) {
 /* ================= AI moves ================= */
 function aiMove() {
   const lvl = document.getElementById('selLevel').value;
-  setStatus('电脑思考中…');
-  showThinking('💻 电脑思考中…');
+  setStatus(T.t('thinking'));
+  showThinking(T.t('thinkingIcon'));
   const mv = searchBest(+lvl, lvl === '1');
   aiThinking = false;
   hideThinking();
-  if (!mv) { gameOver = true; setStatus('红方胜！'); draw(); return; }
+  if (!mv) { gameOver = true; setStatus(T.t('redWin')); draw(); return; }
   // Perpetual-check avoidance: if this move would be black's third consecutive check, play a non-checking move instead
   if (moveGivesCheck(BLACK, mv)) {
     const projected = (checkStreakMover === BLACK ? checkStreakCount : 0) + 1;
@@ -683,7 +746,7 @@ cv.addEventListener('click', e => {
     if (moveGivesCheck(RED, mv)) {
       const projected = (checkStreakMover === RED ? checkStreakCount : 0) + 1;
       if (projected >= 3) {
-        setStatus('长将违规：你已连续将军，不能再走这步（同一步棋不能连续将军3次）');
+        setStatus(T.t('perpWarn'));
         selected = null; legalTargets = null; draw();
         return;
       }
@@ -695,7 +758,7 @@ cv.addEventListener('click', e => {
   if (p && p.color === RED) {
     selected = i;
     legalTargets = legalMoves(board, RED).filter(m => m.from===i).map(m => m.to);
-    if (!legalTargets.length) { selected = null; legalTargets = null; setStatus('该棋子无合法走法'); }
+    if (!legalTargets.length) { selected = null; legalTargets = null; setStatus(T.t('noLegal')); }
   } else {
     selected = null; legalTargets = null;
   }
@@ -716,7 +779,7 @@ document.getElementById('btnUndo').addEventListener('click', () => {
   gameOver = false; selected = null; legalTargets = null;
   checkStreakMover = null; checkStreakCount = 0; // Reset the check streak after undo
   refreshCheckMark();
-  setStatus('红方走棋（已悔棋）');
+  setStatus(T.t('redTurnUndo'));
   draw();
 });
 
@@ -724,32 +787,41 @@ document.getElementById('btnNew').addEventListener('click', newGame);
 document.getElementById('chkAI').addEventListener('change', newGame);
 document.getElementById('selLevel').addEventListener('change', () => {
   const txt = document.getElementById('selLevel').selectedOptions[0].text;
-  setStatus(`难度已切换为：${txt}`);
+  setStatus(T.t('diffChanged', { name: txt }));
 });
 
 /* Export the game notation: spectator coordinates, downloadable as a txt file */
 function exportRecord() {
-  if (!moveLog.length) { setStatus('尚无对局记录，先走几步'); return; }
+  if (!moveLog.length) { setStatus(T.t('noRecord')); return; }
   const lvlEl = document.getElementById('selLevel');
   const diff = lvlEl.selectedOptions[0].text;
-  let txt = '中国象棋 人机对战 棋谱\n';
-  txt += '生成时间：' + new Date().toLocaleString() + '\n';
-  txt += '难度：' + diff + ' ｜ 你执红，电脑执黑\n';
-  txt += '坐标说明：列1-9从左到右，行1-10从下到上（红方底线为行1）\n';
+  let txt = T.t('recTitle');
+  txt += T.t('recTime') + new Date().toLocaleString() + '\n';
+  txt += T.t('recLevel') + diff + T.t('recSides');
+  txt += T.t('recCoords');
   txt += '--------------------------------\n';
   moveLog.forEach(e => { txt += e.text + '\n'; });
-  if (gameOver) txt += '--------------------------------\n结果：' + statusEl.textContent + '\n';
+  if (gameOver) txt += '--------------------------------\n' + T.t('recResult') + statusEl.textContent + '\n';
   const blob = new Blob([txt], { type: 'text/plain;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'xiangqi_棋谱_' + Date.now() + '.txt';
+  a.download = (T.lang === 'zh' ? 'xiangqi_棋谱_' : 'xiangqi_record_') + Date.now() + '.txt';
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(a.href);
-  setStatus('棋谱已导出（' + moveLog.length + '手）');
+  setStatus(T.t('exported', { n: moveLog.length }));
 }
 document.getElementById('btnExport').addEventListener('click', exportRecord);
 
+// Refresh the status line when the language changes.
+T.onChange(function () {
+  if (gameOver) return;
+  if (aiThinking) { setStatus(T.t('thinking')); showThinking(T.t('thinkingIcon')); }
+  else setStatus(T.t('redTurn'));
+  draw();
+});
+
 newGame();
+T.start();
 </script>
 </body>
 </html>
