@@ -8,7 +8,7 @@ A collection of AI-generated HTML5 mini games. Zero dependencies — just open `
 
 ## Games
 
-- [snake-game/](snake-game/) — Snake
-- [gomoku-game/](gomoku-game/) — Gomoku (Renju forbidden-move rules)
-- [xiangqi-game/](xiangqi-game/) — Chinese Chess (player vs computer)
+- [snake-game](snake-game) — Snake
+- [gomoku-game](gomoku-game) — Gomoku (Renju forbidden-move rules)
+- [xiangqi-game](xiangqi-game) — Chinese Chess (player vs computer)
 

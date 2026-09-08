@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<html lang="zh-CN" data-page-node-id="r9lGJwxaHpMwvuHtI5xykC">
+<head data-page-node-id="Xn2kuAfPcUwmbKibfYv0dR">
+<meta charset="UTF-8" data-page-node-id="Zv8OnvCGbRDSz7db6yRNnx">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="uB8H35J6EJr5tH5mztOgtK">
 <title>中国象棋 · 人机对战</title>
 <style>
   :root { --wood:#e8c99b; --wood2:#d4a86a; --ink:#5a3a1a; }
@@ -60,26 +60,26 @@
   .tip { color: #cbd5c0; font-size: 12px; margin-top: 10px; }
 </style>
 </head>
-<body>
-<h1>中国象棋 · 人机对战</h1>
-<div class="toolbar">
-  <button id="btnNew">重新开始</button>
-  <button id="btnUndo">悔棋</button>
-  <button id="btnExport">导出棋谱</button>
-  <label style="color:#f5e6c8;font-size:14px;">难度
-    <select id="selLevel">
-      <option value="1">新手</option>
-      <option value="3" selected>普通</option>
-      <option value="4">高手</option>
+<body data-page-node-id="C3be8lsav95MEEQG3PzHkf">
+<h1 data-page-node-id="HWG7SRjPXqIYmmYxLM8AqV">中国象棋 · 人机对战</h1>
+<div class="toolbar" data-page-node-id="w8ZFXFxQqGTwn3u6hFGWYz">
+  <button id="btnNew" data-page-node-id="yBv9IU0OPqDYoy36ZEfxl6">重新开始</button>
+  <button id="btnUndo" data-page-node-id="rapEwyKRBELX09GyzLOaPt">悔棋</button>
+  <button id="btnExport" data-page-node-id="SDMiPMkKi7OdAnCQUBICWD">导出棋谱</button>
+  <label style="color:#f5e6c8;font-size:14px;" data-page-node-id="QSBsdHKE8hY6vxBQqtNdrY">难度
+    <select id="selLevel" data-page-node-id="Jqe7pXtWCd8dLhrCPNdaO4">
+      <option value="1" data-page-node-id="VNwzvl2tHeDaYYLYNUD28z">新手</option>
+      <option value="3" selected data-page-node-id="iy6jo4SUsKQoqyyb1qcEgp">普通</option>
+      <option value="4" data-page-node-id="BDFDUMTxpPn2Ela5JkdIcj">高手</option>
     </select>
   </label>
-  <label style="color:#f5e6c8;font-size:14px;">
-    <input type="checkbox" id="chkAI" style="vertical-align:middle"> AI先手(黑)
+  <label style="color:#f5e6c8;font-size:14px;" data-page-node-id="mj0yGejgg5wLfIz8ZZIuMV">
+    <input type="checkbox" id="chkAI" style="vertical-align:middle" data-page-node-id="XzrypEzbCU1HwXLYxAJPXZ"> AI先手(黑)
   </label>
 </div>
-<div id="status">红方走棋</div>
-<div id="boardWrap"><canvas id="cv"></canvas><div id="thinkOverlay"><div class="box"><div class="spinner"></div><span id="thinkText">AI思考中…</span></div></div></div>
-<div class="tip">点击棋子选中，再点击目标位置落子。你执红，电脑执黑。规则：连续将军3次判负（长将）。点「导出棋谱」保存对局记录。</div>
+<div id="status" data-page-node-id="Rv5r1Fmx2fW36SIwtwuMvQ">红方走棋</div>
+<div id="boardWrap" data-page-node-id="UfMNfYZTJ27LAmryk4WL88"><canvas id="cv" data-page-node-id="ZNawwNgihaJRghInJblCSN"></canvas><div id="thinkOverlay" data-page-node-id="QEJMNIvtL977TDWtM1PPGj"><div class="box" data-page-node-id="6yuqaAmUYpGDG396MF3uC9"><div class="spinner" data-page-node-id="BxqSgbn9XFw8Tm2hHzMCoz"></div><span id="thinkText" data-page-node-id="BlOMpbLOqkXXzQIWEn8GpE">AI思考中…</span></div></div></div>
+<div class="tip" data-page-node-id="cTZSIKHJSRafdMHiwXtTd2">点击棋子选中，再点击目标位置落子。你执红，电脑执黑。规则：连续将军3次判负（长将）。点「导出棋谱」保存对局记录。</div>
 
 <script>
 "use strict";
