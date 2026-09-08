@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>2048</title>
+<style>
+  :root {
+    --bg: #faf8ef;
+    --board: #bbada0;
+    --cell: #cdc1b4;
+    --text: #776e65;
+    --text-light: #f9f6f2;
+    --panel: #8f7a66;
+    --pad: 10px;
+    --gap: 10px;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    margin: 0;
+    padding: 24px 16px 40px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+  }
+
+  h1 { margin: 0; font-size: 40px; letter-spacing: -.02em; }
+
+  .top {
+    width: 100%;
+    max-width: 440px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 16px;
+    gap: 12px;
+  }
+
+  .hint { font-size: 13px; color: #8b8073; line-height: 1.5; }
+
+  .scores { display: flex; gap: 8px; }
+  .score-box {
+    background: var(--panel);
+    border-radius: 6px;
+    padding: 7px 14px;
+    min-width: 78px;
+    text-align: center;
+    color: #eee4da;
+  }
+  .score-box .label { font-size: 11px; letter-spacing: .06em; }
+  .score-box .value { font-size: 20px; font-weight: 700; color: #fff; }
+
+  .bar {
+    width: 100%;
+    max-width: 440px;
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  button {
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-light);
+    background: var(--panel);
+    border: 0;
+    border-radius: 6px;
+    padding: 10px 18px;
+    cursor: pointer;
+  }
+  button:hover { filter: brightness(1.08); }
+  button:active { transform: translateY(1px); }
+
+  #board {
+    position: relative;
+    width: 100%;
+    max-width: 440px;
+    aspect-ratio: 1 / 1;
+    background: var(--board);
+    border-radius: 8px;
+    padding: var(--pad);
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(4, 1fr);
+    gap: var(--gap);
+    touch-action: none;
+  }
+
+  .cell { background: var(--cell); border-radius: 5px; }
+
+  .tile {
+    position: absolute;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    transition: transform .12s ease-in-out;
+    will-change: transform;
+  }
+  .tile.pop { animation: pop .16s ease-out; }
+  @keyframes pop {
+    from { transform: scale(.4); opacity: .4; }
+    to   { transform: scale(1); opacity: 1; }
+  }
+
+  #overlay {
+    position: absolute;
+    inset: 0;
+    border-radius: 8px;
+    background: rgba(238, 228, 218, .78);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    z-index: 5;
+  }
+  #overlay.show { display: flex; }
+  #overlay .msg { font-size: 34px; font-weight: 700; }
+
+  @media (max-width: 480px) {
+    h1 { font-size: 32px; }
+    .top { flex-wrap: wrap; }
+  }
+</style>
+</head>
+<body>
+
+<h1>2048</h1>
+
+<div class="top">
+  <div class="hint">方向键 或 滑动 移动方块<br>相同数字合并，凑出 2048</div>
+  <div class="scores">
+    <div class="score-box"><div class="label">得分</div><div class="value" id="score">0</div></div>
+    <div class="score-box"><div class="label">最高</div><div class="value" id="best">0</div></div>
+  </div>
+</div>
+
+<div class="bar">
+  <button id="btnNew">重新开始</button>
+  <button id="btnUndo">撤销一步</button>
+</div>
+
+<div id="board">
+  <div id="overlay">
+    <div class="msg" id="overlayMsg"></div>
+    <button id="overlayBtn">再来一局</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var SIZE = 4;
+  var TARGET = 2048;
+  var STORE_KEY = 'game2048_best';
+
+  var boardEl = document.getElementById('board');
+  var scoreEl = document.getElementById('score');
+  var bestEl = document.getElementById('best');
+  var overlayEl = document.getElementById('overlay');
+  var overlayMsgEl = document.getElementById('overlayMsg');
+  var overlayBtnEl = document.getElementById('overlayBtn');
+
+  // Tile palette keyed by value; anything above 2048 falls back to the dark tile.
+  var COLORS = {
+    2: '#eee4da', 4: '#ede0c8', 8: '#f2b179', 16: '#f59563',
+    32: '#f67c5f', 64: '#f65e3b', 128: '#edcf72', 256: '#edcc61',
+    512: '#edc850', 1024: '#edc53f', 2048: '#edc22e'
+  };
+  var DARK_TEXT = '#776e65';
+  var LIGHT_TEXT = '#f9f6f2';
+
+  var grid;      // SIZE x SIZE of tile objects or null
+  var nodes;     // tile id -> DOM node
+  var nextId;
+  var score, best, history, state;
+
+  /* ---------- storage ---------- */
+
+  function loadBest() {
+    try { return parseInt(localStorage.getItem(STORE_KEY), 10) || 0; }
+    catch (e) { return 0; }
+  }
+
+  function saveBest(v) {
+    try { localStorage.setItem(STORE_KEY, String(v)); } catch (e) {}
+  }
+
+  /* ---------- grid helpers ---------- */
+
+  function emptyGrid() {
+    var g = [];
+    for (var r = 0; r < SIZE; r++) {
+      g.push([]);
+      for (var c = 0; c < SIZE; c++) g.push(null);
+    }
+    return g;
+  }
+
+  function eachCell(fn) {
+    for (var r = 0; r < SIZE; r++)
+      for (var c = 0; c < SIZE; c++) fn(r, c, grid[r][c]);
+  }
+
+  function freeCells() {
+    var out = [];
+    eachCell(function (r, c, t) { if (!t) out.push({ r: r, c: c }); });
+    return out;
+  }
+
+  function addRandomTile() {
+    var free = freeCells();
+    if (!free.length) return null;
+    var spot = free[Math.floor(Math.random() * free.length)];
+    var tile = { id: nextId++, value: Math.random() < 0.9 ? 2 : 4, r: spot.r, c: spot.c, isNew: true };
+    grid[spot.r][spot.c] = tile;
+    return tile;
+  }
+
+  function inBounds(r, c) {
+    return r >= 0 && r < SIZE && c >= 0 && c < SIZE;
+  }
+
+  function movesAvailable() {
+    var found = false;
+    eachCell(function (r, c, t) {
+      if (found) return;
+      if (!t) { found = true; return; }
+      if (c + 1 < SIZE && grid[r][c + 1] && grid[r][c + 1].value === t.value) found = true;
+      if (r + 1 < SIZE && grid[r + 1][c] && grid[r + 1][c].value === t.value) found = true;
+    });
+    return found;
+  }
+
+  function reachedTarget() {
+    var hit = false;
+    eachCell(function (r, c, t) { if (t && t.value >= TARGET) hit = true; });
+    return hit;
+  }
+
+  /* ---------- movement ---------- */
+
+  var VECTORS = {
+    left:  [0, -1],
+    right: [0, 1],
+    up:    [-1, 0],
+    down:  [1, 0]
+  };
+
+  // Visit order depends on direction: cells nearest the target wall go first.
+  function traversal(dir) {
+    var idx = [];
+    for (var i = 0; i < SIZE; i++) idx.push(i);
+    if (dir === 'right' || dir === 'down') idx.reverse();
+    return idx;
+  }
+
+  // Walk along the vector until the next cell is blocked, returning the last free cell.
+  function farthest(r, c, vec) {
+    var pr = r, pc = c;
+    do {
+      r = pr + vec[0];
+      c = pc + vec[1];
+      if (!inBounds(r, c) || grid[r][c]) break;
+      pr = r; pc = c;
+    } while (true);
+    return { r: pr, c: pc, nr: r, nc: c };
+  }
+
+  function snapshot() {
+    var cells = [];
+    eachCell(function (r, c, t) {
+      cells.push(t ? { r: r, c: c, value: t.value } : null);
+    });
+    return { cells: cells, score: score };
+  }
+
+  function restore(snap) {
+    grid = emptyGrid();
+    nextId = 1;
+    snap.cells.forEach(function (t) {
+      if (!t) return;
+      grid[t.r][t.c] = { id: nextId++, value: t.value, r: t.r, c: t.c, isNew: true };
+    });
+  }
+
+  function move(dir) {
+    if (state !== 'playing') return;
+
+    var vec = VECTORS[dir];
+    var order = traversal(dir);
+    var before = snapshot();
+    var gained = 0;
+    var moved = false;
+
+    // Clear merge markers so a tile merges at most once per move.
+    eachCell(function (r, c, t) { if (t) t.merged = false; });
+
+    order.forEach(function (r) {
+      order.forEach(function (c) {
+        var tile = grid[r][c];
+        if (!tile) return;
+
+        var spot = farthest(r, c, vec);
+        var target = inBounds(spot.nr, spot.nc) ? grid[spot.nr][spot.nc] : null;
+
+        if (target && target.value === tile.value && !target.merged) {
+          // Merge this tile into its neighbour.
+          var value = tile.value * 2;
+          grid[spot.nr][spot.nc] = {
+            id: nextId++, value: value, r: spot.nr, c: spot.nc, merged: true, isNew: true
+          };
+          grid[r][c] = null;
+          tile.r = spot.nr;   // keep the old node sliding into place before removal
+          tile.c = spot.nc;
+          dead.push(tile);
+          dead.push(target);
+          gained += value;
+          moved = true;
+        } else if (spot.r !== r || spot.c !== c) {
+          grid[r][c] = null;
+          grid[spot.r][spot.c] = tile;
+          tile.r = spot.r;
+          tile.c = spot.c;
+          moved = true;
+        }
+      });
+    });
+
+    if (!moved) return;
+
+    history.push(before);
+    if (history.length > 20) history.shift();
+
+    score += gained;
+    if (score > best) { best = score; saveBest(best); }
+
+    addRandomTile();
+    render();
+    updateHud();
+
+    if (reachedTarget()) {
+      state = 'won';
+      showOverlay('你赢了！', true);
+    } else if (!movesAvailable()) {
+      state = 'over';
+      showOverlay('游戏结束', false);
+    }
+  }
+
+  var dead = [];   // tiles consumed by a merge, removed after the slide
+
+  /* ---------- rendering ---------- */
+
+  function geometry() {
+    var pad = 10, gap = 10;
+    var size = (boardEl.clientWidth - pad * 2 - gap * (SIZE - 1)) / SIZE;
+    return { pad: pad, gap: gap, size: size };
+  }
+
+  function positionOf(r, c) {
+    var g = geometry();
+    return {
+      x: g.pad + c * (g.size + g.gap),
+      y: g.pad + r * (g.size + g.gap),
+      s: g.size
+    };
+  }
+
+  function ensureCells() {
+    if (boardEl.querySelector('.cell')) return;
+    for (var i = 0; i < SIZE * SIZE; i++) {
+      var d = document.createElement('div');
+      d.className = 'cell';
+      boardEl.appendChild(d);
+    }
+  }
+
+  function styleTile(el, tile) {
+    var p = positionOf(tile.r, tile.c);
+    var bg = COLORS[tile.value] || '#3c3a32';
+    var fg = (tile.value === 2 || tile.value === 4) ? DARK_TEXT : LIGHT_TEXT;
+    var scale = tile.value >= 1024 ? 0.34 : tile.value >= 128 ? 0.40 : 0.46;
+
+    el.style.width = p.s + 'px';
+    el.style.height = p.s + 'px';
+    el.style.background = bg;
+    el.style.color = fg;
+    el.style.fontSize = Math.round(p.s * scale) + 'px';
+    el.style.transform = 'translate(' + p.x + 'px,' + p.y + 'px)';
+    el.textContent = tile.value;
+  }
+
+  function render() {
+    ensureCells();
+    var alive = {};
+
+    // Slide the tiles consumed by a merge onto their target, then drop them.
+    dead.forEach(function (tile) {
+      var el = nodes[tile.id];
+      if (!el) return;
+      styleTile(el, tile);
+      boardEl.removeChild(el);
+      delete nodes[tile.id];
+    });
+    dead = [];
+
+    eachCell(function (r, c, tile) {
+      if (!tile) return;
+      alive[tile.id] = true;
+
+      var el = nodes[tile.id];
+      if (!el) {
+        el = document.createElement('div');
+        el.className = 'tile';
+        boardEl.appendChild(el);
+        nodes[tile.id] = el;
+      }
+      // Pop tiles that are brand new or just produced by a merge.
+      el.classList.toggle('pop', !!tile.isNew);
+      styleTile(el, tile);
+      tile.isNew = false;
+    });
+
+    // Remove nodes whose tile disappeared from the grid.
+    Object.keys(nodes).forEach(function (id) {
+      if (!alive[id]) {
+        boardEl.removeChild(nodes[id]);
+        delete nodes[id];
+      }
+    });
+  }
+
+  function updateHud() {
+    scoreEl.textContent = score;
+    bestEl.textContent = best;
+  }
+
+  function showOverlay(msg, keepPlaying) {
+    overlayMsgEl.textContent = msg;
+    overlayBtnEl.textContent = keepPlaying ? '继续挑战' : '再来一局';
+    overlayEl.dataset.keep = keepPlaying ? '1' : '0';
+    overlayEl.classList.add('show');
+  }
+
+  function hideOverlay() {
+    overlayEl.classList.remove('show');
+  }
+
+  /* ---------- lifecycle ---------- */
+
+  function newGame() {
+    grid = emptyGrid();
+    nodes = {};
+    dead = [];
+    nextId = 1;
+    score = 0;
+    history = [];
+    state = 'playing';
+
+    Object.keys(nodes).forEach(function (id) { delete nodes[id]; });
+    Array.prototype.slice.call(boardEl.querySelectorAll('.tile'))
+      .forEach(function (n) { boardEl.removeChild(n); });
+
+    addRandomTile();
+    addRandomTile();
+    hideOverlay();
+    render();
+    updateHud();
+  }
+
+  function undo() {
+    if (!history.length) return;
+    var snap = history.pop();
+    restore(snap);
+    score = snap.score;
+    state = 'playing';
+    hideOverlay();
+    render();
+    updateHud();
+  }
+
+  /* ---------- input ---------- */
+
+  var KEYS = {
+    ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down',
+    a: 'left', d: 'right', w: 'up', s: 'down',
+    A: 'left', D: 'right', W: 'up', S: 'down'
+  };
+
+  document.addEventListener('keydown', function (ev) {
+    if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
+    var dir = KEYS[ev.key];
+    if (!dir) return;
+    ev.preventDefault();
+    move(dir);
+  });
+
+  var startX = 0, startY = 0, tracking = false;
+
+  boardEl.addEventListener('touchstart', function (ev) {
+    var t = ev.changedTouches[0];
+    startX = t.clientX; startY = t.clientY; tracking = true;
+  }, { passive: true });
+
+  boardEl.addEventListener('touchend', function (ev) {
+    if (!tracking) return;
+    tracking = false;
+    var t = ev.changedTouches[0];
+    var dx = t.clientX - startX;
+    var dy = t.clientY - startY;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) return;
+    if (Math.abs(dx) > Math.abs(dy)) move(dx > 0 ? 'right' : 'left');
+    else move(dy > 0 ? 'down' : 'up');
+  }, { passive: true });
+
+  document.getElementById('btnNew').addEventListener('click', newGame);
+  document.getElementById('btnUndo').addEventListener('click', undo);
+
+  overlayBtnEl.addEventListener('click', function () {
+    if (overlayEl.dataset.keep === '1') {
+      state = 'playing';
+      hideOverlay();
+    } else {
+      newGame();
+    }
+  });
+
+  window.addEventListener('resize', function () { render(); });
+
+  best = loadBest();
+  newGame();
+})();
+</script>
+</body>
+</html>

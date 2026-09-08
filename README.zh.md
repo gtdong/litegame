@@ -13,3 +13,6 @@ AI 生成的 HTML5 小游戏合集，零依赖，用浏览器打开 `index.html`
 - [snake-game](snake-game) — 贪吃蛇
 - [gomoku-game](gomoku-game) — 五子棋（禁手规则）
 - [xiangqi-game](xiangqi-game) — 中国象棋（人机对战）
+- [2048-game](2048-game) — 2048（滑动合并）
+- [minesweeper-game](minesweeper-game) — 扫雷（三档难度）
+- [breakout-game](breakout-game) — 打砖块

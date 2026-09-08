@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>打砖块</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --panel: #ffffff;
+    --border: #dfe3e8;
+    --text: #1f2328;
+    --muted: #6b7280;
+    --accent: #3b6ef5;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    margin: 0;
+    padding: 24px 16px 40px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+  }
+
+  h1 { margin: 0 0 4px; font-size: 30px; letter-spacing: -.02em; }
+  .tip { margin: 0 0 18px; font-size: 13px; color: var(--muted); text-align: center; }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+    box-shadow: 0 1px 2px rgba(16,24,40,.05), 0 4px 12px rgba(16,24,40,.06);
+  }
+
+  .hud {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+    font-size: 14px;
+  }
+  .hud b { font-size: 16px; }
+  .hud .right { display: flex; gap: 8px; align-items: center; }
+
+  button {
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--text);
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 13px;
+    cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); color: var(--accent); }
+
+  .stage { position: relative; }
+
+  canvas {
+    display: block;
+    width: 100%;
+    max-width: 480px;
+    height: auto;
+    border-radius: 8px;
+    background: #10151f;
+    touch-action: none;
+  }
+
+  #overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    background: rgba(16, 21, 31, .72);
+    border-radius: 8px;
+    color: #fff;
+    text-align: center;
+    padding: 20px;
+  }
+  #overlay.hide { display: none; }
+  #overlay .msg { font-size: 26px; font-weight: 700; }
+  #overlay .sub { font-size: 14px; color: #c7cedb; }
+  #overlay button { color: #fff; background: var(--accent); border-color: var(--accent); padding: 10px 22px; font-weight: 700; }
+</style>
+</head>
+<body>
+
+<h1>打砖块</h1>
+<p class="tip">鼠标移动 / ← → 键 / 手指拖动 控制挡板<br>挡住小球，打掉所有砖块</p>
+
+<div class="panel">
+  <div class="hud">
+    <div>得分 <b id="score">0</b></div>
+    <div>生命 <b id="lives">3</b> · 关卡 <b id="level">1</b></div>
+    <div class="right">
+      <button id="btnPause">暂停</button>
+      <button id="btnNew">重新开始</button>
+    </div>
+  </div>
+
+  <div class="stage">
+    <canvas id="cv" width="480" height="320"></canvas>
+    <div id="overlay">
+      <div class="msg" id="ovMsg">准备好了吗？</div>
+      <div class="sub" id="ovSub">点击开始</div>
+      <button id="ovBtn">开始游戏</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var W = 480, H = 320;
+  var PADDLE_W = 84, PADDLE_H = 10, PADDLE_Y = H - 26;
+  var BALL_R = 6;
+  var BRICK_ROWS = 5, BRICK_COLS = 9;
+  var BRICK_W = 46, BRICK_H = 18, BRICK_GAP = 4;
+  var BRICK_TOP = 46, BRICK_LEFT = 13;
+  var MAX_LIVES = 3;
+  var BASE_SPEED = 3.4;
+
+  var cv = document.getElementById('cv');
+  var ctx = cv.getContext('2d');
+  var scoreEl = document.getElementById('score');
+  var livesEl = document.getElementById('lives');
+  var levelEl = document.getElementById('level');
+  var overlayEl = document.getElementById('overlay');
+  var ovMsgEl = document.getElementById('ovMsg');
+  var ovSubEl = document.getElementById('ovSub');
+  var ovBtnEl = document.getElementById('ovBtn');
+  var btnPause = document.getElementById('btnPause');
+
+  // Row colors from top to bottom.
+  var ROW_COLORS = ['#e24b4a', '#ef9f27', '#639922', '#378add', '#7f77dd'];
+
+  var paddle, ball, bricks, score, lives, level, state, rafId;
+  var keys = { left: false, right: false };
+
+  /* ---------- canvas scaling ---------- */
+
+  function setupCanvas() {
+    var dpr = window.devicePixelRatio || 1;
+    cv.width = W * dpr;
+    cv.height = H * dpr;
+    cv.style.aspectRatio = W + ' / ' + H;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  /* ---------- level / entity setup ---------- */
+
+  function buildBricks() {
+    bricks = [];
+    for (var r = 0; r < BRICK_ROWS; r++) {
+      for (var c = 0; c < BRICK_COLS; c++) {
+        bricks.push({
+          x: BRICK_LEFT + c * (BRICK_W + BRICK_GAP),
+          y: BRICK_TOP + r * (BRICK_H + BRICK_GAP),
+          w: BRICK_W,
+          h: BRICK_H,
+          color: ROW_COLORS[r % ROW_COLORS.length],
+          alive: true
+        });
+      }
+    }
+  }
+
+  function speedForLevel() {
+    return BASE_SPEED + (level - 1) * 0.45;
+  }
+
+  function resetRound() {
+    paddle = { x: (W - PADDLE_W) / 2, y: PADDLE_Y, w: PADDLE_W, h: PADDLE_H };
+    ball = { x: W / 2, y: PADDLE_Y - BALL_R - 1, vx: 0, vy: 0, r: BALL_R, stuck: true };
+    buildBricks();
+    draw();
+  }
+
+  function launchBall() {
+    var speed = speedForLevel();
+    var angle = -Math.PI / 3 - Math.random() * (Math.PI / 3);
+    ball.vx = Math.cos(angle) * speed * (Math.random() < 0.5 ? 1 : -1);
+    ball.vy = Math.sin(angle) * speed;
+    ball.stuck = false;
+  }
+
+  function newGame() {
+    score = 0;
+    lives = MAX_LIVES;
+    level = 1;
+    resetRound();
+    updateHud();
+    showOverlay('准备好了吗？', '点击开始，或按空格发小球', '开始游戏');
+    state = 'ready';
+  }
+
+  function nextLevel() {
+    level++;
+    resetRound();
+    updateHud();
+    showOverlay('第 ' + level + ' 关', '球速变快了，小心点', '继续');
+    state = 'ready';
+  }
+
+  /* ---------- hud / overlay ---------- */
+
+  function updateHud() {
+    scoreEl.textContent = score;
+    livesEl.textContent = lives;
+    levelEl.textContent = level;
+  }
+
+  function showOverlay(msg, sub, btn) {
+    ovMsgEl.textContent = msg;
+    ovSubEl.textContent = sub;
+    ovBtnEl.textContent = btn;
+    overlayEl.classList.remove('hide');
+  }
+
+  function hideOverlay() {
+    overlayEl.classList.add('hide');
+  }
+
+  /* ---------- update ---------- */
+
+  function update() {
+    // Paddle movement from the keyboard.
+    if (keys.left) paddle.x -= 6.5;
+    if (keys.right) paddle.x += 6.5;
+    paddle.x = Math.max(0, Math.min(W - paddle.w, paddle.x));
+
+    if (ball.stuck) {
+      ball.x = paddle.x + paddle.w / 2;
+      ball.y = PADDLE_Y - BALL_R - 1;
+      return;
+    }
+
+    ball.x += ball.vx;
+    ball.y += ball.vy;
+
+    // Walls.
+    if (ball.x - ball.r < 0) { ball.x = ball.r; ball.vx = -ball.vx; }
+    if (ball.x + ball.r > W) { ball.x = W - ball.r; ball.vx = -ball.vx; }
+    if (ball.y - ball.r < 0) { ball.y = ball.r; ball.vy = -ball.vy; }
+
+    // Paddle: reflect and add a little spin based on where it landed.
+    if (ball.vy > 0 &&
+        ball.y + ball.r >= paddle.y &&
+        ball.y - ball.r <= paddle.y + paddle.h &&
+        ball.x >= paddle.x - ball.r &&
+        ball.x <= paddle.x + paddle.w + ball.r) {
+      var hit = (ball.x - (paddle.x + paddle.w / 2)) / (paddle.w / 2);
+      hit = Math.max(-1, Math.min(1, hit));
+      var speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
+      var angle = -Math.PI / 2 + hit * (Math.PI / 3);
+      ball.vx = Math.cos(angle) * speed;
+      ball.vy = Math.sin(angle) * speed;
+      ball.y = paddle.y - ball.r - 0.5;
+    }
+
+    // Bricks: resolve along the axis with the smaller overlap.
+    for (var i = 0; i < bricks.length; i++) {
+      var b = bricks[i];
+      if (!b.alive) continue;
+      if (ball.x + ball.r < b.x || ball.x - ball.r > b.x + b.w) continue;
+      if (ball.y + ball.r < b.y || ball.y - ball.r > b.y + b.h) continue;
+
+      b.alive = false;
+      score += 10;
+
+      var overlapX = Math.min(ball.x + ball.r - b.x, b.x + b.w - (ball.x - ball.r));
+      var overlapY = Math.min(ball.y + ball.r - b.y, b.y + b.h - (ball.y - ball.r));
+      if (overlapX < overlapY) ball.vx = -ball.vx;
+      else ball.vy = -ball.vy;
+
+      updateHud();
+      break;   // one brick per frame keeps the bounce predictable
+    }
+
+    // Bottom edge: lose a life.
+    if (ball.y - ball.r > H) {
+      lives--;
+      updateHud();
+      if (lives <= 0) {
+        state = 'over';
+        showOverlay('游戏结束', '最终得分 ' + score, '再来一局');
+        return;
+      }
+      ball.stuck = true;
+      return;
+    }
+
+    // Cleared the level.
+    if (!bricks.some(function (b) { return b.alive; })) {
+      state = 'cleared';
+      showOverlay('过关！', '得分 ' + score + '，进入第 ' + (level + 1) + ' 关', '下一关');
+      cancelAnimationFrame(rafId);
+      rafId = 0;
+    }
+  }
+
+  /* ---------- draw ---------- */
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+
+    // Bricks.
+    bricks.forEach(function (b) {
+      if (!b.alive) return;
+      ctx.fillStyle = b.color;
+      ctx.fillRect(b.x, b.y, b.w, b.h);
+      ctx.fillStyle = 'rgba(255,255,255,.22)';
+      ctx.fillRect(b.x, b.y, b.w, 3);
+    });
+
+    // Paddle.
+    ctx.fillStyle = '#e9edf2';
+    ctx.fillRect(paddle.x, paddle.y, paddle.w, paddle.h);
+
+    // Ball.
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    ctx.closePath();
+  }
+
+  function loop() {
+    if (state !== 'playing') return;
+    update();
+    if (state === 'playing') draw();
+    if (state === 'playing') rafId = requestAnimationFrame(loop);
+  }
+
+  function start() {
+    hideOverlay();
+    state = 'playing';
+    if (ball.stuck) launchBall();
+    cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(loop);
+  }
+
+  function pause() {
+    if (state !== 'playing') return;
+    cancelAnimationFrame(rafId);
+    rafId = 0;
+    state = 'paused';
+    showOverlay('已暂停', '点击继续', '继续');
+  }
+
+  /* ---------- input ---------- */
+
+  function pointerX(clientX) {
+    var rect = cv.getBoundingClientRect();
+    return (clientX - rect.left) / rect.width * W;
+  }
+
+  function movePaddleTo(x) {
+    paddle.x = Math.max(0, Math.min(W - paddle.w, x - paddle.w / 2));
+    if (ball.stuck) {
+      ball.x = paddle.x + paddle.w / 2;
+      draw();
+    }
+  }
+
+  cv.addEventListener('mousemove', function (ev) {
+    movePaddleTo(pointerX(ev.clientX));
+  });
+
+  cv.addEventListener('touchstart', function (ev) {
+    ev.preventDefault();
+    movePaddleTo(pointerX(ev.touches[0].clientX));
+  }, { passive: false });
+
+  cv.addEventListener('touchmove', function (ev) {
+    ev.preventDefault();
+    movePaddleTo(pointerX(ev.touches[0].clientX));
+  }, { passive: false });
+
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key === 'ArrowLeft') keys.left = true;
+    if (ev.key === 'ArrowRight') keys.right = true;
+    if (ev.key === ' ' || ev.key === 'Enter') {
+      ev.preventDefault();
+      if (state === 'ready' || state === 'paused') start();
+    }
+  });
+
+  document.addEventListener('keyup', function (ev) {
+    if (ev.key === 'ArrowLeft') keys.left = false;
+    if (ev.key === 'ArrowRight') keys.right = false;
+  });
+
+  ovBtnEl.addEventListener('click', function () {
+    if (state === 'over') newGame();
+    else if (state === 'cleared') nextLevel();
+    else start();
+  });
+
+  btnPause.addEventListener('click', function () {
+    if (state === 'playing') { pause(); btnPause.textContent = '继续'; }
+    else if (state === 'paused') { start(); btnPause.textContent = '暂停'; }
+  });
+
+  document.getElementById('btnNew').addEventListener('click', function () {
+    btnPause.textContent = '暂停';
+    newGame();
+  });
+
+  cv.addEventListener('click', function () {
+    if (state === 'ready') start();
+  });
+
+  window.addEventListener('resize', function () {
+    setupCanvas();
+    draw();
+  });
+
+  setupCanvas();
+  newGame();
+})();
+</script>
+</body>
+</html>

@@ -13,4 +13,7 @@ Play online: <https://litegame-hub.github.io/>
 - [snake-game](snake-game) — Snake
 - [gomoku-game](gomoku-game) — Gomoku (Renju forbidden-move rules)
 - [xiangqi-game](xiangqi-game) — Chinese Chess (player vs computer)
+- [2048-game](2048-game) — 2048 (slide and merge)
+- [minesweeper-game](minesweeper-game) — Minesweeper (three difficulties)
+- [breakout-game](breakout-game) — Breakout (paddle and bricks)
 
