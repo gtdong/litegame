@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>五子棋 · 禁手规则</title>
+<style>
+  :root{
+    --bg:#f4f5f7; --card:#ffffff; --line:#e5e7eb; --text:#1f2328;
+    --muted:#6b7280; --accent:#2f6feb; --danger:#d92d20; --ok:#1a7f37;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font:14px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",Arial,sans-serif;
+  }
+  .app{max-width:1000px; margin:0 auto; padding:24px 20px 40px}
+  h1{font-size:20px; margin:0 0 4px}
+  .sub{color:var(--muted); font-size:12px; margin-bottom:18px}
+  main{display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap}
+  .board-card{position:relative; background:var(--card); padding:12px; border-radius:14px;
+    box-shadow:0 1px 3px rgba(16,24,40,.08),0 8px 24px rgba(16,24,40,.06)}
+  canvas{display:block; border-radius:8px; max-width:100%; height:auto; cursor:pointer}
+  .panel{flex:1; min-width:260px; background:var(--card); border-radius:14px; padding:16px;
+    box-shadow:0 1px 3px rgba(16,24,40,.08),0 8px 24px rgba(16,24,40,.06)}
+  .row{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px}
+  .row label{color:var(--muted); font-size:13px; white-space:nowrap}
+  select{flex:1; padding:6px 8px; border:1px solid var(--line); border-radius:8px; background:#fff;
+    color:var(--text); font-size:13px}
+  .btns{display:flex; gap:8px; margin:16px 0 4px}
+  button{flex:1; padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:#fff;
+    color:var(--text); font-size:13px; cursor:pointer; transition:.15s}
+  button:hover{border-color:var(--accent); color:var(--accent)}
+  button.primary{background:var(--accent); border-color:var(--accent); color:#fff}
+  button.primary:hover{opacity:.9; color:#fff}
+  .turn{display:flex; align-items:center; gap:8px; font-size:14px; font-weight:600; margin-bottom:10px}
+  .disc{width:16px; height:16px; border-radius:50%; display:inline-block; border:1px solid #c9ced6}
+  .disc.b{background:radial-gradient(circle at 32% 30%,#6b6b6b,#0a0a0a)}
+  .disc.w{background:radial-gradient(circle at 32% 30%,#ffffff,#cfd4dc)}
+  .meta{font-size:12px; color:var(--muted)}
+  .toast{margin-top:10px; min-height:20px; font-size:13px; color:var(--danger)}
+  .toast.info{color:var(--muted)}
+  .toast.good{color:var(--ok)}
+  hr{border:0; border-top:1px solid var(--line); margin:14px 0}
+  details{font-size:12px; color:var(--muted)}
+  summary{cursor:pointer; color:var(--accent); outline:none}
+  details ul{padding-left:18px; margin:8px 0 0}
+  .banner{position:absolute; inset:0; display:none; align-items:center; justify-content:center;
+    background:rgba(255,255,255,.72); border-radius:8px; font-size:22px; font-weight:700}
+  .banner.show{display:flex}
+  .banner span{background:#fff; padding:10px 22px; border-radius:12px;
+    box-shadow:0 2px 10px rgba(16,24,40,.15)}
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>五子棋 · 禁手规则（Renju）</h1>
+  <div class="sub">黑棋先行，受三三 / 四四 / 长连禁手限制；白棋无禁手，六连以上同样获胜。</div>
+
+  <main>
+    <div class="board-card">
+      <canvas id="board"></canvas>
+      <div class="banner" id="banner"><span id="bannerText"></span></div>
+    </div>
+
+    <aside class="panel">
+      <div class="turn"><span class="disc b" id="turnDisc"></span><span id="turnText">黑方落子</span></div>
+      <div class="meta" id="meta">第 1 手 · 无落子</div>
+
+      <hr>
+      <div class="row">
+        <label>对战模式</label>
+        <select id="mode">
+          <option value="pvp">双人对战</option>
+          <option value="ai" selected>人机对战</option>
+        </select>
+      </div>
+      <div class="row" id="aiSideRow">
+        <label>电脑执子</label>
+        <select id="aiSide">
+          <option value="2" selected>白棋（玩家先手）</option>
+          <option value="1">黑棋（电脑先手）</option>
+        </select>
+      </div>
+      <div class="row">
+        <label>禁手处理</label>
+        <select id="foulMode">
+          <option value="ban" selected>禁手点禁止落子</option>
+          <option value="lose">落禁手即判负</option>
+          <option value="off">关闭禁手</option>
+        </select>
+      </div>
+
+      <div class="btns">
+        <button id="btnUndo">悔棋</button>
+        <button id="btnReset" class="primary">重新开始</button>
+      </div>
+      <div class="toast info" id="toast">提示：黑方悬停禁手点会显示红色叉号。</div>
+
+      <hr>
+      <details>
+        <summary>禁手规则说明</summary>
+        <ul>
+          <li><b>三三禁手</b>：一子落下同时形成两个「活三」。</li>
+          <li><b>四四禁手</b>：一子落下同时形成两个「四」（活四或冲四）。</li>
+          <li><b>长连禁手</b>：一子落下形成六子以上相连。</li>
+          <li>黑棋「四三」合法，成五优先于禁手（长连除外）。</li>
+          <li>本实现未处理递归禁手（因禁手点导致的假三）。</li>
+        </ul>
+      </details>
+    </aside>
+  </main>
+</div>
+
+<script id="gomoku-engine">
+/* ================= Rules engine (can be required directly by Node for tests) ================= */
+const SIZE = 15;
+const EMPTY = 0, BLACK = 1, WHITE = 2;
+const DIRS = [[1,0],[0,1],[1,1],[1,-1]];
+
+function createBoard(){ return new Array(SIZE * SIZE).fill(EMPTY); }
+function idxOf(x, y){ return y * SIZE + x; }
+function inBoard(x, y){ return x >= 0 && x < SIZE && y >= 0 && y < SIZE; }
+
+// Take the 9 cells centered on (x,y) along direction d; out-of-board cells are -1
+// and the center is set to color, simulating a stone being placed there
+function lineAt(board, x, y, d, color){
+  const dx = d[0], dy = d[1], arr = new Array(9);
+  for (let i = -4; i <= 4; i++){
+    const nx = x + dx * i, ny = y + dy * i;
+    arr[i + 4] = inBoard(nx, ny) ? board[idxOf(nx, ny)] : -1;
+  }
+  arr[4] = color;
+  return arr;
+}
+
+// Analyze a single direction for five / overline / four / open four;
+// every window that counts must contain the center
+function analyzeLine(arr, color, center){
+  center = (center === undefined) ? 4 : center;
+  let five = false, long = false, four = false;
+  const fivePoints = new Set();
+  for (let s = 0; s <= 4; s++){
+    if (center < s || center > s + 4) continue;
+    let cnt = 0, blocked = false;
+    const empties = [];
+    for (let k = s; k <= s + 4; k++){
+      const v = arr[k];
+      if (v === color) cnt++;
+      else if (v === EMPTY) empties.push(k);
+      else { blocked = true; break; }
+    }
+    if (blocked) continue;
+    if (cnt === 5){                                  // Five in a row: an overline if a friendly stone sits outside the window
+      if (arr[s - 1] === color || arr[s + 5] === color) long = true; else five = true;
+    } else if (cnt === 4){                           // Four: filling the empty cell makes five
+      if (arr[s - 1] === color || arr[s + 5] === color){ long = true; continue; }
+      four = true; fivePoints.add(empties[0]);
+    }
+  }
+  return { five, long, four, openFour: fivePoints.size >= 2 };
+}
+
+// Whether this direction forms an open three: some empty cell produces
+// an open four that still contains the original point
+function lineHasOpenThree(arr, color, center){
+  center = (center === undefined) ? 4 : center;
+  for (let i = 0; i < 9; i++){
+    if (arr[i] !== EMPTY) continue;
+    const t = arr.slice();
+    t[i] = color;
+    const r = analyzeLine(t, color, center);
+    if (r.four && r.openFour) return true;
+  }
+  return false;
+}
+
+// Length of the same-color run that contains (x,y)
+function countLen(board, x, y, d, color){
+  const dx = d[0], dy = d[1];
+  let n = 1;
+  for (let s = 1; s <= 5; s++){
+    const nx = x + dx * s, ny = y + dy * s;
+    if (inBoard(nx, ny) && board[idxOf(nx, ny)] === color) n++; else break;
+  }
+  for (let s = 1; s <= 5; s++){
+    const nx = x - dx * s, ny = y - dy * s;
+    if (inBoard(nx, ny) && board[idxOf(nx, ny)] === color) n++; else break;
+  }
+  return n;
+}
+
+/**
+ * Evaluate placing `color` at (x,y)
+ * @returns {{win:boolean, foul:string|null, fourCnt:number, threeCnt:number, maxLen:number}}
+ *          foul: 'long' | 'double-four' | 'double-three'
+ */
+function checkMove(board, x, y, color){
+  const i = idxOf(x, y);
+  if (!inBoard(x, y) || board[i] !== EMPTY) return { win:false, foul:null, fourCnt:0, threeCnt:0, maxLen:0 };
+  board[i] = color;
+  let maxLen = 0, long = false, fourCnt = 0, threeCnt = 0;
+  for (const d of DIRS){
+    const len = countLen(board, x, y, d, color);
+    if (len > maxLen) maxLen = len;
+    if (len >= 6) long = true;
+    const arr = lineAt(board, x, y, d, color);
+    const r = analyzeLine(arr, color, 4);
+    if (r.four) fourCnt++;                                   // Directions already counted as four are not counted as three
+    else if (lineHasOpenThree(arr, color, 4)) threeCnt++;
+  }
+  board[i] = EMPTY;
+
+  const res = { win:false, foul:null, fourCnt, threeCnt, maxLen };
+  if (color === BLACK){
+    if (long) res.foul = 'long';                             // An overline takes precedence over five in a row
+    else if (maxLen === 5) res.win = true;
+    else if (fourCnt >= 2) res.foul = 'double-four';
+    else if (threeCnt >= 2) res.foul = 'double-three';
+  } else {
+    if (maxLen >= 5) res.win = true;                         // White has no forbidden moves; an overline also wins
+  }
+  return res;
+}
+
+function isFoulPoint(board, x, y){ return checkMove(board, x, y, BLACK).foul; }
+
+if (typeof module !== 'undefined' && module.exports){
+  module.exports = { SIZE, EMPTY, BLACK, WHITE, DIRS, createBoard, idxOf, inBoard,
+    lineAt, analyzeLine, lineHasOpenThree, countLen, checkMove, isFoulPoint };
+}
+</script>
+
+<script>
+/* ================= UI and AI ================= */
+const CELL = 36, PAD = 26, W = PAD * 2 + CELL * (SIZE - 1);
+const canvas = document.getElementById('board');
+const ctx = canvas.getContext('2d');
+const dpr = window.devicePixelRatio || 1;
+canvas.width = W * dpr; canvas.height = W * dpr;
+canvas.style.width = W + 'px'; canvas.style.height = W + 'px';
+ctx.scale(dpr, dpr);
+
+const el = id => document.getElementById(id);
+const board = createBoard();
+const state = {
+  turn: BLACK, over: false, winner: 0, foulReason: null,
+  mode: 'ai', aiColor: WHITE, foulMode: 'ban',
+  last: null, hover: null, thinking: false
+};
+let history = [];
+
+/* ---------- Rendering ---------- */
+const COLS = 'ABCDEFGHIJKLMNO';
+function draw(){
+  ctx.clearRect(0, 0, W, W);
+  ctx.fillStyle = '#e9c893';
+  ctx.fillRect(0, 0, W, W);
+
+  ctx.strokeStyle = 'rgba(80,55,25,.7)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let i = 0; i < SIZE; i++){
+    const p = PAD + i * CELL;
+    ctx.moveTo(PAD, p); ctx.lineTo(PAD + CELL * (SIZE - 1), p);
+    ctx.moveTo(p, PAD); ctx.lineTo(p, PAD + CELL * (SIZE - 1));
+  }
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(80,55,25,.95)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(PAD - 0.5, PAD - 0.5, CELL * (SIZE - 1) + 1, CELL * (SIZE - 1) + 1);
+
+  ctx.fillStyle = 'rgba(80,55,25,.9)';
+  [[3,3],[11,3],[3,11],[11,11],[7,7]].forEach(([x,y]) => {
+    ctx.beginPath();
+    ctx.arc(PAD + x * CELL, PAD + y * CELL, 3, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  ctx.fillStyle = 'rgba(60,40,15,.45)';
+  ctx.font = '10px -apple-system,Arial';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (let i = 0; i < SIZE; i++){
+    ctx.fillText(COLS[i], PAD + i * CELL, PAD - 13);
+    ctx.fillText(String(i + 1), PAD - 14, PAD + i * CELL);
+  }
+
+  for (let y = 0; y < SIZE; y++)
+    for (let x = 0; x < SIZE; x++){
+      const v = board[idxOf(x, y)];
+      if (v) drawStone(x, y, v, 1);
+    }
+
+  if (state.last){
+    const [lx, ly] = state.last;
+    ctx.strokeStyle = '#d92d20'; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(PAD + lx * CELL, PAD + ly * CELL, CELL * 0.46, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  const h = state.hover;
+  if (h && !state.over && !state.thinking && board[idxOf(h[0], h[1])] === EMPTY){
+    const [x, y] = h;
+    const foul = (state.turn === BLACK && state.foulMode !== 'off') ? isFoulPoint(board, x, y) : null;
+    if (foul){
+      const cx = PAD + x * CELL, cy = PAD + y * CELL, r = CELL * 0.42;
+      ctx.strokeStyle = 'rgba(217,45,32,.95)'; ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(cx - r, cy - r); ctx.lineTo(cx + r, cy + r);
+      ctx.moveTo(cx + r, cy - r); ctx.lineTo(cx - r, cy + r);
+      ctx.stroke();
+    } else {
+      drawStone(x, y, state.turn, 0.45);
+    }
+  }
+}
+
+function drawStone(x, y, color, alpha){
+  const cx = PAD + x * CELL, cy = PAD + y * CELL, r = CELL * 0.42;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.beginPath(); ctx.arc(cx + 1, cy + 2, r, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.fill();
+  const g = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.4, r * 0.15, cx, cy, r);
+  if (color === BLACK){ g.addColorStop(0, '#6e6e6e'); g.addColorStop(1, '#0b0b0b'); }
+  else { g.addColorStop(0, '#ffffff'); g.addColorStop(1, '#c9cfd8'); }
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fillStyle = g; ctx.fill();
+  ctx.strokeStyle = color === BLACK ? 'rgba(0,0,0,.5)' : 'rgba(90,95,105,.6)';
+  ctx.lineWidth = 1; ctx.stroke();
+  ctx.restore();
+}
+
+/* ---------- Interaction ---------- */
+const FOUL_NAME = { 'long':'长连禁手', 'double-four':'四四禁手', 'double-three':'三三禁手' };
+
+function toast(msg, type){
+  const t = el('toast');
+  t.textContent = msg;
+  t.className = 'toast ' + (type || 'info');
+}
+
+function coordText(x, y){ return COLS[x] + (y + 1); }
+
+function updateUI(){
+  el('turnDisc').className = 'disc ' + (state.turn === BLACK ? 'b' : 'w');
+  el('turnText').textContent = state.over
+    ? (state.winner ? (state.winner === BLACK ? '黑方获胜' : '白方获胜') : '对局结束')
+    : (state.turn === BLACK ? '黑方落子' : '白方落子');
+  el('meta').textContent = '第 ' + (history.length + 1) + ' 手 · 最近 ' +
+    (state.last ? coordText(state.last[0], state.last[1]) : '无落子');
+  el('aiSideRow').style.display = state.mode === 'ai' ? '' : 'none';
+  const banner = el('banner');
+  if (state.over && state.winner){
+    el('bannerText').textContent = (state.winner === BLACK ? '黑方' : '白方') + '获胜' +
+      (state.foulReason ? '（黑方' + FOUL_NAME[state.foulReason] + '）' : '');
+    banner.classList.add('show');
+  } else banner.classList.remove('show');
+}
+
+function tryMove(x, y){
+  if (state.over || state.thinking || board[idxOf(x, y)] !== EMPTY) return;
+  if (state.mode === 'ai' && state.turn === state.aiColor) return;
+
+  const color = state.turn;
+  const res = checkMove(board, x, y, color);
+
+  if (color === BLACK && state.foulMode === 'ban' && res.foul){
+    toast('黑棋禁手：' + FOUL_NAME[res.foul] + '，此点不能落子', 'danger');
+    return;
+  }
+  place(x, y, color, res);
+}
+
+function place(x, y, color, res){
+  board[idxOf(x, y)] = color;
+  history.push({ x, y, color });
+  state.last = [x, y];
+
+  if (res.win){
+    state.over = true; state.winner = color;
+    toast((color === BLACK ? '黑方' : '白方') + '五连获胜！', 'good');
+  } else if (color === BLACK && state.foulMode === 'lose' && res.foul){
+    state.over = true; state.winner = WHITE; state.foulReason = res.foul;
+    toast('黑方' + FOUL_NAME[res.foul] + '，判负', 'danger');
+  } else {
+    state.turn = 3 - color;
+    toast(state.mode === 'ai' && state.turn === state.aiColor ? '电脑思考中…' : '', 'info');
+  }
+  draw(); updateUI();
+
+  if (!state.over && state.mode === 'ai' && state.turn === state.aiColor){
+    state.thinking = true;
+    setTimeout(() => {
+      const mv = aiMove();
+      state.thinking = false;
+      if (mv) place(mv.x, mv.y, state.aiColor, checkMove(board, mv.x, mv.y, state.aiColor));
+      else { state.over = true; toast('无子可下，和棋', 'info'); updateUI(); }
+      draw();
+    }, 220);
+  }
+}
+
+function rebuild(){
+  board.fill(EMPTY);
+  state.last = null; state.over = false; state.winner = 0; state.foulReason = null;
+  state.turn = BLACK; state.thinking = false;
+  for (const h of history){ board[idxOf(h.x, h.y)] = h.color; state.last = [h.x, h.y]; }
+  if (history.length) state.turn = 3 - history[history.length - 1].color;
+}
+
+function reset(){
+  history = []; rebuild(); draw(); updateUI();
+  toast('新局开始，黑方先行', 'info');
+  if (state.mode === 'ai' && state.aiColor === BLACK){
+    state.thinking = true;
+    setTimeout(() => {
+      const mv = aiMove();
+      state.thinking = false;
+      if (mv) place(mv.x, mv.y, BLACK, checkMove(board, mv.x, mv.y, BLACK));
+      draw();
+    }, 220);
+  }
+}
+
+function undo(){
+  if (!history.length || state.thinking) return;
+  history.pop();
+  if (state.mode === 'ai' && history.length && history[history.length - 1].color === state.aiColor)
+    history.pop();
+  rebuild(); draw(); updateUI();
+  toast('已悔棋', 'info');
+}
+
+/* ---------- AI ---------- */
+const PATTERNS = [
+  [/aaaaa/, 1000000],                                   // five in a row
+  [/_aaaa_/, 100000],                                   // open four
+  [/aaaa_|_aaaa|aa_aa|a_aaa|aaa_a/, 10000],             // four (one move from five)
+  [/_aaa_|_a_aa_|_aa_a_/, 8000],                        // open three
+  [/aaa|aa_a|a_aa/, 800],                               // sleeping three
+  [/__aa__|_a_a_|_aa_/, 500],                           // open two
+  [/aa|a_a/, 60]                                        // sleeping two
+];
+
+function scorePoint(x, y, color){
+  const i = idxOf(x, y);
+  if (board[i] !== EMPTY) return 0;
+  board[i] = color;
+  let total = 0;
+  for (const d of DIRS){
+    const arr = lineAt(board, x, y, d, color);
+    let s = '';
+    for (let k = 0; k < 9; k++) s += arr[k] === color ? 'a' : (arr[k] === EMPTY ? '_' : 'x');
+    for (const [re, val] of PATTERNS){ if (re.test(s)){ total += val; break; } }
+  }
+  board[i] = EMPTY;
+  return total;
+}
+
+function candidates(){
+  const out = [];
+  for (let y = 0; y < SIZE; y++)
+    for (let x = 0; x < SIZE; x++){
+      if (board[idxOf(x, y)] !== EMPTY) continue;
+      let near = false;
+      for (let dy = -2; dy <= 2 && !near; dy++)
+        for (let dx = -2; dx <= 2; dx++){
+          const nx = x + dx, ny = y + dy;
+          if (inBoard(nx, ny) && board[idxOf(nx, ny)] !== EMPTY){ near = true; break; }
+        }
+      if (near) out.push({ x, y });
+    }
+  return out.length ? out : [{ x:7, y:7 }];
+}
+
+function aiMove(){
+  const me = state.aiColor, opp = 3 - me;
+  let best = null, bestScore = -Infinity;
+  for (const p of candidates()){
+    if (me === BLACK && state.foulMode !== 'off' && isFoulPoint(board, p.x, p.y)) continue;
+    const s = scorePoint(p.x, p.y, me) + scorePoint(p.x, p.y, opp) * 0.85 + Math.random() * 5;
+    if (s > bestScore){ bestScore = s; best = p; }
+  }
+  return best;
+}
+
+/* ---------- Events ---------- */
+function toCell(e){
+  const rect = canvas.getBoundingClientRect();
+  const px = (e.clientX - rect.left) * (W / rect.width);
+  const py = (e.clientY - rect.top) * (W / rect.height);
+  const x = Math.round((px - PAD) / CELL), y = Math.round((py - PAD) / CELL);
+  return inBoard(x, y) ? [x, y] : null;
+}
+canvas.addEventListener('mousemove', e => {
+  const c = toCell(e);
+  const changed = !c !== !state.hover || (c && state.hover && (c[0] !== state.hover[0] || c[1] !== state.hover[1]));
+  state.hover = c;
+  if (changed) draw();
+});
+canvas.addEventListener('mouseleave', () => { state.hover = null; draw(); });
+canvas.addEventListener('click', e => {
+  const c = toCell(e);
+  if (c) tryMove(c[0], c[1]);
+});
+el('mode').addEventListener('change', e => { state.mode = e.target.value; reset(); });
+el('aiSide').addEventListener('change', e => { state.aiColor = +e.target.value; reset(); });
+el('foulMode').addEventListener('change', e => { state.foulMode = e.target.value; draw(); });
+el('btnUndo').addEventListener('click', undo);
+el('btnReset').addEventListener('click', reset);
+
+reset();
+</script>
+</body>
+</html>

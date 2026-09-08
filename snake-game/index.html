@@ -7,7 +7,7 @@
 <title>贪吃蛇 · Snake</title>
 <style>
   /* ============================================================
-     样式分区：基础 / 布局 / 顶栏 / 游戏区 / Overlay
+     Style sections: base / layout / topbar / game area / overlay
      ============================================================ */
   :root {
     --bg: #0f1220;
@@ -29,7 +29,7 @@
     color: var(--text);
     font-family: "PingFang SC", "Microsoft YaHei", -apple-system, "Segoe UI", sans-serif;
     -webkit-tap-highlight-color: transparent;
-    overscroll-behavior: none; /* 阻止触屏下拉刷新 */
+    overscroll-behavior: none; /* Prevent pull-to-refresh on touch devices */
   }
 
   body {
@@ -43,7 +43,7 @@
     min-height: 100dvh;
   }
 
-  /* ---------- 顶栏：分数信息 ---------- */
+  /* ---------- Topbar: score info ---------- */
   .topbar {
     width: var(--board-size, 480px);
     max-width: 100%;
@@ -61,7 +61,7 @@
   .topbar .best  { color: var(--accent); }
   .topbar .hint  { color: var(--text-dim); font-size: 12px; }
 
-  /* ---------- 游戏区 ---------- */
+  /* ---------- Game area ---------- */
   .board-wrap {
     position: relative;
     width: var(--board-size, 480px);
@@ -76,10 +76,10 @@
     display: block;
     width: 100%;
     height: 100%;
-    touch-action: none; /* 手势交给游戏自己处理 */
+    touch-action: none; /* Gestures are handled by the game itself */
   }
 
-  /* ---------- Overlay：开始 / 结束 / 暂停 ---------- */
+  /* ---------- Overlay: start / game over / paused ---------- */
   .overlay {
     position: absolute;
     inset: 0;
@@ -139,18 +139,18 @@
 </head>
 <body>
 
-  <!-- 顶栏：当前分数 / 最高分 -->
+  <!-- Topbar: current score / best score -->
   <div class="topbar">
     <span><span class="label">分数</span><span class="value score" id="score">0</span></span>
     <span class="hint" id="hint">方向键 / WASD 移动 · 空格暂停</span>
     <span><span class="label">最高分</span><span class="value best" id="best">0</span></span>
   </div>
 
-  <!-- 游戏区 -->
+  <!-- Game area -->
   <div class="board-wrap">
     <canvas id="game" width="480" height="480"></canvas>
 
-    <!-- 开始界面 -->
+    <!-- Start screen -->
     <div class="overlay" id="startOverlay">
       <h1>贪吃蛇</h1>
       <p class="sub">
@@ -161,7 +161,7 @@
       <p class="key-hint">按 <kbd>Enter</kbd> 也可以开始</p>
     </div>
 
-    <!-- 结束界面 -->
+    <!-- Game over screen -->
     <div class="overlay hidden" id="gameOverOverlay">
       <h1>游戏结束</h1>
       <div class="final-score" id="finalScore">0</div>
@@ -171,7 +171,7 @@
       <p class="key-hint">按 <kbd>Enter</kbd> 重新开始</p>
     </div>
 
-    <!-- 暂停界面 -->
+    <!-- Pause screen -->
     <div class="overlay hidden" id="pauseOverlay">
       <h1>已暂停</h1>
       <p class="key-hint">按 <kbd>空格</kbd> 继续</p>
@@ -183,18 +183,18 @@
   'use strict';
 
   /* ============================================================
-     一、常量与配置
+     1. Constants and configuration
      ============================================================ */
-  var GRID = 24;                 // 棋盘 24 x 24 格
-  var CELL = 20;                 // 每格像素（canvas 逻辑尺寸 480x480）
+  var GRID = 24;                 // 24 x 24 grid
+  var CELL = 20;                 // Pixel size per cell (canvas logical size 480x480)
   var CANVAS_SIZE = GRID * CELL; // 480
 
-  var BASE_SPEED = 150;          // 初始步进间隔（毫秒）
-  var MIN_SPEED = 65;            // 速度上限（间隔下限，越小越快）
-  var SPEED_STEP = 4;            // 每吃一个食物，间隔减少的毫秒数
+  var BASE_SPEED = 150;          // Initial step interval (ms)
+  var MIN_SPEED = 65;            // Speed cap (lower interval means faster)
+  var SPEED_STEP = 4;            // Interval reduction per food eaten (ms)
 
-  var SCORE_PER_FOOD = 10;       // 每个食物得分
-  var BEST_KEY = 'snake_best_score'; // localStorage 键名
+  var SCORE_PER_FOOD = 10;       // Score per food
+  var BEST_KEY = 'snake_best_score'; // localStorage key
 
   var Direction = {
     UP:    { x: 0,  y: -1 },
@@ -204,7 +204,7 @@
   };
 
   /* ============================================================
-     二、DOM 引用
+     2. DOM references
      ============================================================ */
   var canvas = document.getElementById('game');
   var ctx = canvas.getContext('2d');
@@ -220,46 +220,46 @@
   var restartBtn = document.getElementById('restartBtn');
 
   /* ============================================================
-     三、游戏状态
+     3. Game state
      ============================================================ */
   var GameState = {
-    READY: 'ready',     // 开始界面
-    RUNNING: 'running', // 游戏中
-    PAUSED: 'paused',   // 暂停
-    OVER: 'over'        // 结束
+    READY: 'ready',     // Start screen
+    RUNNING: 'running', // Running
+    PAUSED: 'paused',   // Paused
+    OVER: 'over'        // Game over
   };
 
   var state = {
     phase: GameState.READY,
-    snake: [],        // 数组头在前：[{x, y}, ...]
-    dir: Direction.RIGHT,   // 当前实际移动方向
-    nextDir: Direction.RIGHT, // 输入缓冲方向（每步只应用一次，防连按反向）
+    snake: [],        // Head first: [{x, y}, ...]
+    dir: Direction.RIGHT,   // Current moving direction
+    nextDir: Direction.RIGHT, // Buffered input direction, applied once per step to avoid reversing
     food: { x: 0, y: 0 },
     score: 0,
     best: 0,
     stepInterval: BASE_SPEED,
-    accTime: 0,       // rAF 累积时间，用于固定步长更新
+    accTime: 0,       // rAF accumulated time for fixed-step updates
     lastTime: 0,
     rafId: 0
   };
 
   /* ============================================================
-     四、工具函数
+     4. Utility functions
      ============================================================ */
 
-  /** 读取最高分（localStorage 持久化） */
+  /** Load the best score (persisted in localStorage) */
   function loadBest() {
     var v = 0;
-    try { v = parseInt(localStorage.getItem(BEST_KEY), 10) || 0; } catch (e) { /* 隐私模式下忽略 */ }
+    try { v = parseInt(localStorage.getItem(BEST_KEY), 10) || 0; } catch (e) { /* Ignore in private mode */ }
     return v;
   }
 
-  /** 保存最高分 */
+  /** Save the best score */
   function saveBest(score) {
-    try { localStorage.setItem(BEST_KEY, String(score)); } catch (e) { /* 忽略 */ }
+    try { localStorage.setItem(BEST_KEY, String(score)); } catch (e) { /* Ignore */ }
   }
 
-  /** 在空格子中随机放置食物（避开蛇身） */
+  /** Place food randomly in a free cell (avoiding the snake body) */
   function spawnFood() {
     var occupied = {};
     for (var i = 0; i < state.snake.length; i++) {
@@ -271,19 +271,19 @@
         if (!occupied[x + ',' + y]) free.push({ x: x, y: y });
       }
     }
-    // 没有空格 = 蛇占满全场（通关），任意放一个即可触发胜利式结束
+    // No free cell means the snake fills the board (win condition); place a dummy one
     state.food = free.length > 0
       ? free[Math.floor(Math.random() * free.length)]
       : { x: -1, y: -1 };
   }
 
   /* ============================================================
-     五、游戏流程控制
+     5. Game flow control
      ============================================================ */
 
-  /** 重置并开始一局新游戏 */
+  /** Reset and start a new game */
   function startGame() {
-    // 按钮聚焦时按 Enter 会同时触发 keydown 与 click，失焦避免双重重启
+    // A focused button fires both keydown and click on Enter; blur it to avoid a double restart
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
     var cx = Math.floor(GRID / 2);
     var cy = Math.floor(GRID / 2);
@@ -312,7 +312,7 @@
     state.rafId = requestAnimationFrame(loop);
   }
 
-  /** 暂停 / 继续 */
+  /** Pause / resume */
   function togglePause() {
     if (state.phase === GameState.RUNNING) {
       state.phase = GameState.PAUSED;
@@ -320,11 +320,11 @@
     } else if (state.phase === GameState.PAUSED) {
       state.phase = GameState.RUNNING;
       pauseOverlay.classList.add('hidden');
-      state.lastTime = performance.now(); // 重置计时基准，避免暂停期间累积步长
+      state.lastTime = performance.now(); // Reset the time base so no steps accumulate while paused
     }
   }
 
-  /** 游戏结束：结算并处理最高分 */
+  /** Game over: settle the score and update the best score */
   function gameOver() {
     state.phase = GameState.OVER;
     cancelAnimationFrame(state.rafId);
@@ -344,21 +344,21 @@
     gameOverOverlay.classList.remove('hidden');
   }
 
-  /** 单步逻辑更新：移动蛇、判定碰撞、吃食物 */
+  /** One step: move the snake, detect collisions, eat food */
   function step() {
-    // 应用输入缓冲方向（保证一帧内多次按键不会 180 度反向）
+    // Apply the buffered direction so rapid key presses cannot cause a 180-degree reversal
     state.dir = state.nextDir;
 
     var head = state.snake[0];
     var nx = head.x + state.dir.x;
     var ny = head.y + state.dir.y;
 
-    // 撞墙
+    // Hit the wall
     if (nx < 0 || nx >= GRID || ny < 0 || ny >= GRID) {
       gameOver();
       return;
     }
-    // 撞自身（尾巴即将离开的格子不算：若这步不吃食物，尾尖会移走）
+    // Hit itself: the tail tip moves away this step, so it does not count unless food is eaten
     var willEat = (nx === state.food.x && ny === state.food.y);
     var checkLen = willEat ? state.snake.length : state.snake.length - 1;
     for (var i = 0; i < checkLen; i++) {
@@ -368,31 +368,31 @@
       }
     }
 
-    // 前进：新头入队
+    // Move forward: push the new head
     state.snake.unshift({ x: nx, y: ny });
 
     if (willEat) {
-      // 吃到食物：不删尾（增长）、加分、提速
+      // Ate food: keep the tail (grow), add score, speed up
       state.score += SCORE_PER_FOOD;
       state.stepInterval = Math.max(MIN_SPEED, state.stepInterval - SPEED_STEP);
       spawnFood();
       updateHud();
     } else {
-      // 正常移动：删尾
+      // Normal move: pop the tail
       state.snake.pop();
     }
 
-    // 蛇占满全场：胜利式结束
+    // The snake fills the whole board: win-style game over
     if (state.snake.length >= GRID * GRID) {
       gameOver();
     }
   }
 
   /* ============================================================
-     六、渲染
+     6. Rendering
      ============================================================ */
 
-  /** 绘制棋盘背景网格 */
+  /** Draw the board background grid */
   function drawBoard() {
     ctx.fillStyle = '#141829';
     ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
@@ -410,9 +410,9 @@
     }
   }
 
-  /** 绘制食物（圆形 + 微光晕） */
+  /** Draw food (a circle with a soft glow) */
   function drawFood() {
-    if (state.food.x < 0) return; // 无空格占位
+    if (state.food.x < 0) return; // Dummy position, nothing to draw
     var cx = state.food.x * CELL + CELL / 2;
     var cy = state.food.y * CELL + CELL / 2;
     ctx.save();
@@ -425,30 +425,30 @@
     ctx.restore();
   }
 
-  /** 绘制蛇身（渐进色：头部最亮，向尾部渐暗；头部带眼睛） */
+  /** Draw the snake: gradient body, brightest at the head, with eyes on the head */
   function drawSnake() {
     var len = state.snake.length;
     for (var i = len - 1; i >= 0; i--) {
       var seg = state.snake[i];
-      var t = len === 1 ? 0 : i / (len - 1); // 0=头, 1=尾
-      // 颜色插值：#7dffb2(头) → #2fbf71(体) → 更暗的尾
+      var t = len === 1 ? 0 : i / (len - 1); // 0 = head, 1 = tail
+      // Color interpolation: #7dffb2 (head) to #2fbf71 (body) to a darker tail
       var r = Math.round(125 + (34 - 125) * t);
       var g = Math.round(255 + (168 - 255) * t);
       var b = Math.round(178 + (95 - 178) * t);
-      var pad = i === 0 ? 1 : 2; // 头部稍大一点
+      var pad = i === 0 ? 1 : 2; // Slightly larger head
       ctx.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')';
       roundRect(seg.x * CELL + pad, seg.y * CELL + pad, CELL - pad * 2, CELL - pad * 2, 5);
       ctx.fill();
     }
-    // 眼睛：根据移动方向画在头部
+    // Eyes: drawn on the head according to the moving direction
     var head = state.snake[0];
     var hx = head.x * CELL + CELL / 2;
     var hy = head.y * CELL + CELL / 2;
     var d = state.dir;
-    // 垂直于移动方向的偏移，用来分出两只眼睛
+    // Offset perpendicular to the direction, separating the two eyes
     var ox = -d.y * CELL * 0.18;
     var oy = d.x * CELL * 0.18;
-    var fx = d.x * CELL * 0.18; // 沿移动方向前移
+    var fx = d.x * CELL * 0.18; // Shift forward along the moving direction
     var fy = d.y * CELL * 0.18;
     ctx.fillStyle = '#0b1f16';
     ctx.beginPath();
@@ -459,7 +459,7 @@
     ctx.fill();
   }
 
-  /** 圆角矩形路径辅助 */
+  /** Rounded rectangle path helper */
   function roundRect(x, y, w, h, r) {
     ctx.beginPath();
     ctx.moveTo(x + r, y);
@@ -476,30 +476,30 @@
     drawSnake();
   }
 
-  /** 更新顶栏 HUD */
+  /** Update the topbar HUD */
   function updateHud() {
     scoreEl.textContent = state.score;
     bestEl.textContent = state.best;
   }
 
   /* ============================================================
-     七、主循环（requestAnimationFrame + 固定步长）
+     7. Main loop (requestAnimationFrame + fixed timestep)
      ============================================================ */
   function loop(now) {
     state.rafId = requestAnimationFrame(loop);
     var delta = now - state.lastTime;
     state.lastTime = now;
-    // 处理标签页切走后回来 delta 过大的情况
+    // Handle a huge delta after the tab was sent to the background
     if (delta > 500) delta = state.stepInterval;
 
-    // 固定步长：仅在运行中累积时间（暂停期间不累积，防止恢复后多步连跳）
+    // Fixed timestep: time accumulates only while running, so pausing never causes a jump
     if (state.phase === GameState.RUNNING) {
       state.accTime += delta;
-      // while 防止低帧率设备丢步
+      // The while loop prevents dropped steps on low frame rate devices
       while (state.accTime >= state.stepInterval) {
         state.accTime -= state.stepInterval;
         step();
-        if (state.phase !== GameState.RUNNING) break; // 本步触发了 game over
+        if (state.phase !== GameState.RUNNING) break; // Game over was triggered by this step
       }
     }
 
@@ -507,15 +507,15 @@
   }
 
   /* ============================================================
-     八、输入处理
+     8. Input handling
      ============================================================ */
 
-  /** 设置下一步方向；拒绝与当前方向相反（180 度） */
+  /** Set the next direction; a 180-degree reversal is rejected */
   function setDirection(dir) {
     if (state.phase !== GameState.RUNNING) return;
     var cur = state.dir;
-    if (dir.x === -cur.x && dir.y === -cur.y) return; // 反向禁止
-    if (dir.x === state.nextDir.x && dir.y === state.nextDir.y) return; // 重复忽略
+    if (dir.x === -cur.x && dir.y === -cur.y) return; // Reversal is forbidden
+    if (dir.x === state.nextDir.x && dir.y === state.nextDir.y) return; // Ignore duplicates
     state.nextDir = dir;
   }
 
@@ -527,9 +527,9 @@
   };
 
   document.addEventListener('keydown', function (e) {
-    // 用 e.code，兼容 WASD 大小写及不同键盘布局
+    // Use e.code so WASD works regardless of case and keyboard layout
     if (keyMap[e.code]) {
-      e.preventDefault(); // 阻止方向键滚动页面
+      e.preventDefault(); // Prevent arrow keys from scrolling the page
       setDirection(keyMap[e.code]);
       return;
     }
@@ -543,10 +543,10 @@
     }
   });
 
-  // ---------- 触屏滑动 ----------
+  // ---------- Touch swipe ----------
   var touchStartX = 0;
   var touchStartY = 0;
-  var SWIPE_THRESHOLD = 24; // 最小滑动距离（px）
+  var SWIPE_THRESHOLD = 24; // Minimum swipe distance (px)
 
   canvas.addEventListener('touchstart', function (e) {
     if (e.touches.length !== 1) return;
@@ -564,7 +564,7 @@
     var dx = e.changedTouches[0].clientX - touchStartX;
     var dy = e.changedTouches[0].clientY - touchStartY;
     if (Math.abs(dx) < SWIPE_THRESHOLD && Math.abs(dy) < SWIPE_THRESHOLD) return;
-    // 取绝对位移更大的轴作为滑动方向
+    // Pick the axis with the larger absolute delta as the swipe direction
     if (Math.abs(dx) > Math.abs(dy)) {
       setDirection(dx > 0 ? Direction.RIGHT : Direction.LEFT);
     } else {
@@ -573,16 +573,16 @@
     e.preventDefault();
   }, { passive: false });
 
-  // 移动端：双击画布在暂停/继续间切换
+  // Mobile: double tap the canvas to toggle pause
   var lastTapTime = 0;
   canvas.addEventListener('touchend', function (e) {
-    // 滑动不视作点按，避免连续快速滑动时误触发暂停
+    // A swipe is not a tap, which avoids accidental pauses during fast consecutive swipes
     var tdx = e.changedTouches[0].clientX - touchStartX;
     var tdy = e.changedTouches[0].clientY - touchStartY;
     if (Math.abs(tdx) > SWIPE_THRESHOLD || Math.abs(tdy) > SWIPE_THRESHOLD) return;
     var now = Date.now();
     if (now - lastTapTime < 300) {
-      // 双击：暂停/继续
+      // Double tap: toggle pause
       if (state.phase === GameState.RUNNING || state.phase === GameState.PAUSED) togglePause();
       lastTapTime = 0;
     } else {
@@ -590,23 +590,23 @@
     }
   });
 
-  // 暂停遮罩会盖住画布（拦截触屏事件），必须支持点击遮罩本身恢复，
-  // 否则移动端暂停后将无任何途径继续
+  // The pause overlay covers the canvas and swallows touch events, so tapping the overlay
+  // itself must resume the game; otherwise mobile users would be stuck once paused
   pauseOverlay.addEventListener('click', function () {
     if (state.phase === GameState.PAUSED) togglePause();
   });
 
-  // ---------- 按钮 ----------
+  // ---------- Buttons ----------
   startBtn.addEventListener('click', startGame);
   restartBtn.addEventListener('click', startGame);
 
   /* ============================================================
-     九、初始化
+     9. Initialization
      ============================================================ */
   function init() {
     state.best = loadBest();
     updateHud();
-    // 开始界面背后画一个静态初始棋盘，视觉不空白
+    // Draw a static initial board behind the start screen so the area is not blank
     state.snake = [
       { x: 12, y: 12 }, { x: 11, y: 12 }, { x: 10, y: 12 }
     ];
