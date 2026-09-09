@@ -150,6 +150,80 @@
   #status.win { color: var(--good); }
   #status.lose { color: var(--danger); }
 
+  /* End-of-round dialog */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(16, 24, 40, .55);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 50;
+  }
+  .overlay.show { display: flex; }
+
+  .dialog {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 26px 30px 24px;
+    text-align: center;
+    width: 100%;
+    max-width: 340px;
+    box-shadow: 0 20px 50px rgba(16, 24, 40, .3);
+    animation: dlgIn .2s ease-out;
+  }
+  @keyframes dlgIn {
+    from { transform: translateY(14px) scale(.94); opacity: 0; }
+    to   { transform: none; opacity: 1; }
+  }
+
+  .dlg-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--muted);
+    letter-spacing: .04em;
+  }
+  .dlg-score {
+    font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 62px;
+    font-weight: 800;
+    line-height: 1.15;
+    color: var(--good);
+  }
+  .dlg-score small {
+    font-size: 14px;
+    font-weight: 400;
+    color: var(--muted);
+    margin-left: 6px;
+  }
+  .dlg-rank {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--accent);
+    margin: 2px 0 18px;
+  }
+
+  .dlg-stats { display: flex; gap: 10px; margin-bottom: 22px; }
+  .dlg-stats > div {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 9px 4px;
+  }
+  .dlg-stats b {
+    display: block;
+    font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 20px;
+  }
+  .dlg-stats span { font-size: 11px; color: var(--muted); }
+
+  .dlg-actions { display: flex; gap: 10px; justify-content: center; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary:hover { color: #fff; opacity: .88; }
+
   @media (max-width: 560px) {
     #field { grid-template-columns: repeat(3, 86px); gap: 8px; }
     .hole { height: 86px; }
@@ -188,6 +262,23 @@
   <div id="status"></div>
 </div>
 
+<div id="overlay" class="overlay">
+  <div class="dialog">
+    <div class="dlg-title" data-i18n="timeUpTitle"></div>
+    <div class="dlg-score"><span id="dlgScore">0</span><small data-i18n="pointsUnit"></small></div>
+    <div class="dlg-rank" id="dlgRank"></div>
+    <div class="dlg-stats">
+      <div><b id="dlgHits">0</b><span data-i18n="hitsLabel"></span></div>
+      <div><b id="dlgBombs">0</b><span data-i18n="bombsLabel"></span></div>
+      <div><b id="dlgBest">0</b><span data-i18n="bestLabel"></span></div>
+    </div>
+    <div class="dlg-actions">
+      <button id="btnAgain" class="primary" data-i18n="playAgain"></button>
+      <button id="btnClose" data-i18n="closeBtn"></button>
+    </div>
+  </div>
+</div>
+
 <script src="../assets/i18n.js"></script>
 <script>
 (function () {
@@ -205,7 +296,17 @@
     restart: { en: 'New game', zh: '重新开始' },
     clickGo: { en: 'Press "New game" to start', zh: '点「重新开始」开局' },
     go:      { en: 'Go!', zh: '开始！' },
-    timeUp:  { en: "Time's up! Score: {n}", zh: '时间到！得分：{n}' }
+    timeUp:  { en: "Time's up! Score: {n}", zh: '时间到！得分：{n}' },
+    timeUpTitle: { en: "TIME'S UP", zh: '时间到' },
+    pointsUnit:  { en: 'pts', zh: '分' },
+    hitsLabel:   { en: 'Moles', zh: '击中地鼠' },
+    bombsLabel:  { en: 'Bombs', zh: '误击炸弹' },
+    bestLabel:   { en: 'Best', zh: '最高分' },
+    playAgain:   { en: 'Play again', zh: '再玩一局' },
+    closeBtn:    { en: 'Close', zh: '关闭' },
+    rankGreat:   { en: 'Mallet master!', zh: '神锤手！' },
+    rankGood:    { en: 'Nice work!', zh: '打得不错！' },
+    rankTry:     { en: 'Keep practicing', zh: '再练练手' }
   });
 
   // Difficulty: spawn interval and how long a mole stays up (ms).
@@ -220,13 +321,34 @@
   var scoreEl = document.getElementById('score');
   var timeEl = document.getElementById('time');
   var statusEl = document.getElementById('status');
+  var overlayEl = document.getElementById('overlay');
+  var dlgScoreEl = document.getElementById('dlgScore');
+  var dlgRankEl = document.getElementById('dlgRank');
+  var dlgHitsEl = document.getElementById('dlgHits');
+  var dlgBombsEl = document.getElementById('dlgBombs');
+  var dlgBestEl = document.getElementById('dlgBest');
+
+  var BEST_KEY = 'whackmole_best';
 
   var holes = [];   // { el, moleEl, occupant: null | { kind } }
   var playing = false;
-  var score, timeLeft;
+  var score, timeLeft, hits, bombs, best;
   var spawnTimer, tickTimer;
   var lastResult;
   var currentLevel = 'lv1';
+
+  /* ---------- best score ---------- */
+
+  function loadBest() {
+    try {
+      var v = parseInt(localStorage.getItem(BEST_KEY), 10);
+      return isNaN(v) ? 0 : v;
+    } catch (e) { return 0; }
+  }
+
+  function saveBest(v) {
+    try { localStorage.setItem(BEST_KEY, String(v)); } catch (e) {}
+  }
 
   /* ---------- setup ---------- */
 
@@ -255,9 +377,12 @@
     hideAll();
 
     score = 0;
+    hits = 0;
+    bombs = 0;
     timeLeft = ROUND;
     playing = true;
     lastResult = null;
+    hideOverlay();
     scoreEl.textContent = '0';
     timeEl.textContent = String(ROUND);
     statusEl.textContent = T.t('go');
@@ -329,6 +454,7 @@
     if (!hole.occupant) return;
 
     if (hole.occupant.kind === 'bomb') {
+      bombs++;
       score = Math.max(0, score - 3);
       // Show 💥 on the spot, flash the hole red, then return the tile to idle.
       hole.el.classList.add('boom');
@@ -340,18 +466,45 @@
       }, 300);
     } else {
       score++;
+      hits++;
       despawn(hole, true);
     }
     scoreEl.textContent = String(score);
+  }
+
+  /* ---------- end-of-round dialog ---------- */
+
+  function rankKey(s) {
+    if (s >= 25) return 'rankGreat';
+    if (s >= 15) return 'rankGood';
+    return 'rankTry';
+  }
+
+  function showOverlay() {
+    dlgScoreEl.textContent = String(score);
+    dlgHitsEl.textContent = String(hits);
+    dlgBombsEl.textContent = String(bombs);
+    dlgBestEl.textContent = String(best);
+    dlgRankEl.textContent = T.t(rankKey(score));
+    overlayEl.classList.add('show');
+  }
+
+  function hideOverlay() {
+    overlayEl.classList.remove('show');
   }
 
   function endRound() {
     playing = false;
     stopTimers();
     hideAll();
-    lastResult = { score: score };
+
+    best = Math.max(loadBest(), score);
+    saveBest(best);
+
+    lastResult = { score: score, hits: hits, bombs: bombs, best: best };
     statusEl.textContent = T.t('timeUp', { n: score });
     statusEl.className = score >= 20 ? 'win' : 'lose';
+    showOverlay();
   }
 
   /* ---------- input wiring ---------- */
@@ -363,6 +516,21 @@
   });
 
   document.getElementById('btnNew').addEventListener('click', newGame);
+
+  document.getElementById('btnAgain').addEventListener('click', function () {
+    hideOverlay();
+    newGame();
+  });
+  document.getElementById('btnClose').addEventListener('click', hideOverlay);
+
+  // Clicking the dark backdrop closes the dialog; clicks inside do not.
+  overlayEl.addEventListener('click', function (ev) {
+    if (ev.target === overlayEl) hideOverlay();
+  });
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key !== 'Escape') return;
+    if (overlayEl.classList.contains('show')) hideOverlay();
+  });
   [['lv1'], ['lv2'], ['lv3']].forEach(function (pair) {
     var id = pair[0];
     document.getElementById(id).addEventListener('click', function () {
@@ -375,12 +543,18 @@
   });
 
   T.onChange(function () {
-    if (lastResult) statusEl.textContent = T.t('timeUp', { n: lastResult.score });
-    else if (!playing) statusEl.textContent = T.t('clickGo');
+    if (lastResult) {
+      statusEl.textContent = T.t('timeUp', { n: lastResult.score });
+      // Keep the open dialog in sync with the new language.
+      if (overlayEl.classList.contains('show')) showOverlay();
+    } else if (!playing) {
+      statusEl.textContent = T.t('clickGo');
+    }
   });
 
   // Initialize the game first, then apply the language (project convention).
   buildField();
+  best = loadBest();
   statusEl.textContent = T.t('clickGo');
   T.start();
 })();

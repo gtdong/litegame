@@ -12,6 +12,7 @@ Grab the hammer and whack every mole that pops out of the grass — but watch ou
 - **Bombs 💣** look like moles at a glance: hitting one costs **−3 points**
 - Each round lasts **30 seconds**
 - The score counter and the countdown sit next to the difficulty buttons
+- When time runs out a **dialog** shows your score, moles hit, bombs whacked and your best score yet (kept in `localStorage`)
 
 ## Difficulty
 

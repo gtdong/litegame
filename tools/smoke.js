@@ -112,9 +112,12 @@ function makeContext() {
     Math, Date, JSON, Object, Array, String, Number, Boolean, Error, Set, Map,
     parseInt, parseFloat, isNaN,
     performance: { now: () => Date.now() },
+    // Timers are recorded so the test can pump them; a round that ends by
+    // countdown (whack-a-mole) is exactly where end-state bugs hide.
+    intervals: [],
     setTimeout: () => 0,
     clearTimeout: () => {},
-    setInterval: () => 0,
+    setInterval: fn => context.intervals.push(fn),
     clearInterval: () => {},
     requestAnimationFrame: fn => { frame = fn; return 1; },
     cancelAnimationFrame: () => { frame = null; },
@@ -150,7 +153,16 @@ function makeContext() {
     els,
     fireDoc(t, ev) { (docHandlers[t] || []).forEach(f => f(ev || {})); },
     fireWin(t, ev) { (winHandlers[t] || []).forEach(f => f(ev || {})); },
-    step() { const f = frame; frame = null; if (f) f(); }
+    step() { const f = frame; frame = null; if (f) f(); },
+    // Fire every registered interval once; repeated n times it fast-forwards
+    // countdowns, so end-of-round code actually runs.
+    timers(n) {
+      const out = [];
+      for (let i = 0; i < n; i++) {
+        context.intervals.slice().forEach(fn => { if (fn) out.push(fn); });
+      }
+      return out;
+    }
   };
 }
 
@@ -230,6 +242,11 @@ function smoke(dir) {
   });
 
   for (let i = 0; i < 40; i++) poke('frame', () => env.step());
+
+  // Fast-forward 40 ticks of every interval: enough for a 30s round to end,
+  // which exercises the "time's up" path (dialogs, overlays, cleanup).
+  env.timers(40).forEach((fn, i) => poke(`interval tick #${i}`, () => fn()));
+  for (let i = 0; i < 5; i++) poke('frame after timers', () => env.step());
 
   return { dir, problems };
 }
