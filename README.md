@@ -19,4 +19,5 @@ Play online: <https://litegame-hub.github.io/>
 - [memory-game](memory-game) — Memory Match (flip and pair)
 - [tictactoe-game](tictactoe-game) — Tic-Tac-Toe (vs AI or two players)
 - [whackmole-game](whackmole-game) — Whack-a-Mole (timed rounds)
+- [sudoku-game](sudoku-game) — Sudoku (unique-solution puzzles, notes mode)
 

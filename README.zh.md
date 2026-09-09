@@ -19,3 +19,4 @@ AI 生成的 HTML5 小游戏合集，零依赖，用浏览器打开 `index.html`
 - [memory-game](memory-game) — 记忆翻牌（配对所有成对的牌）
 - [tictactoe-game](tictactoe-game) — 井字棋（人机 / 双人对战）
 - [whackmole-game](whackmole-game) — 打地鼠（限时挑战）
+- [sudoku-game](sudoku-game) — 数独（唯一解出题，笔记模式）

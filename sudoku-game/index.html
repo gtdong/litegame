@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>数独</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --panel: #ffffff;
+    --border: #dfe3e8;
+    --text: #1f2328;
+    --muted: #6b7280;
+    --accent: #3b6ef5;
+    --good: #2e7d32;
+    --danger: #e24b4a;
+    --rel: #eef2ff;
+    --sel: #cdddfc;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    margin: 0;
+    padding: 24px 16px 40px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+  }
+
+  h1 { margin: 0 0 4px; font-size: 30px; letter-spacing: -.02em; }
+  .tip { margin: 0 0 18px; font-size: 13px; color: var(--muted); }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+    box-shadow: 0 1px 2px rgba(16,24,40,.05), 0 4px 12px rgba(16,24,40,.06);
+  }
+
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .stat {
+    background: #2f3640;
+    color: #9fd0ff;
+    font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 16px;
+    font-weight: 700;
+    padding: 5px 10px;
+    border-radius: 4px;
+    min-width: 58px;
+    text-align: center;
+  }
+  .stat.bad { color: #ff9a94; }
+
+  button {
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--text);
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 13px;
+    cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); color: var(--accent); }
+  button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  #board {
+    display: grid;
+    grid-template-columns: repeat(9, 38px);
+    grid-template-rows: repeat(9, 38px);
+    margin: 0 auto;
+    background: var(--border);
+    border: 2px solid #9aa4b2;
+    border-radius: 4px;
+    padding: 1px;
+    gap: 1px;
+    touch-action: manipulation;
+    user-select: none;
+  }
+
+  .cell {
+    border: 0;
+    border-radius: 2px;
+    background: #fff;
+    padding: 0;
+    font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--accent);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+  .cell.given { color: var(--text); cursor: default; background: #f2f4f7; }
+  .cell.rel { background: var(--rel); }
+  .cell.given.rel { background: #e7eaf0; }
+  .cell.sel { background: var(--sel) !important; }
+
+  .cell.bad { color: var(--danger); }
+  .cell.fixed-done { color: #5b6472; }
+
+  /* Pencil marks: tiny 3×3 layout inside the cell */
+  .cell .pencil {
+    position: absolute;
+    inset: 2px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    font-size: 9px;
+    font-weight: 400;
+    line-height: 1;
+    color: var(--muted);
+  }
+  .cell .pencil span { display: flex; align-items: center; justify-content: center; }
+
+  #status {
+    margin-top: 14px;
+    font-size: 15px;
+    font-weight: 700;
+    min-height: 22px;
+    text-align: center;
+  }
+  #status.win { color: var(--good); }
+
+  @media (max-width: 560px) {
+    #board { grid-template-columns: repeat(9, 32px); grid-template-rows: repeat(9, 32px); }
+    .cell { font-size: 17px; }
+    .cell .pencil { font-size: 8px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="lang-switch" data-lang-switch></div>
+
+<h1 data-i18n="title"></h1>
+<p class="tip" data-i18n="tip"></p>
+
+<div class="panel">
+  <div class="bar">
+    <button id="lvEasy" class="active" data-i18n="lvEasy"></button>
+    <button id="lvMedium" data-i18n="lvMedium"></button>
+    <button id="lvHard" data-i18n="lvHard"></button>
+    <button id="btnNotes" data-i18n="notes"></button>
+    <button id="btnErase" data-i18n="erase"></button>
+    <button id="btnNew" data-i18n="newGame"></button>
+    <div class="stat" id="timer">0s</div>
+    <div class="stat" id="mistakes">0</div>
+  </div>
+  <div id="board"></div>
+  <div id="status"></div>
+</div>
+
+<script src="../assets/i18n.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var T = LiteI18N.create({
+    title:    { en: 'Sudoku', zh: '数独' },
+    tip: {
+      en: 'Fill each row, column and 3×3 box with 1–9 · arrows or tap to move, N toggles notes',
+      zh: '每行、每列、每个 3×3 宫填入 1–9 且不重复 · 点选或方向键移动，N 键切换笔记'
+    },
+    lvEasy:   { en: 'Easy', zh: '简单' },
+    lvMedium: { en: 'Medium', zh: '中等' },
+    lvHard:   { en: 'Hard', zh: '困难' },
+    notes:    { en: 'Notes', zh: '笔记' },
+    erase:    { en: 'Erase', zh: '擦除' },
+    newGame:  { en: 'New game', zh: '重新开始' },
+    generating: { en: 'Generating…', zh: '出题中…' },
+    won:      { en: 'Solved in {sec}s · {n} mistakes', zh: '通关！用时 {sec} 秒 · 错 {n} 次' }
+  });
+
+  // Holes to dig per difficulty; more holes = fewer clues = harder.
+  var LEVELS = { lvEasy: 38, lvMedium: 46, lvHard: 52 };
+  var ROW = [], COL = [], BOX = []; // precomputed peers for each cell index
+  (function buildPeers() {
+    for (var i = 0; i < 81; i++) {
+      var r = Math.floor(i / 9), c = i % 9;
+      ROW.push(r); COL.push(c);
+      BOX.push(Math.floor(r / 3) * 3 + Math.floor(c / 3));
+    }
+  })();
+
+  var boardEl = document.getElementById('board');
+  var statusEl = document.getElementById('status');
+  var timerEl = document.getElementById('timer');
+  var mistakesEl = document.getElementById('mistakes');
+
+  var cellsEl = [];
+  var grid;         // current values, 0 = empty
+  var solution;     // full solution from the generator
+  var given;        // true for clue cells (not editable)
+  var notes;        // Set of pencil marks per cell
+  var sel;          // selected cell index, -1 = none
+  var notesMode;
+  var mistakes;
+  var seconds;
+  var timerId;
+  var solved;
+  var currentLevel = 'lvEasy';
+
+  /* ---------- sudoku solver / generator ---------- */
+
+  function shuffle(arr) {
+    for (var i = arr.length - 1; i > 0; i--) {
+      var k = Math.floor(Math.random() * (i + 1));
+      var t = arr[i]; arr[i] = arr[k]; arr[k] = t;
+    }
+    return arr;
+  }
+
+  function fits(b, idx, d) {
+    for (var i = 0; i < 81; i++) {
+      if (b[i] !== d) continue;
+      if (ROW[i] === ROW[idx] || COL[i] === COL[idx] || BOX[i] === BOX[idx]) return false;
+    }
+    return true;
+  }
+
+  // Count solutions up to `limit` with plain backtracking (used for uniqueness).
+  function countSolutions(b, limit) {
+    var count = 0;
+    function rec() {
+      var idx = b.indexOf(0);
+      if (idx < 0) { count++; return; }
+      for (var d = 1; d <= 9; d++) {
+        if (fits(b, idx, d)) {
+          b[idx] = d;
+          rec();
+          b[idx] = 0;
+          if (count >= limit) return;
+        }
+      }
+    }
+    rec();
+    return count;
+  }
+
+  // Build a complete grid by backtracking over shuffled digits.
+  function generateFull() {
+    var b = [];
+    for (var i = 0; i < 81; i++) b.push(0);
+    function rec(idx) {
+      if (idx === 81) return true;
+      var digits = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+      for (var j = 0; j < 9; j++) {
+        var d = digits[j];
+        if (fits(b, idx, d)) {
+          b[idx] = d;
+          if (rec(idx + 1)) return true;
+          b[idx] = 0;
+        }
+      }
+      return false;
+    }
+    rec(0);
+    return b;
+  }
+
+  // Dig holes while keeping the solution unique.
+  function makePuzzle(holes) {
+    var sol = generateFull();
+    var b = sol.slice();
+    var order = [];
+    for (var j = 0; j < 81; j++) order.push(j);
+    shuffle(order);
+    var removed = 0;
+    for (var i = 0; i < 81 && removed < holes; i++) {
+      var idx = order[i];
+      var tmp = b[idx];
+      b[idx] = 0;
+      if (countSolutions(b.slice(), 2) === 1) removed++;
+      else b[idx] = tmp;
+    }
+    return { puzzle: b, solution: sol };
+  }
+
+  /* ---------- game setup ---------- */
+
+  function newGame() {
+    stopTimer();
+    var result = makePuzzle(LEVELS[currentLevel]);
+
+    grid = result.puzzle;
+    solution = result.solution;
+    given = grid.map(function (v) { return v !== 0; });
+    notes = [];
+    for (var i = 0; i < 81; i++) notes.push(new Set());
+
+    sel = firstEmpty();
+    notesMode = false;
+    document.getElementById('btnNotes').classList.remove('active');
+
+    mistakes = 0;
+    seconds = 0;
+    solved = false;
+    mistakesEl.textContent = '0';
+    timerEl.textContent = '0s';
+    statusEl.textContent = '';
+    statusEl.className = '';
+    render();
+    startTimer();
+  }
+
+  function firstEmpty() {
+    for (var i = 0; i < 81; i++) if (!grid[i]) return i;
+    return 0;
+  }
+
+  function buildBoard() {
+    boardEl.innerHTML = '';
+    var frag = document.createDocumentFragment();
+    for (var i = 0; i < 81; i++) {
+      var el = document.createElement('button');
+      el.className = 'cell';
+      el.dataset.idx = String(i);
+      cellsEl[i] = el;
+      frag.appendChild(el);
+    }
+    boardEl.appendChild(frag);
+  }
+
+  /* ---------- timer ---------- */
+
+  function startTimer() {
+    if (timerId) return;
+    timerId = setInterval(function () {
+      seconds++;
+      timerEl.textContent = seconds + 's';
+    }, 1000);
+  }
+
+  function stopTimer() {
+    if (timerId) { clearInterval(timerId); timerId = null; }
+  }
+
+  /* ---------- rendering ---------- */
+
+  function findConflicts() {
+    // Mark every duplicated value within a row, column or box.
+    var bad = {};
+    var groups = {}; // one array per row / column / box
+    for (var i = 0; i < 81; i++) {
+      (groups['r' + ROW[i]] = groups['r' + ROW[i]] || []).push(i);
+      (groups['c' + COL[i]] = groups['c' + COL[i]] || []).push(i);
+      (groups['b' + BOX[i]] = groups['b' + BOX[i]] || []).push(i);
+    }
+    Object.keys(groups).forEach(function (key) {
+      var seen = {};
+      groups[key].forEach(function (i) {
+        var v = grid[i];
+        if (!v) return;
+        if (seen[v] !== undefined) { bad[i] = true; bad[seen[v]] = true; }
+        else seen[v] = i;
+      });
+    });
+    return bad;
+  }
+
+  function render() {
+    var bad = findConflicts();
+    var selRow = sel >= 0 ? ROW[sel] : -1;
+    var selCol = sel >= 0 ? COL[sel] : -1;
+    var selBox = sel >= 0 ? BOX[sel] : -1;
+
+    for (var i = 0; i < 81; i++) {
+      var el = cellsEl[i];
+      var cls = 'cell';
+      if (given[i]) cls += ' given';
+      if (bad[i]) cls += ' bad';
+      if (sel >= 0 && i !== sel &&
+          (ROW[i] === selRow || COL[i] === selCol || BOX[i] === selBox)) cls += ' rel';
+      if (i === sel) cls += ' sel';
+
+      var v = grid[i];
+      if (v) {
+        el.textContent = String(v);
+      } else if (notes[i] && notes[i].size) {
+        var html = '<span class="pencil">';
+        for (var d = 1; d <= 9; d++) {
+          html += '<span>' + (notes[i].has(d) ? d : '') + '</span>';
+        }
+        html += '</span>';
+        el.innerHTML = html;
+      } else {
+        el.textContent = '';
+      }
+      el.className = cls;
+    }
+  }
+
+  /* ---------- game flow ---------- */
+
+  function select(i) {
+    if (solved) return;
+    sel = i;
+    render();
+  }
+
+  function inputDigit(d) {
+    if (solved || sel < 0 || given[sel]) return;
+
+    if (notesMode) {
+      // Pencil marks only make sense on empty cells.
+      if (!grid[sel]) {
+        if (notes[sel].has(d)) notes[sel].delete(d);
+        else notes[sel].add(d);
+      }
+      render();
+      return;
+    }
+
+    if (grid[sel] === d) return;
+    grid[sel] = d;
+    notes[sel].clear();
+    if (d !== solution[sel]) {
+      mistakes++;
+      mistakesEl.textContent = String(mistakes);
+      mistakesEl.classList.add('bad');
+    }
+    render();
+    checkWin();
+  }
+
+  function erase() {
+    if (solved || sel < 0 || given[sel]) return;
+    grid[sel] = 0;
+    notes[sel].clear();
+    render();
+  }
+
+  function checkWin() {
+    for (var i = 0; i < 81; i++) {
+      if (!grid[i] || findConflictsHas(i)) return;
+    }
+    solved = true;
+    stopTimer();
+    // All cells filled without conflicts == the unique solution.
+    statusEl.textContent = T.t('won', { sec: seconds, n: mistakes });
+    statusEl.className = 'win';
+  }
+
+  // Lightweight single-cell conflict test used by checkWin.
+  function findConflictsHas(i) {
+    var v = grid[i];
+    for (var j = 0; j < 81; j++) {
+      if (j === i || grid[j] !== v) continue;
+      if (ROW[j] === ROW[i] || COL[j] === COL[i] || BOX[j] === BOX[i]) return true;
+    }
+    return false;
+  }
+
+  function moveSel(dr, dc) {
+    if (solved || sel < 0) return;
+    var r = Math.min(8, Math.max(0, ROW[sel] + dr));
+    var c = Math.min(8, Math.max(0, COL[sel] + dc));
+    sel = r * 9 + c;
+    render();
+  }
+
+  /* ---------- input wiring ---------- */
+
+  boardEl.addEventListener('click', function (ev) {
+    var el = ev.target.closest('.cell');
+    if (!el) return;
+    select(parseInt(el.dataset.idx, 10));
+  });
+
+  document.getElementById('btnNew').addEventListener('click', newGame);
+
+  document.getElementById('btnNotes').addEventListener('click', function () {
+    notesMode = !notesMode;
+    document.getElementById('btnNotes').classList.toggle('active', notesMode);
+  });
+
+  document.getElementById('btnErase').addEventListener('click', erase);
+
+  [['lvEasy'], ['lvMedium'], ['lvHard']].forEach(function (pair) {
+    var id = pair[0];
+    document.getElementById(id).addEventListener('click', function () {
+      currentLevel = id;
+      ['lvEasy', 'lvMedium', 'lvHard'].forEach(function (k) {
+        document.getElementById(k).classList.toggle('active', k === id);
+      });
+      newGame();
+    });
+  });
+
+  document.addEventListener('keydown', function (ev) {
+    var k = ev.key;
+    if (k === 'ArrowUp') { moveSel(-1, 0); ev.preventDefault(); }
+    else if (k === 'ArrowDown') { moveSel(1, 0); ev.preventDefault(); }
+    else if (k === 'ArrowLeft') { moveSel(0, -1); ev.preventDefault(); }
+    else if (k === 'ArrowRight') { moveSel(0, 1); ev.preventDefault(); }
+    else if (k >= '1' && k <= '9') inputDigit(parseInt(k, 10));
+    else if (k === 'Backspace' || k === 'Delete' || k === '0') erase();
+    else if (k === 'n' || k === 'N') document.getElementById('btnNotes').click();
+  });
+
+  T.onChange(function () {
+    if (solved) statusEl.textContent = T.t('won', { sec: seconds, n: mistakes });
+  });
+
+  // Initialize the game first, then apply the language (project convention).
+  buildBoard();
+  newGame();
+  T.start();
+})();
+</script>
+</body>
+</html>
