@@ -94,6 +94,7 @@
     position: relative;
     height: 110px;
     cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="34" height="34"><text y="26" font-size="28">🔨</text></svg>') 6 6, pointer;
+    overflow: hidden;
   }
 
   .hole::after {
@@ -107,29 +108,31 @@
     background: var(--hole);
     border-radius: 50%;
     box-shadow: inset 0 4px 6px rgba(0,0,0,.45);
+    z-index: 2; /* keep the hole rim above the mole so it reads as a real opening */
   }
 
+  /* Moles live below the hole by default; .up pops them out, .hit bounces once. */
   .mole {
     position: absolute;
     left: 50%;
-    bottom: 12px;
-    transform: translateX(-50%) translateY(80%);
+    bottom: -70px;
+    transform: translateX(-50%);
     width: 76px;
     height: 76px;
     font-size: 58px;
     line-height: 76px;
     text-align: center;
-    transition: transform .12s ease-out;
+    transition: bottom .12s ease-out;
     pointer-events: none; /* clicks land on the hole */
     z-index: 1;
   }
-  .mole.up { transform: translateX(-50%) translateY(0); }
+  .mole.up { bottom: 12px; }
 
   .mole.hit { animation: pop .18s ease-out; }
   @keyframes pop {
-    0%   { transform: translateX(-50%) translateY(0) scale(1); }
-    50%  { transform: translateX(-50%) translateY(0) scale(1.25); }
-    100% { transform: translateX(-50%) translateY(80%) scale(1); }
+    0%   { bottom: 12px; }
+    50%  { bottom: 26px; }
+    100% { bottom: -70px; }
   }
 
   #status {
@@ -145,7 +148,17 @@
     #field { grid-template-columns: repeat(3, 86px); gap: 8px; }
     .hole { height: 86px; }
     .hole::after { width: 64px; height: 20px; }
-    .mole { width: 58px; height: 58px; font-size: 42px; line-height: 58px; bottom: 10px; }
+    .mole {
+      width: 58px; height: 58px;
+      font-size: 42px; line-height: 58px;
+      bottom: -54px;
+    }
+    .mole.up { bottom: 10px; }
+    @keyframes pop {
+      0%   { bottom: 10px; }
+      50%  { bottom: 22px; }
+      100% { bottom: -54px; }
+    }
   }
 </style>
 </head>
