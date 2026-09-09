@@ -80,6 +80,7 @@
 
   /* 3×3 grass field with holes. Both share a wooden mallet cursor (SVG, 48px). */
   #field {
+    position: relative;
     display: grid;
     grid-template-columns: repeat(3, 110px);
     gap: 12px;
@@ -98,6 +99,66 @@
     overflow: hidden;
     border-radius: 8px;
     transition: background-color .12s ease-out;
+  }
+
+  /* Bomb explosion: shock ring, flying sparks and a panel shake */
+  .blast {
+    position: absolute;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+    z-index: 5;
+  }
+  .blast .ring {
+    position: absolute;
+    left: 0; top: 0;
+    width: 22px; height: 22px;
+    margin: -11px 0 0 -11px;
+    border: 3px solid #ffb020;
+    border-radius: 50%;
+    animation: blastRing .45s ease-out forwards;
+  }
+  @keyframes blastRing {
+    from { transform: scale(.3); opacity: .95; }
+    to   { transform: scale(3.6); opacity: 0; }
+  }
+
+  .blast .boomchar {
+    position: absolute;
+    left: 0; top: 0;
+    width: 40px; height: 40px;
+    margin: -20px 0 0 -20px;
+    font-size: 34px;
+    line-height: 40px;
+    text-align: center;
+    animation: blastChar .5s ease-out forwards;
+  }
+  @keyframes blastChar {
+    from { transform: scale(.4); opacity: 1; }
+    to   { transform: scale(1.5); opacity: 0; }
+  }
+
+  .blast .spark {
+    position: absolute;
+    left: 0; top: 0;
+    width: 8px; height: 8px;
+    margin: -4px 0 0 -4px;
+    border-radius: 50%;
+    background: #ff8a3d;
+    animation: blastSpark .5s ease-out forwards;
+  }
+  @keyframes blastSpark {
+    from { transform: translate(0, 0) scale(1); opacity: 1; }
+    to   { transform: translate(var(--tx), var(--ty)) scale(.2); opacity: 0; }
+  }
+
+  .panel.shake { animation: panelShake .32s ease-in-out; }
+  @keyframes panelShake {
+    0%, 100% { transform: none; }
+    20% { transform: translate(-4px, 2px) rotate(-.4deg); }
+    40% { transform: translate(4px, -2px) rotate(.4deg); }
+    60% { transform: translate(-3px, 1px) rotate(-.3deg); }
+    80% { transform: translate(3px, -1px) rotate(.2deg); }
   }
 
   /* Red flash when you whack a bomb */
@@ -249,7 +310,7 @@
 <h1 data-i18n="title"></h1>
 <p class="tip" data-i18n="tip"></p>
 
-<div class="panel">
+<div class="panel" id="panel">
   <div class="bar">
     <button id="lv1" class="active" data-i18n="lv1"></button>
     <button id="lv2" data-i18n="lv2"></button>
@@ -322,6 +383,7 @@
   var timeEl = document.getElementById('time');
   var statusEl = document.getElementById('status');
   var overlayEl = document.getElementById('overlay');
+  var panelEl = document.getElementById('panel');
   var dlgScoreEl = document.getElementById('dlgScore');
   var dlgRankEl = document.getElementById('dlgRank');
   var dlgHitsEl = document.getElementById('dlgHits');
@@ -446,6 +508,51 @@
     });
   }
 
+  /* ---------- bomb explosion ---------- */
+
+  var SPARK_COLORS = ['#ffd54a', '#ff8a3d', '#e24b4a', '#ff6f00'];
+
+  // Burst a shock ring plus a spray of sparks centered on the hole.
+  function explode(hole) {
+    var fr = fieldEl.getBoundingClientRect();
+    var hr = hole.el.getBoundingClientRect();
+
+    var blast = document.createElement('div');
+    blast.className = 'blast';
+    blast.style.left = (hr.left - fr.left + hr.width / 2) + 'px';
+    blast.style.top = (hr.top - fr.top + hr.height / 2) + 'px';
+
+    var ring = document.createElement('div');
+    ring.className = 'ring';
+    blast.appendChild(ring);
+
+    var boom = document.createElement('div');
+    boom.className = 'boomchar';
+    boom.textContent = '💥';
+    blast.appendChild(boom);
+
+    for (var i = 0; i < 12; i++) {
+      var spark = document.createElement('div');
+      spark.className = 'spark';
+      var angle = (Math.PI * 2 / 12) * i + Math.random() * 0.4;
+      var dist = 34 + Math.random() * 30;
+      spark.style.setProperty('--tx', (Math.cos(angle) * dist).toFixed(1) + 'px');
+      spark.style.setProperty('--ty', (Math.sin(angle) * dist).toFixed(1) + 'px');
+      spark.style.background = SPARK_COLORS[i % SPARK_COLORS.length];
+      spark.style.animationDelay = (Math.random() * 0.05).toFixed(2) + 's';
+      blast.appendChild(spark);
+    }
+
+    fieldEl.appendChild(blast);
+    setTimeout(function () { fieldEl.removeChild(blast); }, 700);
+
+    // Panel shake, restarted cleanly if bombs are hit in quick succession.
+    panelEl.classList.remove('shake');
+    void panelEl.offsetWidth;
+    panelEl.classList.add('shake');
+    setTimeout(function () { panelEl.classList.remove('shake'); }, 340);
+  }
+
   /* ---------- interaction ---------- */
 
   function whack(i) {
@@ -456,13 +563,12 @@
     if (hole.occupant.kind === 'bomb') {
       bombs++;
       score = Math.max(0, score - 3);
-      // Show 💥 on the spot, flash the hole red, then return the tile to idle.
+      // Show the blast on the spot, flash the hole red, then return to idle.
       hole.el.classList.add('boom');
       despawn(hole, false);
-      hole.moleEl.textContent = '💥';
+      explode(hole);
       setTimeout(function () {
         hole.el.classList.remove('boom');
-        if (!hole.occupant) hole.moleEl.textContent = '🐹';
       }, 300);
     } else {
       score++;

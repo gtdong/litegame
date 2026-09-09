@@ -42,7 +42,9 @@ function makeContext() {
     constructor(tag) {
       this.tag = tag || 'div';
       this.children = [];
-      this.style = {};
+      // style is a plain object in real DOM terms; give it the two methods the
+      // games actually call (CSS custom properties) so they don't blow up.
+      this.style = { setProperty() {}, removeProperty() {}, getPropertyValue: () => '' };
       this.dataset = {};
       this.handlers = {};
       this.parent = null;
@@ -229,17 +231,20 @@ function smoke(dir) {
   // Fire on the element itself and on its classed children, because delegated
   // handlers (board.addEventListener('click') + ev.target.closest('.cell'))
   // need a realistic ev.target to be exercised at all.
-  Object.keys(env.els).forEach(id => {
-    const el = env.els[id];
-    poke(`click #${id}`, () =>
-      el.fire('click', { target: el, button: 0, preventDefault() {} }));
-    el.children.forEach((c, ci) => {
-      if (c && c._cls && c._cls.size) {
-        poke(`click #${id} > .${[...c._cls].join('.')} #${ci}`, () =>
-          el.fire('click', { target: c, button: 0, preventDefault() {} }));
-      }
+  const clickAll = () => {
+    Object.keys(env.els).forEach(id => {
+      const el = env.els[id];
+      poke(`click #${id}`, () =>
+        el.fire('click', { target: el, button: 0, preventDefault() {} }));
+      el.children.forEach((c, ci) => {
+        if (c && c._cls && c._cls.size) {
+          poke(`click #${id} > .${[...c._cls].join('.')} #${ci}`, () =>
+            el.fire('click', { target: c, button: 0, preventDefault() {} }));
+        }
+      });
     });
-  });
+  };
+  clickAll();
 
   for (let i = 0; i < 40; i++) poke('frame', () => env.step());
 
@@ -247,6 +252,10 @@ function smoke(dir) {
   // which exercises the "time's up" path (dialogs, overlays, cleanup).
   env.timers(40).forEach((fn, i) => poke(`interval tick #${i}`, () => fn()));
   for (let i = 0; i < 5; i++) poke('frame after timers', () => env.step());
+
+  // Click again now that things have spawned: this is what actually reaches
+  // the "hit a mole / hit a bomb" branches (explosions, scoring, win states).
+  clickAll();
 
   return { dir, problems };
 }
