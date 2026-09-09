@@ -78,7 +78,7 @@
   button:hover { border-color: var(--accent); color: var(--accent); }
   button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 
-  /* 3×3 grass field with holes */
+  /* 3×3 grass field with holes. Both share a wooden mallet cursor (SVG, 48px). */
   #field {
     display: grid;
     grid-template-columns: repeat(3, 110px);
@@ -88,14 +88,20 @@
     background: linear-gradient(160deg, #8bc34a, var(--grass));
     border-radius: 12px;
     touch-action: manipulation;
+    cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'><rect x='19' y='24' width='8' height='21' rx='4' fill='saddlebrown' stroke='sienna' stroke-width='2'/><rect x='5' y='5' width='37' height='17' rx='5' fill='peru' stroke='sienna' stroke-width='2'/><rect x='29' y='5' width='13' height='17' rx='4' fill='slategray' stroke='sienna' stroke-width='2'/></svg>") 12 13, pointer;
   }
 
   .hole {
     position: relative;
     height: 110px;
-    cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="34" height="34"><text y="26" font-size="28">🔨</text></svg>') 6 6, pointer;
+    cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'><rect x='19' y='24' width='8' height='21' rx='4' fill='saddlebrown' stroke='sienna' stroke-width='2'/><rect x='5' y='5' width='37' height='17' rx='5' fill='peru' stroke='sienna' stroke-width='2'/><rect x='29' y='5' width='13' height='17' rx='4' fill='slategray' stroke='sienna' stroke-width='2'/></svg>") 12 13, pointer;
     overflow: hidden;
+    border-radius: 8px;
+    transition: background-color .12s ease-out;
   }
+
+  /* Red flash when you whack a bomb */
+  .hole.boom { background: rgba(226, 75, 74, .35); }
 
   .hole::after {
     content: '';
@@ -324,9 +330,14 @@
 
     if (hole.occupant.kind === 'bomb') {
       score = Math.max(0, score - 3);
+      // Show 💥 on the spot, flash the hole red, then return the tile to idle.
+      hole.el.classList.add('boom');
       despawn(hole, false);
       hole.moleEl.textContent = '💥';
-      setTimeout(function () { if (!hole.occupant) hole.moleEl.textContent = '🐹'; }, 300);
+      setTimeout(function () {
+        hole.el.classList.remove('boom');
+        if (!hole.occupant) hole.moleEl.textContent = '🐹';
+      }, 300);
     } else {
       score++;
       despawn(hole, true);
