@@ -376,5 +376,80 @@ console.log('\n[12] adjustable speed');
   g.newGame();
 }
 
+console.log('\n[13] down arrow slams the piece to the floor');
+{
+  // Regression guard: the down arrow used to be dead. It sat in KEY_MAP, and
+  // the keydown handler returns early for anything in KEY_MAP — so the held-key
+  // state the gravity loop was reading (keys.ArrowDown) was never set. Now the
+  // arrow is a one-tap slam and S carries the held soft drop.
+  g.setSpeed(1);
+  g.newGame();
+
+  function floorFor() {
+    let y = g.piece.y;
+    while (!g.collides(g.piece.type, g.piece.rot, g.piece.x, y + 1)) y++;
+    return y;
+  }
+
+  const floorY = floorFor();
+  const scoreBefore = g.score;
+  check('the down key is bound to an action', typeof g.KEY_MAP['ArrowDown'] === 'function');
+
+  g.KEY_MAP['ArrowDown']();
+  check('one press drops the piece straight to the floor',
+    g.piece.y === floorY, `y=${g.piece.y} expected ${floorY}`);
+  check('the slam itself scores nothing', g.score === scoreBefore, `${scoreBefore} -> ${g.score}`);
+  check('the slam does not lock the piece yet',
+    !g.board.some(r => r.some(c => c !== null)));
+
+  const x0 = g.piece.x;
+  g.move(-1);
+  check('the piece can still be nudged sideways after the slam',
+    g.piece.x === x0 - 1, `${x0} -> ${g.piece.x}`);
+
+  g.KEY_MAP['ArrowDown']();
+  check('pressing down again locks the piece in',
+    g.board.some(r => r.some(c => c !== null)));
+  check('a fresh piece is spawned after the lock', !!g.piece && g.piece.y < 0);
+
+  // The on-screen down button shares the same behaviour.
+  g.newGame();
+  const floor2 = floorFor();
+  g.document.getElementById('btnDown').fire('click', {});
+  check('the on-screen down button slams too', g.piece.y === floor2, String(g.piece.y));
+
+  // Soft drop survives on S, and still pays one point per cell.
+  g.newGame();
+  const sScore = g.score, sY = g.piece.y;
+  g.keys.s = true;
+  let t = 9000000;
+  for (let i = 0; i < 6; i++) { t += 50; g.__pump(t); }
+  g.keys.s = false;
+  check('holding S still soft-drops', g.piece.y > sY, `y ${sY} -> ${g.piece.y}`);
+  check('soft drop still scores 1 per cell', g.score > sScore, `${sScore} -> ${g.score}`);
+
+  // The original bug: the down arrow was in KEY_MAP, so the keydown handler
+  // returned before recording it as held — yet the gravity loop still read the
+  // held flag. Nothing should pay attention to that flag any more.
+  g.newGame();
+  const stuckScore = g.score;
+  g.keys.ArrowDown = true;
+  let t2 = 9500000;
+  for (let i = 0; i < 4; i++) { t2 += 50; g.__pump(t2); }
+  g.keys.ArrowDown = false;
+  check('a stuck keys.ArrowDown no longer triggers a soft drop',
+    g.score === stuckScore, `${stuckScore} -> ${g.score}`);
+
+  // Hard drop is untouched: it locks immediately and pays 2 per cell.
+  g.newGame();
+  const hFloor = floorFor(), hScore = g.score, hCells = hFloor - g.piece.y;
+  g.hardDrop();
+  check('hard drop locks immediately', g.board.some(r => r.some(c => c !== null)));
+  check('hard drop pays 2 points per cell', g.score === hScore + hCells * 2,
+    `${hScore} + ${hCells}*2 -> ${g.score}`);
+
+  g.newGame();
+}
+
 console.log(`\n${pass} passed, ${fail} failed\n`);
 process.exit(fail ? 1 : 0);

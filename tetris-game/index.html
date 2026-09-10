@@ -277,7 +277,7 @@
       <div class="box">
         <div class="glyph">🟦</div>
         <h2 data-i18n="readyTitle">准备好了吗？</h2>
-        <p data-i18n-html="readyKeys"><kbd>←</kbd> <kbd>→</kbd> 移动 · <kbd>↑</kbd> 旋转 · <kbd>Space</kbd> 速降 · <kbd>C</kbd> 暂存</p>
+        <p data-i18n-html="readyKeys"><kbd>←</kbd> <kbd>→</kbd> 移动 · <kbd>↑</kbd> 旋转 · <kbd>↓</kbd> 贴地 · <kbd>Space</kbd> 速降 · <kbd>C</kbd> 暂存</p>
         <p class="tip" data-i18n-html="speedHint"><kbd>-</kbd> <kbd>=</kbd> 随时调速</p>
         <button id="btnStart" data-i18n="start">开始游戏</button>
       </div>
@@ -305,9 +305,10 @@
     </div>
     <div class="hintline">
       <kbd>←</kbd> <kbd>→</kbd>
-      <kbd>↓</kbd>
       <kbd>↑</kbd>/<kbd>X</kbd>
       <kbd>Z</kbd>
+      <kbd>↓</kbd>
+      <kbd>S</kbd>
       <kbd>Space</kbd>
       <kbd>C</kbd>
       <kbd>P</kbd>
@@ -331,8 +332,8 @@ var T = LiteI18N.create({
   start:     { en: 'Start',             zh: '开始游戏' },
   readyTitle:{ en: 'Ready?',            zh: '准备好了吗？' },
   readyKeys: {
-    en: '<kbd>←</kbd> <kbd>→</kbd> move · <kbd>↑</kbd> rotate · <kbd>Space</kbd> hard drop · <kbd>C</kbd> hold',
-    zh: '<kbd>←</kbd> <kbd>→</kbd> 移动 · <kbd>↑</kbd> 旋转 · <kbd>Space</kbd> 速降 · <kbd>C</kbd> 暂存'
+    en: '<kbd>←</kbd> <kbd>→</kbd> move · <kbd>↑</kbd> rotate · <kbd>↓</kbd> slam · <kbd>Space</kbd> hard drop · <kbd>C</kbd> hold',
+    zh: '<kbd>←</kbd> <kbd>→</kbd> 移动 · <kbd>↑</kbd> 旋转 · <kbd>↓</kbd> 贴地 · <kbd>Space</kbd> 速降 · <kbd>C</kbd> 暂存'
   },
   newGame:   { en: 'New game',         zh: '新游戏' },
   speed:     { en: 'SPEED',            zh: '速度' },
@@ -630,17 +631,20 @@ function move(dx) {
   return false;
 }
 
-function softDrop() {
+// One-tap slam: drop the piece straight to the bottom of its column without
+// locking it, so the player still gets a moment to slide it sideways. Pressing
+// down again while it is already resting commits the piece.
+function slamDown() {
   if (state !== 'playing' || !piece) return;
-  if (!collides(piece.type, piece.rot, piece.x, piece.y + 1)) {
+  var moved = 0;
+  while (!collides(piece.type, piece.rot, piece.x, piece.y + 1)) {
     piece.y++;
-    score += 1;
-    lastActionWasRotate = false;
-    dropAcc = 0;
-    updateHud();
-  } else {
-    lockPiece();
+    moved++;
   }
+  if (!moved) { lockPiece(); return; }
+  lastActionWasRotate = false;
+  dropAcc = 0;
+  lockDelay = 0;
 }
 
 function hardDrop() {
@@ -1034,8 +1038,9 @@ function tick(ts) {
     dropAcc += dt;
     var g = currentGravity();
 
-    // Soft drop: holding ↓ multiplies gravity so the piece falls fast.
-    var soft = keys.ArrowDown || keys.s;
+    // Soft drop: holding S multiplies gravity so the piece falls fast.
+    // (The down arrow is a one-tap slam instead, handled in the key map.)
+    var soft = keys.s;
     var step = soft ? Math.min(g, 40) : g;
 
     if (dropAcc >= step) {
@@ -1075,7 +1080,7 @@ var keys = {};
 var KEY_MAP = {
   ArrowLeft:  function () { move(-1); },
   ArrowRight: function () { move(1); },
-  ArrowDown:  function () { /* handled by the gravity loop */ },
+  ArrowDown:  function () { slamDown(); },
   ArrowUp:    function () { tryRotate(1); },
   x:          function () { tryRotate(1); },
   z:          function () { tryRotate(-1); },
@@ -1110,6 +1115,10 @@ window.addEventListener('keydown', function (ev) {
 
   if (KEY_MAP[lower]) {
     ev.preventDefault();
+    // Auto-repeat would fire the one-tap slam dozens of times a second and lock
+    // the piece instantly, so let the slam ignore repeats. Moving and rotating
+    // are fine to repeat.
+    if (ev.repeat && lower === 'ArrowDown') return;
     if (state === 'playing' || lower === 'p' || lower === 'escape') KEY_MAP[lower]();
     return;
   }
@@ -1133,7 +1142,7 @@ function bind(id, fn) {
 }
 bind('btnLeft',  function () { move(-1); });
 bind('btnRight', function () { move(1); });
-bind('btnDown',  function () { softDrop(); });
+bind('btnDown',  function () { slamDown(); });
 bind('btnCW',    function () { tryRotate(1); });
 bind('btnCCW',   function () { tryRotate(-1); });
 bind('btnHard',  function () { hardDrop(); });

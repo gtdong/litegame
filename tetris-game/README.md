@@ -17,10 +17,11 @@ The classic falling-block game, built to modern competitive rules — SRS rotati
 | Key | Action |
 |---|---|
 | `←` `→` | Move left / right |
-| `↓` | Soft drop (+1 point per cell) |
 | `↑` or `X` | Rotate clockwise |
 | `Z` | Rotate counter-clockwise |
-| `Space` | Hard drop (+2 points per cell) |
+| `↓` | **Slam** — drop straight to the bottom of the column, without locking. Stay put and you can still slide sideways; press `↓` again to lock |
+| `S` | Soft drop, hold to fall fast (+1 point per cell) |
+| `Space` | Hard drop — instant lock (+2 points per cell) |
 | `C` | Hold / swap the current piece |
 | `P` | Pause / resume |
 | `R` | New game |
@@ -28,6 +29,14 @@ The classic falling-block game, built to modern competitive rules — SRS rotati
 | `Esc` | Close the dialog |
 
 On touch devices an on-screen button pad sits below the board.
+
+The three "go down" keys are deliberately different:
+
+| Key | Feel | Scores | Reversible |
+|---|---|---|---|
+| `S` | accelerates the fall, one cell at a time | +1 / cell | yes |
+| `↓` | one-tap slam to the floor | — | yes, until it locks |
+| `Space` | instant slam *and* lock | +2 / cell | no |
 
 ## Features
 
