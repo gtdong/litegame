@@ -20,4 +20,5 @@ Play online: <https://litegame-hub.github.io/>
 - [tictactoe-game](tictactoe-game) — Tic-Tac-Toe (vs AI or two players)
 - [whackmole-game](whackmole-game) — Whack-a-Mole (timed rounds)
 - [sudoku-game](sudoku-game) — Sudoku (unique-solution puzzles, notes mode)
+- [fruitcatcher-game](fruitcatcher-game) — Fruit Catcher (basket vs falling fruit and bombs)
 
