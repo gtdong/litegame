@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>俄罗斯方块</title>
+<style>
+  :root {
+    --bg: #12141c;
+    --bg2: #1a1d29;
+    --panel: #222639;
+    --panel2: #2a2f42;
+    --border: #343a52;
+    --text: #e8ecf5;
+    --muted: #8b93a8;
+    --accent: #4dd0e1;
+    --good: #66bb6a;
+    --danger: #ef5350;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    margin: 0;
+    padding: 20px 14px 36px;
+    background: radial-gradient(1200px 700px at 50% -10%, #1e2233 0%, var(--bg) 60%);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    user-select: none;
+    overflow-x: hidden;
+  }
+
+  h1 {
+    margin: 0 0 10px;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  .lang-switch { margin-bottom: 14px; }
+  .lang-switch a { border-color: var(--border) !important; color: var(--muted) !important; }
+  .lang-switch a.active { background: var(--accent) !important; color: #12141c !important; border-color: var(--accent) !important; }
+
+  .stage {
+    position: relative;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 10px;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, .45);
+    touch-action: none;
+  }
+  .stage.shake { animation: shake .3s ease-out; }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-5px) rotate(-.4deg); }
+    45% { transform: translateX(5px) rotate(.4deg); }
+    70% { transform: translateX(-3px); }
+  }
+
+  canvas { display: block; border-radius: 8px; }
+
+  /* Touch control pad (visible on small screens, harmless on desktop) */
+  .pad {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-top: 12px;
+    width: 100%;
+    max-width: 380px;
+  }
+  .pad button {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 10px;
+    padding: 12px 4px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background .12s, border-color .12s, transform .08s;
+  }
+  .pad button:hover { background: var(--panel2); border-color: var(--accent); }
+  .pad button:active { transform: scale(.95); background: var(--accent); color: #12141c; }
+  .pad button.wide { grid-column: span 2; }
+
+  .pad .hintline {
+    grid-column: span 4;
+    text-align: center;
+    color: var(--muted);
+    font-size: 11px;
+    letter-spacing: .04em;
+    line-height: 1.7;
+  }
+  kbd {
+    background: var(--panel2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px;
+    color: var(--text);
+  }
+
+  /* Pause / game-over overlay drawn inside the stage */
+  #overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(10, 12, 20, .82);
+    border-radius: 14px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 6;
+    backdrop-filter: blur(3px);
+  }
+  #overlay.show { display: flex; }
+  #dialog {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px 28px;
+    min-width: 250px;
+    text-align: center;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, .6);
+    animation: pop .2s ease-out;
+  }
+  @keyframes pop {
+    from { transform: translateY(14px) scale(.96); opacity: 0; }
+    to   { transform: translateY(0) scale(1); opacity: 1; }
+  }
+  #dialog h2 { margin: 0 0 6px; font-size: 20px; }
+  #dialog .big { font-size: 44px; font-weight: 800; color: var(--accent); line-height: 1.1; margin: 8px 0 4px; letter-spacing: -.02em; }
+  #dialog .grade { font-size: 14px; color: var(--muted); margin-bottom: 14px; }
+  #dialog .grid3 { display: flex; gap: 8px; justify-content: center; margin-bottom: 16px; }
+  #dialog .grid3 div {
+    background: var(--panel2);
+    border-radius: 8px;
+    padding: 6px 10px;
+    min-width: 78px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  #dialog .grid3 strong { display: block; font-size: 17px; color: var(--text); margin-top: 2px; }
+  #dialog .actions { display: flex; gap: 10px; justify-content: center; }
+  #dialog button {
+    border: none;
+    border-radius: 8px;
+    padding: 9px 18px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    background: var(--accent);
+    color: #12141c;
+  }
+  #dialog button.secondary { background: transparent; color: var(--text); border: 1px solid var(--border); }
+  #dialog button:hover { filter: brightness(1.1); }
+
+  @media (max-width: 420px) {
+    body { padding: 14px 8px 28px; }
+    h1 { font-size: 17px; }
+    .stage { padding: 6px; }
+    #board { width: 100% !important; height: auto !important; }
+  }
+</style>
+</head>
+<body>
+  <h1 data-i18n="title">俄罗斯方块</h1>
+  <div class="lang-switch" data-lang-switch></div>
+
+  <div class="stage" id="stage">
+    <canvas id="board" width="360" height="480"></canvas>
+    <div id="overlay">
+      <div id="dialog">
+        <h2 id="dlgTitle">游戏结束</h2>
+        <div class="big" id="dlgScore">0</div>
+        <div class="grade" id="dlgGrade"></div>
+        <div class="grid3">
+          <div><span data-i18n="lines">行数</span><strong id="dlgLines">0</strong></div>
+          <div><span data-i18n="level">等级</span><strong id="dlgLevel">1</strong></div>
+          <div><span data-i18n="best">最高分</span><strong id="dlgBest">0</strong></div>
+        </div>
+        <div class="actions">
+          <button id="btnAgain" data-i18n="playAgain">再玩一局</button>
+          <button id="btnClose" class="secondary" data-i18n="close">关闭</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pad">
+    <button id="btnHold" data-i18n="hold">暂存</button>
+    <button id="btnCCW">↺</button>
+    <button id="btnCW">↻</button>
+    <button id="btnPause" data-i18n="pause">暂停</button>
+    <button id="btnLeft">←</button>
+    <button id="btnDown">↓</button>
+    <button id="btnRight">→</button>
+    <button id="btnHard" data-i18n="drop">速降</button>
+    <div class="hintline">
+      <kbd>←</kbd> <kbd>→</kbd>
+      <kbd>↓</kbd>
+      <kbd>↑</kbd>/<kbd>X</kbd>
+      <kbd>Z</kbd>
+      <kbd>Space</kbd>
+      <kbd>C</kbd>
+      <kbd>P</kbd>
+    </div>
+  </div>
+
+<script src="../assets/i18n.js"></script>
+<script>
+'use strict';
+
+/* ------------------------------------------------------------------ i18n --- */
+
+var T = LiteI18N.create({
+  title:     { en: 'Tetris',           zh: '俄罗斯方块' },
+  hold:      { en: 'Hold',             zh: '暂存' },
+  next:      { en: 'Next',             zh: '预览' },
+  pause:     { en: 'Pause',            zh: '暂停' },
+  resume:    { en: 'Resume',           zh: '继续' },
+  drop:      { en: 'Drop',             zh: '速降' },
+  newGame:   { en: 'New game',         zh: '新游戏' },
+  playAgain: { en: 'Play again',       zh: '再玩一局' },
+  close:     { en: 'Close',            zh: '关闭' },
+  lines:     { en: 'Lines',            zh: '行数' },
+  level:     { en: 'Level',            zh: '等级' },
+  best:      { en: 'Best',             zh: '最高分' },
+  score:     { en: 'Score',            zh: '得分' },
+  paused:    { en: 'Paused',           zh: '已暂停' },
+  pausedSub: { en: 'Press P to resume',zh: '按 P 继续' },
+  over:      { en: 'Game over',        zh: '游戏结束' },
+  master:    { en: 'Block master!',    zh: '方块大师！' },
+  expert:    { en: 'Excellent!',       zh: '消除高手！' },
+  good:      { en: 'Solid run',        zh: '不错的成绩' },
+  rookie:    { en: 'Keep practicing',  zh: '继续练习' },
+  single:    { en: 'Single',           zh: '单消' },
+  double:    { en: 'Double',           zh: '双消' },
+  triple:    { en: 'Triple',           zh: '三消' },
+  tetris:    { en: 'TETRIS!',          zh: '四消！' },
+  tspin:     { en: 'T-SPIN',           zh: 'T-SPIN' },
+  combo:     { en: 'Combo',            zh: '连击' }
+});
+
+/* --------------------------------------------------------------- constants --- */
+
+var COLS = 10, ROWS = 20, CELL = 24;
+var BOARD_W = COLS * CELL;          // 240
+var BOARD_H = ROWS * CELL;          // 480
+var PAD = 8;
+var SIDE_X = BOARD_W + PAD * 2;     // sidebar origin on the canvas
+var SIDE_W = 104;
+var CANVAS_W = SIDE_X + SIDE_W;     // 360
+var CANVAS_H = BOARD_H;             // 480
+
+// Piece colours, indexed by type letter.
+var COLORS = {
+  I: '#4dd0e1', J: '#5c7cfa', L: '#ffa726',
+  O: '#ffd54f', S: '#66bb6a', T: '#ab47bc', Z: '#ef5350'
+};
+var TYPES = ['I', 'J', 'L', 'O', 'S', 'T', 'Z'];
+
+// Spawn shapes per SRS. O stays 2x2 (it has no meaningful rotation).
+var SHAPES = {
+  I: [[0,0,0,0], [1,1,1,1], [0,0,0,0], [0,0,0,0]],
+  J: [[1,0,0], [1,1,1], [0,0,0]],
+  L: [[0,0,1], [1,1,1], [0,0,0]],
+  O: [[1,1], [1,1]],
+  S: [[0,1,1], [1,1,0], [0,0,0]],
+  T: [[0,1,0], [1,1,1], [0,0,0]],
+  Z: [[1,1,0], [0,1,1], [0,0,0]]
+};
+
+/**
+ * SRS wall-kick data. Offsets are given in SRS convention (y grows upwards);
+ * applyKick() flips the y sign because the board's y axis grows downwards.
+ * Keys are "fromRotation>toRotation".
+ */
+var KICKS = {
+  '0>1': [[0,0], [-1,0], [-1,1], [0,-2], [-1,-2]],
+  '1>0': [[0,0], [1,0], [1,-1], [0,2], [1,2]],
+  '1>2': [[0,0], [1,0], [1,-1], [0,2], [1,2]],
+  '2>1': [[0,0], [-1,0], [-1,1], [0,-2], [-1,-2]],
+  '2>3': [[0,0], [1,0], [1,1], [0,-2], [1,-2]],
+  '3>2': [[0,0], [-1,0], [-1,-1], [0,2], [-1,2]],
+  '3>0': [[0,0], [-1,0], [-1,-1], [0,2], [-1,2]],
+  '0>3': [[0,0], [1,0], [1,1], [0,-2], [1,-2]]
+};
+var KICKS_I = {
+  '0>1': [[0,0], [-2,0], [1,0], [-2,-1], [1,2]],
+  '1>0': [[0,0], [2,0], [-1,0], [2,1], [-1,-2]],
+  '1>2': [[0,0], [-1,0], [2,0], [-1,2], [2,-1]],
+  '2>1': [[0,0], [1,0], [-2,0], [1,-2], [-2,1]],
+  '2>3': [[0,0], [2,0], [-1,0], [2,1], [-1,-2]],
+  '3>2': [[0,0], [-2,0], [1,0], [-2,-1], [1,2]],
+  '3>0': [[0,0], [1,0], [-2,0], [1,-2], [-2,1]],
+  '0>3': [[0,0], [-1,0], [2,0], [-1,2], [2,-1]]
+};
+
+// Gravity in milliseconds per cell, by level (1-based). Classic-style curve.
+function gravityMs(level) {
+  return Math.max(55, Math.round(800 * Math.pow(0.815, level - 1)));
+}
+
+/* ------------------------------------------------------------------ canvas --- */
+
+var cvs = document.getElementById('board');
+var ctx = cvs.getContext('2d');
+var DPR = window.devicePixelRatio || 1;
+if (DPR !== 1) {
+  cvs.width = CANVAS_W * DPR;
+  cvs.height = CANVAS_H * DPR;
+  cvs.style.width = CANVAS_W + 'px';
+  cvs.style.height = CANVAS_H + 'px';
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+
+/* ------------------------------------------------------------------- state --- */
+
+var board;            // ROWS x COLS, null or a type letter
+var piece;            // { type, rot, x, y } or null
+var holdType;         // type letter or null
+var holdUsed;         // true once hold has been used for the current piece
+var queue;            // upcoming types (>= 6 deep)
+var bag;              // remaining types in the current 7-bag shuffle
+
+var score = 0, lines = 0, level = 1, combo = -1;
+var best = +(localStorage.getItem('tetris_best') || 0);
+
+var state = 'ready';  // ready | playing | paused | over
+var dropAcc = 0;      // ms accumulated toward the next gravity step
+var lastTs = 0;
+var lastActionWasRotate = false;
+var toast = null;     // { text, life } transient banner ("TETRIS!", "T-SPIN"...)
+var lockDelay = 0;    // ms the piece has been resting on the stack
+
+/* ------------------------------------------------------- board / piece ops --- */
+
+function emptyBoard() {
+  var b = [];
+  for (var y = 0; y < ROWS; y++) {
+    var row = [];
+    for (var x = 0; x < COLS; x++) row.push(null);
+    b.push(row);
+  }
+  return b;
+}
+
+// Rotate a square matrix 90° clockwise.
+function rotateCW(m) {
+  var n = m.length, out = [], y, x, row;
+  for (y = 0; y < n; y++) {
+    row = [];
+    for (x = 0; x < n; x++) row.push(m[n - 1 - x][y]);
+    out.push(row);
+  }
+  return out;
+}
+
+// Pre-compute the four rotation states of every piece.
+var ROTATIONS = {};
+TYPES.forEach(function (t) {
+  var states = [SHAPES[t]];
+  for (var i = 1; i < 4; i++) states.push(rotateCW(states[i - 1]));
+  ROTATIONS[t] = states;
+});
+
+function cellsOf(type, rot) {
+  var m = ROTATIONS[type][((rot % 4) + 4) % 4];
+  var out = [];
+  for (var y = 0; y < m.length; y++) {
+    for (var x = 0; x < m[y].length; x++) {
+      if (m[y][x]) out.push([x, y]);
+    }
+  }
+  return out;
+}
+
+// Spawn position: horizontally centred, slightly above the visible field.
+function spawnX(type) {
+  var m = ROTATIONS[type][0];
+  return Math.floor((COLS - m[0].length) / 2);
+}
+
+function spawnY(type) {
+  // Pieces with an empty top row (I, and the 3x3 pieces) start one row higher.
+  return type === 'I' ? -1 : -1;
+}
+
+function collides(type, rot, px, py) {
+  var cells = cellsOf(type, rot);
+  for (var i = 0; i < cells.length; i++) {
+    var x = px + cells[i][0];
+    var y = py + cells[i][1];
+    if (x < 0 || x >= COLS || y >= ROWS) return true;
+    if (y >= 0 && board[y][x]) return true;
+  }
+  return false;
+}
+
+/* ------------------------------------------------------------- 7-bag logic --- */
+
+function refillBag() {
+  bag = TYPES.slice();
+  for (var i = bag.length - 1; i > 0; i--) {
+    var j = (Math.random() * (i + 1)) | 0;
+    var t = bag[i]; bag[i] = bag[j]; bag[j] = t;
+  }
+}
+
+function nextType() {
+  if (!bag || !bag.length) refillBag();
+  return bag.pop();
+}
+
+function fillQueue() {
+  while (queue.length < 6) queue.push(nextType());
+}
+
+/* ----------------------------------------------------------------- control --- */
+
+function newGame() {
+  board = emptyBoard();
+  queue = [];
+  bag = null;
+  holdType = null;
+  holdUsed = false;
+  score = 0; lines = 0; level = 1; combo = -1;
+  dropAcc = 0; lockDelay = 0;
+  lastActionWasRotate = false;
+  toast = null;
+  state = 'playing';
+  closeDialog();
+  fillQueue();
+  spawnPiece();
+  updateHud();
+}
+
+function spawnPiece() {
+  fillQueue();
+  var type = queue.shift();
+  fillQueue();
+  piece = { type: type, rot: 0, x: spawnX(type), y: spawnY(type) };
+  holdUsed = false;
+  lockDelay = 0;
+  lastActionWasRotate = false;
+  dropAcc = 0;
+
+  // Block out: spawning inside the stack ends the run.
+  if (collides(piece.type, piece.rot, piece.x, piece.y)) {
+    piece.y -= 1;
+    if (collides(piece.type, piece.rot, piece.x, piece.y)) {
+      gameOver();
+    }
+  }
+}
+
+function move(dx) {
+  if (state !== 'playing' || !piece) return false;
+  if (!collides(piece.type, piece.rot, piece.x + dx, piece.y)) {
+    piece.x += dx;
+    lastActionWasRotate = false;
+    resetLockIfGrounded();
+    return true;
+  }
+  return false;
+}
+
+function softDrop() {
+  if (state !== 'playing' || !piece) return;
+  if (!collides(piece.type, piece.rot, piece.x, piece.y + 1)) {
+    piece.y++;
+    score += 1;
+    lastActionWasRotate = false;
+    dropAcc = 0;
+    updateHud();
+  } else {
+    lockPiece();
+  }
+}
+
+function hardDrop() {
+  if (state !== 'playing' || !piece) return;
+  var moved = 0;
+  while (!collides(piece.type, piece.rot, piece.x, piece.y + 1)) {
+    piece.y++;
+    moved++;
+  }
+  score += moved * 2;
+  lastActionWasRotate = false;
+  lockPiece();
+  updateHud();
+}
+
+function tryRotate(dir) {
+  if (state !== 'playing' || !piece) return;
+  if (piece.type === 'O') { lastActionWasRotate = true; return; }
+
+  var from = ((piece.rot % 4) + 4) % 4;
+  var to = ((from + dir) % 4 + 4) % 4;
+  var key = from + '>' + to;
+  var table = piece.type === 'I' ? KICKS_I : KICKS;
+  var kicks = table[key] || [[0, 0]];
+
+  for (var i = 0; i < kicks.length; i++) {
+    var dx = kicks[i][0];
+    var dy = -kicks[i][1];            // SRS y is up, board y is down
+    if (!collides(piece.type, to, piece.x + dx, piece.y + dy)) {
+      piece.rot = to;
+      piece.x += dx;
+      piece.y += dy;
+      lastActionWasRotate = true;
+      resetLockIfGrounded();
+      return true;
+    }
+  }
+  return false;
+}
+
+function hold() {
+  if (state !== 'playing' || !piece || holdUsed) return;
+  var cur = piece.type;
+  if (holdType == null) {
+    holdType = cur;
+    spawnPiece();
+  } else {
+    var swap = holdType;
+    holdType = cur;
+    piece = { type: swap, rot: 0, x: spawnX(swap), y: spawnY(swap) };
+    lockDelay = 0;
+    dropAcc = 0;
+    if (collides(piece.type, piece.rot, piece.x, piece.y)) gameOver();
+  }
+  holdUsed = true;
+  lastActionWasRotate = false;
+}
+
+// A grounded piece gets a short grace period before it locks.
+function resetLockIfGrounded() {
+  if (collides(piece.type, piece.rot, piece.x, piece.y + 1)) lockDelay = 0;
+}
+
+/* ------------------------------------------------------------- lock / clear --- */
+
+function isTSpin() {
+  if (!piece || piece.type !== 'T' || !lastActionWasRotate) return false;
+  // Classic 3-corner rule: at least three of the four cells diagonal to the
+  // T's centre are occupied.
+  var cx = piece.x + 1, cy = piece.y + 1;   // centre of the 3x3 box
+  var corners = [[-1, -1], [1, -1], [-1, 1], [1, 1]];
+  var filled = 0;
+  for (var i = 0; i < corners.length; i++) {
+    var x = cx + corners[i][0];
+    var y = cy + corners[i][1];
+    if (x < 0 || x >= COLS || y >= ROWS) filled++;
+    else if (y >= 0 && board[y][x]) filled++;
+  }
+  return filled >= 3;
+}
+
+function lockPiece() {
+  var tspin = isTSpin();
+  var cells = cellsOf(piece.type, piece.rot);
+  var topOut = true;
+
+  for (var i = 0; i < cells.length; i++) {
+    var x = piece.x + cells[i][0];
+    var y = piece.y + cells[i][1];
+    if (y >= 0) {
+      board[y][x] = piece.type;
+      if (y > 0) topOut = false;
+    }
+  }
+
+  var cleared = clearLines();
+  var gained = scoreFor(cleared, tspin, combo + 1);
+
+  if (cleared > 0) {
+    combo++;
+    score += gained;
+    lines += cleared;
+
+    var newLevel = 1 + Math.floor(lines / 10);
+    if (newLevel > level) level = newLevel;
+
+    var label = '';
+    if (tspin) label = T.t('tspin');
+    else if (cleared === 4) label = T.t('tetris');
+    else if (cleared === 3) label = T.t('triple');
+    else if (cleared === 2) label = T.t('double');
+    else if (cleared === 1) label = T.t('single');
+    if (combo > 0) label += (label ? ' · ' : '') + T.t('combo') + ' ×' + (combo + 1);
+    if (label) showToast(label);
+    if (tspin || cleared === 4) shake();
+  } else {
+    combo = -1;
+  }
+
+  updateHud();
+
+  // Top-out: the piece locked entirely inside the hidden rows.
+  if (topOut) { gameOver(); return; }
+
+  piece = null;
+  spawnPiece();
+}
+
+function scoreFor(cleared, tspin, comboCount) {
+  var base = 0;
+  if (tspin) {
+    if (cleared === 0) base = 400;
+    else if (cleared === 1) base = 800;
+    else if (cleared === 2) base = 1200;
+    else if (cleared === 3) base = 1600;
+    else base = 1600;
+  } else {
+    if (cleared === 1) base = 100;
+    else if (cleared === 2) base = 300;
+    else if (cleared === 3) base = 500;
+    else if (cleared >= 4) base = 800;
+  }
+  var total = base * level;
+  if (cleared > 0 && comboCount > 0) total += 50 * comboCount * level;
+  return total;
+}
+
+function clearLines() {
+  var cleared = 0;
+  for (var y = ROWS - 1; y >= 0; y--) {
+    var full = true;
+    for (var x = 0; x < COLS; x++) {
+      if (!board[y][x]) { full = false; break; }
+    }
+    if (full) {
+      board.splice(y, 1);
+      var empty = [];
+      for (var i = 0; i < COLS; i++) empty.push(null);
+      board.unshift(empty);
+      cleared++;
+      y++;                      // re-check the row that just slid down
+    }
+  }
+  return cleared;
+}
+
+function gameOver() {
+  state = 'over';
+  if (score > best) {
+    best = score;
+    try { localStorage.setItem('tetris_best', String(best)); } catch (e) {}
+  }
+  showDialog(T.t('over'));
+}
+
+/* ---------------------------------------------------------------- rendering --- */
+
+function roundRect(c, x, y, w, h, r) {
+  if (r > w / 2) r = w / 2;
+  if (r > h / 2) r = h / 2;
+  c.beginPath();
+  c.moveTo(x + r, y);
+  c.arcTo(x + w, y, x + w, y + h, r);
+  c.arcTo(x + w, y + h, x, y + h, r);
+  c.arcTo(x, y + h, x, y, r);
+  c.arcTo(x, y, x + w, y, r);
+  c.closePath();
+}
+
+function drawBlock(c, px, py, size, color, opts) {
+  opts = opts || {};
+  var pad = opts.ghost ? 1.5 : 1;
+  var x = px + pad, y = py + pad, s = size - pad * 2;
+  var r = Math.max(2, size * 0.16);
+
+  if (opts.ghost) {
+    c.strokeStyle = color;
+    c.lineWidth = 2;
+    c.globalAlpha = 0.32;
+    roundRect(c, x, y, s, s, r);
+    c.stroke();
+    c.globalAlpha = 1;
+    return;
+  }
+
+  c.fillStyle = color;
+  roundRect(c, x, y, s, s, r);
+  c.fill();
+
+  // Top-left highlight + bottom-right shade give the blocks depth.
+  c.globalAlpha = 0.34;
+  c.fillStyle = '#ffffff';
+  roundRect(c, x + s * 0.14, y + s * 0.12, s * 0.72, s * 0.2, r * 0.6);
+  c.fill();
+  c.globalAlpha = 0.2;
+  c.fillStyle = '#000000';
+  roundRect(c, x + s * 0.14, y + s * 0.7, s * 0.72, s * 0.18, r * 0.6);
+  c.fill();
+  c.globalAlpha = 1;
+}
+
+function drawWell() {
+  // Playfield background + subtle grid.
+  ctx.fillStyle = '#171a25';
+  roundRect(ctx, 0, 0, BOARD_W, BOARD_H, 8);
+  ctx.fill();
+
+  ctx.strokeStyle = 'rgba(255,255,255,.045)';
+  ctx.lineWidth = 1;
+  for (var x = 1; x < COLS; x++) {
+    ctx.beginPath();
+    ctx.moveTo(x * CELL, 0);
+    ctx.lineTo(x * CELL, BOARD_H);
+    ctx.stroke();
+  }
+  for (var y = 1; y < ROWS; y++) {
+    ctx.beginPath();
+    ctx.moveTo(0, y * CELL);
+    ctx.lineTo(BOARD_W, y * CELL);
+    ctx.stroke();
+  }
+}
+
+function drawStack() {
+  for (var y = 0; y < ROWS; y++) {
+    for (var x = 0; x < COLS; x++) {
+      var t = board[y][x];
+      if (t) drawBlock(ctx, x * CELL, y * CELL, CELL, COLORS[t]);
+    }
+  }
+}
+
+function drawPiece() {
+  if (!piece) return;
+  var cells = cellsOf(piece.type, piece.rot);
+
+  // Ghost: where the piece would land.
+  var gy = piece.y;
+  while (!collides(piece.type, piece.rot, piece.x, gy + 1)) gy++;
+  if (gy !== piece.y) {
+    var gAlpha = 0.0;
+    for (var i = 0; i < cells.length; i++) {
+      var gx = piece.x + cells[i][0];
+      var gyy = gy + cells[i][1];
+      if (gyy >= 0) drawBlock(ctx, gx * CELL, gyy * CELL, CELL, COLORS[piece.type], { ghost: true });
+    }
+  }
+
+  for (var j = 0; j < cells.length; j++) {
+    var x = piece.x + cells[j][0];
+    var y = piece.y + cells[j][1];
+    if (y >= 0) drawBlock(ctx, x * CELL, y * CELL, CELL, COLORS[piece.type]);
+  }
+}
+
+// Draw a piece inside a small preview box, centred, at the given cell size.
+function drawMini(type, cx, cy, cellSize, alpha) {
+  var cells = cellsOf(type, 0);
+  var minX = 9, maxX = -9, minY = 9, maxY = -9;
+  cells.forEach(function (c) {
+    if (c[0] < minX) minX = c[0];
+    if (c[0] > maxX) maxX = c[0];
+    if (c[1] < minY) minY = c[1];
+    if (c[1] > maxY) maxY = c[1];
+  });
+  var w = (maxX - minX + 1) * cellSize;
+  var h = (maxY - minY + 1) * cellSize;
+  var ox = cx - w / 2 - minX * cellSize;
+  var oy = cy - h / 2 - minY * cellSize;
+
+  ctx.save();
+  if (alpha != null) ctx.globalAlpha = alpha;
+  cells.forEach(function (c) {
+    drawBlock(ctx, ox + c[0] * cellSize, oy + c[1] * cellSize, cellSize, COLORS[type]);
+  });
+  ctx.restore();
+}
+
+function drawSidebar() {
+  var x = SIDE_X;
+  var y = 10;
+
+  // ---- Hold ----
+  ctx.fillStyle = '#8b93a8';
+  ctx.font = '600 11px -apple-system, "PingFang SC", Arial, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText(T.t('hold').toUpperCase(), x, y);
+  y += 16;
+
+  ctx.fillStyle = '#1b1f2c';
+  roundRect(ctx, x - 2, y - 2, SIDE_W, 58, 8);
+  ctx.fill();
+  if (holdType) {
+    drawMini(holdType, x + SIDE_W / 2, y + 27, 13, holdUsed ? 0.35 : 1);
+  }
+  y += 66;
+
+  // ---- Next queue ----
+  ctx.fillStyle = '#8b93a8';
+  ctx.fillText(T.t('next').toUpperCase(), x, y);
+  y += 16;
+
+  ctx.fillStyle = '#1b1f2c';
+  roundRect(ctx, x - 2, y - 2, SIDE_W, 48 * 0 + (58 * 5 + 8), 8);
+  ctx.fill();
+
+  for (var i = 0; i < 5; i++) {
+    var t = queue[i];
+    if (!t) continue;
+    drawMini(t, x + SIDE_W / 2, y + 26 + i * 58, i === 0 ? 13 : 11, i === 0 ? 1 : 0.72);
+  }
+  y += 58 * 5 + 14;
+
+  // ---- Stats ----
+  ctx.font = '600 10px -apple-system, "PingFang SC", Arial, sans-serif';
+  var rows = [
+    [T.t('score'), String(score)],
+    [T.t('lines'), String(lines)],
+    [T.t('level'), String(level)],
+    [T.t('best'),  String(best)]
+  ];
+  rows.forEach(function (r) {
+    ctx.fillStyle = '#8b93a8';
+    ctx.font = '600 10px -apple-system, "PingFang SC", Arial, sans-serif';
+    ctx.fillText(r[0].toUpperCase(), x, y);
+    ctx.fillStyle = '#e8ecf5';
+    ctx.font = '700 17px -apple-system, "PingFang SC", Arial, sans-serif';
+    ctx.fillText(r[1], x, y + 13);
+    y += 36;
+  });
+}
+
+function drawToast() {
+  if (!toast) return;
+  var age = toast.life;
+  var alpha = age > 0.75 ? (1 - age) / 0.25 : Math.min(1, age / 0.3);
+  if (alpha <= 0) return;
+
+  ctx.save();
+  ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = '800 22px -apple-system, "PingFang SC", Arial, sans-serif';
+  ctx.fillStyle = '#4dd0e1';
+  ctx.shadowColor = 'rgba(77,208,225,.7)';
+  ctx.shadowBlur = 16;
+  ctx.fillText(toast.text, BOARD_W / 2, BOARD_H * 0.42);
+  ctx.restore();
+}
+
+function showToast(text) {
+  toast = { text: text, life: 1 };
+}
+
+function shake() {
+  var stage = document.getElementById('stage');
+  stage.classList.remove('shake');
+  void stage.offsetWidth;
+  stage.classList.add('shake');
+}
+
+/* ------------------------------------------------------------------- loop --- */
+
+function tick(ts) {
+  if (!lastTs) lastTs = ts;
+  var dt = Math.min(120, ts - lastTs);
+  lastTs = ts;
+
+  if (state === 'playing' && piece) {
+    dropAcc += dt;
+    var g = gravityMs(level);
+
+    // Soft drop: holding ↓ multiplies gravity so the piece falls fast.
+    var soft = keys.ArrowDown || keys.s;
+    var step = soft ? Math.min(g, 40) : g;
+
+    if (dropAcc >= step) {
+      dropAcc = 0;
+      if (!collides(piece.type, piece.rot, piece.x, piece.y + 1)) {
+        piece.y++;
+        if (soft) { score += 1; updateHud(); }
+        lastActionWasRotate = false;
+      } else {
+        lockDelay += step;
+        if (lockDelay >= 420 || soft) lockPiece();
+      }
+    }
+  }
+
+  if (toast) {
+    toast.life -= dt / 900;
+    if (toast.life <= 0) toast = null;
+  }
+
+  render();
+  requestAnimationFrame(tick);
+}
+
+function render() {
+  ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+  drawWell();
+  drawStack();
+  drawPiece();
+  drawToast();
+  drawSidebar();
+}
+
+/* ------------------------------------------------------------------- input --- */
+
+var keys = {};
+var KEY_MAP = {
+  ArrowLeft:  function () { move(-1); },
+  ArrowRight: function () { move(1); },
+  ArrowDown:  function () { /* handled by the gravity loop */ },
+  ArrowUp:    function () { tryRotate(1); },
+  x:          function () { tryRotate(1); },
+  z:          function () { tryRotate(-1); },
+  ' ':        function () { hardDrop(); },
+  c:          function () { hold(); },
+  p:          function () { togglePause(); }
+};
+
+window.addEventListener('keydown', function (ev) {
+  var k = ev.key;
+  var lower = (k && k.length === 1) ? k.toLowerCase() : k;
+
+  if (lower === 'escape') { closeDialog(); return; }
+  if (lower === 'r') { newGame(); return; }
+
+  if (KEY_MAP[lower]) {
+    ev.preventDefault();
+    if (state === 'playing' || lower === 'p' || lower === 'escape') KEY_MAP[lower]();
+    return;
+  }
+  // Arrow keys arrive as full names, which the map already covers; track them
+  // separately so the gravity loop can read the held state.
+  keys[k] = true;
+});
+
+window.addEventListener('keyup', function (ev) {
+  keys[ev.key] = false;
+});
+
+window.addEventListener('blur', function () {
+  Object.keys(keys).forEach(function (k) { keys[k] = false; });
+});
+
+// --- on-screen pad ---
+function bind(id, fn) {
+  var el = document.getElementById(id);
+  if (el) el.addEventListener('click', fn);
+}
+bind('btnLeft',  function () { move(-1); });
+bind('btnRight', function () { move(1); });
+bind('btnDown',  function () { softDrop(); });
+bind('btnCW',    function () { tryRotate(1); });
+bind('btnCCW',   function () { tryRotate(-1); });
+bind('btnHard',  function () { hardDrop(); });
+bind('btnHold',  function () { hold(); });
+bind('btnPause', function () { togglePause(); });
+
+/* ------------------------------------------------------------------- HUD --- */
+
+var dlgScore = document.getElementById('dlgScore');
+var dlgLines = document.getElementById('dlgLines');
+var dlgLevel = document.getElementById('dlgLevel');
+var dlgBest  = document.getElementById('dlgBest');
+var dlgGrade = document.getElementById('dlgGrade');
+var dlgTitle = document.getElementById('dlgTitle');
+var overlay  = document.getElementById('overlay');
+var btnPause = document.getElementById('btnPause');
+
+function updateHud() {
+  if (btnPause) btnPause.textContent = state === 'paused' ? T.t('resume') : T.t('pause');
+}
+
+function gradeFor(l) {
+  if (l >= 100) return T.t('master');
+  if (l >= 50)  return T.t('expert');
+  if (l >= 20)  return T.t('good');
+  return T.t('rookie');
+}
+
+function showDialog(title) {
+  dlgTitle.textContent = title;
+  dlgScore.textContent = String(score);
+  dlgLines.textContent = String(lines);
+  dlgLevel.textContent = String(level);
+  dlgBest.textContent  = String(best);
+  dlgGrade.textContent = gradeFor(lines);
+  overlay.classList.add('show');
+}
+
+function closeDialog() {
+  overlay.classList.remove('show');
+}
+
+function togglePause() {
+  if (state === 'playing') {
+    state = 'paused';
+    showDialog(T.t('paused'));
+    dlgGrade.textContent = T.t('pausedSub');
+    dlgScore.textContent = String(score);
+  } else if (state === 'paused') {
+    state = 'playing';
+    closeDialog();
+  }
+  updateHud();
+}
+
+overlay.addEventListener('click', function (ev) {
+  if (ev.target === overlay && state === 'paused') togglePause();
+});
+bind('btnAgain', newGame);
+bind('btnClose', function () {
+  if (state === 'paused') togglePause();
+  else closeDialog();
+});
+
+T.onChange(function () {
+  if (state === 'paused') {
+    dlgTitle.textContent = T.t('paused');
+    dlgGrade.textContent = T.t('pausedSub');
+  } else if (state === 'over') {
+    dlgTitle.textContent = T.t('over');
+    dlgGrade.textContent = gradeFor(lines);
+  }
+  updateHud();
+});
+
+/* ------------------------------------------------------------------- init --- */
+
+board = emptyBoard();
+queue = [];
+fillQueue();
+holdType = null;
+updateHud();
+
+T.start();
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>

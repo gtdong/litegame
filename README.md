@@ -21,4 +21,5 @@ Play online: <https://litegame-hub.github.io/>
 - [whackmole-game](whackmole-game) — Whack-a-Mole (timed rounds)
 - [sudoku-game](sudoku-game) — Sudoku (unique-solution puzzles, notes mode)
 - [fruitcatcher-game](fruitcatcher-game) — Fruit Catcher (basket vs falling fruit and bombs)
+- [tetris-game](tetris-game) — Tetris (SRS rotation, 7-bag, hold, T-spin)
 
