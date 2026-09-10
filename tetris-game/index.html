@@ -91,6 +91,8 @@
   .pad button:hover { background: var(--panel2); border-color: var(--accent); }
   .pad button:active { transform: scale(.95); background: var(--accent); color: #12141c; }
   .pad button.wide { grid-column: span 2; }
+  .pad button.wide-total { grid-column: span 4; margin-top: 2px; }
+  .pad button:disabled { opacity: .4; cursor: not-allowed; }
 
   .pad .hintline {
     grid-column: span 4;
@@ -111,7 +113,7 @@
   }
 
   /* Pause / game-over overlay drawn inside the stage */
-  #overlay {
+  #overlay, .veil {
     position: absolute;
     inset: 0;
     background: rgba(10, 12, 20, .82);
@@ -122,7 +124,34 @@
     z-index: 6;
     backdrop-filter: blur(3px);
   }
-  #overlay.show { display: flex; }
+  #overlay.show, .veil.show { display: flex; }
+
+  /* Start screen */
+  .veil .box {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 28px 30px;
+    text-align: center;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, .6);
+    animation: pop .22s ease-out;
+  }
+  .veil .glyph { font-size: 42px; line-height: 1; margin-bottom: 10px; }
+  .veil h2 { margin: 0 0 8px; font-size: 20px; }
+  .veil p { margin: 0 0 20px; font-size: 13px; color: var(--muted); line-height: 1.9; }
+  .veil p kbd { margin: 0 1px; }
+  .veil button {
+    border: none;
+    border-radius: 9px;
+    padding: 11px 32px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    background: var(--accent);
+    color: #12141c;
+  }
+  .veil button:hover { filter: brightness(1.1); }
   #dialog {
     background: var(--panel);
     border: 1px solid var(--border);
@@ -195,6 +224,15 @@
         </div>
       </div>
     </div>
+
+    <div id="start" class="veil show">
+      <div class="box">
+        <div class="glyph">🟦</div>
+        <h2 data-i18n="readyTitle">准备好了吗？</h2>
+        <p data-i18n-html="readyKeys"><kbd>←</kbd> <kbd>→</kbd> 移动 · <kbd>↑</kbd> 旋转 · <kbd>Space</kbd> 速降 · <kbd>C</kbd> 暂存</p>
+        <button id="btnStart" data-i18n="start">开始游戏</button>
+      </div>
+    </div>
   </div>
 
   <div class="pad">
@@ -206,6 +244,7 @@
     <button id="btnDown">↓</button>
     <button id="btnRight">→</button>
     <button id="btnHard" data-i18n="drop">速降</button>
+    <button id="btnNew" class="wide-total" data-i18n="newGame">新游戏</button>
     <div class="hintline">
       <kbd>←</kbd> <kbd>→</kbd>
       <kbd>↓</kbd>
@@ -230,6 +269,12 @@ var T = LiteI18N.create({
   pause:     { en: 'Pause',            zh: '暂停' },
   resume:    { en: 'Resume',           zh: '继续' },
   drop:      { en: 'Drop',             zh: '速降' },
+  start:     { en: 'Start',             zh: '开始游戏' },
+  readyTitle:{ en: 'Ready?',            zh: '准备好了吗？' },
+  readyKeys: {
+    en: '<kbd>←</kbd> <kbd>→</kbd> move · <kbd>↑</kbd> rotate · <kbd>Space</kbd> hard drop · <kbd>C</kbd> hold',
+    zh: '<kbd>←</kbd> <kbd>→</kbd> 移动 · <kbd>↑</kbd> 旋转 · <kbd>Space</kbd> 速降 · <kbd>C</kbd> 暂存'
+  },
   newGame:   { en: 'New game',         zh: '新游戏' },
   playAgain: { en: 'Play again',       zh: '再玩一局' },
   close:     { en: 'Close',            zh: '关闭' },
@@ -441,6 +486,7 @@ function newGame() {
   toast = null;
   state = 'playing';
   closeDialog();
+  showStart(false);
   fillQueue();
   spawnPiece();
   updateHud();
@@ -937,6 +983,16 @@ window.addEventListener('keydown', function (ev) {
   if (lower === 'escape') { closeDialog(); return; }
   if (lower === 'r') { newGame(); return; }
 
+  // From the start screen, Space / Enter starts the game.
+  if (state === 'ready') {
+    if (lower === ' ' || lower === 'Enter') {
+      ev.preventDefault();
+      newGame();
+      return;
+    }
+    return;
+  }
+
   if (KEY_MAP[lower]) {
     ev.preventDefault();
     if (state === 'playing' || lower === 'p' || lower === 'escape') KEY_MAP[lower]();
@@ -968,6 +1024,8 @@ bind('btnCCW',   function () { tryRotate(-1); });
 bind('btnHard',  function () { hardDrop(); });
 bind('btnHold',  function () { hold(); });
 bind('btnPause', function () { togglePause(); });
+bind('btnStart', newGame);
+bind('btnNew',   newGame);
 
 /* ------------------------------------------------------------------- HUD --- */
 
@@ -1003,6 +1061,13 @@ function showDialog(title) {
 
 function closeDialog() {
   overlay.classList.remove('show');
+}
+
+// The start screen owns the game while state === 'ready'.
+function showStart(on) {
+  var el = document.getElementById('start');
+  if (el) el.classList.toggle('show', !!on);
+  if (btnPause) btnPause.disabled = !!on;
 }
 
 function togglePause() {
@@ -1044,7 +1109,9 @@ board = emptyBoard();
 queue = [];
 fillQueue();
 holdType = null;
+state = 'ready';
 updateHud();
+showStart(true);
 
 T.start();
 requestAnimationFrame(tick);

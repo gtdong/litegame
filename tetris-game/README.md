@@ -45,4 +45,6 @@ Highest score is kept in `localStorage` under the `tetris_best` key.
 
 Just open `index.html` in a browser. Zero dependencies.
 
+An opening screen asks you to hit **Start** (or press `Space` / `Enter`) before the first piece drops. The **New game** button below the board restarts at any time.
+
 The game has a built-in English / 简体中文 switch at the top; your choice is remembered in `localStorage`.

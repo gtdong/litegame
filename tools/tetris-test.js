@@ -40,6 +40,7 @@ function boot() {
       };
     }
     addEventListener(t, f) { (this.handlers[t] = this.handlers[t] || []).push(f); }
+    fire(t, ev) { (this.handlers[t] || []).forEach(f => f(ev || {})); }
     appendChild(c) { this.children.push(c); return c; }
     setAttribute() {}
     getAttribute() { return null; }
@@ -52,13 +53,17 @@ function boot() {
   }
 
   const els = {};
+  let frame = null;
   const ctx = {
     console, Math, Date, JSON, Object, Array, String, Number, Boolean, Error, Set, Map,
     parseInt, parseFloat, isNaN,
     performance: { now: () => Date.now() },
     setTimeout: () => 0, clearTimeout() {},
     setInterval: () => 0, clearInterval() {},
-    requestAnimationFrame: () => 1, cancelAnimationFrame() {},
+    // Keep the newest frame callback so the test can drive the render loop
+    // with explicit timestamps and watch the piece actually fall.
+    requestAnimationFrame: fn => { frame = fn; return 1; },
+    cancelAnimationFrame: () => { frame = null; },
     localStorage: { getItem: () => null, setItem() {} },
     document: {
       documentElement: new El(), head: new El(), body: new El(),
@@ -78,6 +83,9 @@ function boot() {
   const html = fs.readFileSync(GAME, 'utf8');
   const scripts = [...html.matchAll(/<script(?![^>]*\ssrc=)[^>]*>([\s\S]*?)<\/script>/g)].map(m => m[1]);
   scripts.forEach((s, i) => vm.runInContext(s, ctx, { filename: `tetris#${i}` }));
+
+  // Advance the game's requestAnimationFrame loop by one frame at time `ts`.
+  ctx.__pump = ts => { const f = frame; frame = null; if (f) f(ts); };
   return ctx;
 }
 
@@ -259,6 +267,46 @@ console.log('\n[10] full game cycle');
   check('hold pulled a different piece from the queue', second !== first || true);
   g.hold();
   check('hold cannot be used twice in a row', g.piece.type === second, `piece=${g.piece.type}`);
+}
+
+console.log('\n[11] the start screen actually starts the game');
+{
+  // Regression guard: the page shipped once with no visible way to start, so
+  // the board just sat there empty. Reproduce the load-time state and prove the
+  // Start button both flips the state and lets the piece fall.
+  g.newGame();
+  g.state = 'ready';
+  g.showStart(true);
+  check('a fresh page sits in the ready state', g.state === 'ready');
+  check('the start screen is visible on load',
+    g.document.getElementById('start').classList.contains('show'));
+  check('the pause button is disabled while on the start screen',
+    g.document.getElementById('btnPause').disabled === true);
+
+  g.document.getElementById('btnStart').fire('click', {});
+  check('clicking Start switches to playing', g.state === 'playing', g.state);
+  check('a piece exists after starting', !!g.piece);
+  check('the start screen hides once playing',
+    !g.document.getElementById('start').classList.contains('show'));
+
+  // Let time pass: gravity must visibly move the piece down.
+  const y0 = g.piece.y;
+  let t = 1000000;
+  for (let i = 0; i < 60; i++) { t += 50; g.__pump(t); }
+  check('the active piece falls as time passes', g.piece.y > y0, `y ${y0} -> ${g.piece.y}`);
+
+  // The render loop must survive a long unattended run.
+  let threw = null;
+  try { for (let i = 0; i < 400; i++) { t += 50; g.__pump(t); } } catch (e) { threw = e.message; }
+  check('the render loop survives 400 further frames', !threw, threw);
+
+  // The on-screen pad buttons must be wired to the game.
+  g.newGame();
+  const before = g.piece.x;
+  g.document.getElementById('btnLeft').fire('click', {});
+  check('the on-screen arrow moves the piece', g.piece.x === before - 1, `${before} -> ${g.piece.x}`);
+  g.document.getElementById('btnHard').fire('click', {});
+  check('the on-screen hard-drop button locks the piece', g.board.some(r => r.some(c => c !== null)));
 }
 
 console.log(`\n${pass} passed, ${fail} failed\n`);
