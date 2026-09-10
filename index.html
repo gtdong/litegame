@@ -93,6 +93,62 @@
     color: var(--accent);
   }
 
+  /* Random-pick banner: sits between the intro copy and the card grid */
+  .random {
+    display: flex;
+    justify-content: center;
+    margin: 0 0 22px;
+  }
+  .random-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 26px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #fff;
+    background: linear-gradient(135deg, #3b6ef5 0%, #7c3aed 55%, #ec4899 100%);
+    background-size: 200% 200%;
+    border: none;
+    border-radius: 999px;
+    cursor: pointer;
+    text-decoration: none;
+    box-shadow: 0 4px 14px rgba(59, 110, 245, .28);
+    transition: transform .15s ease, box-shadow .15s ease, background-position .35s ease;
+    font-family: inherit;
+  }
+  .random-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 22px rgba(124, 58, 237, .32);
+    background-position: 100% 50%;
+  }
+  .random-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(59, 110, 245, .3);
+  }
+  .random-btn .dice {
+    display: inline-block;
+    font-size: 22px;
+    line-height: 1;
+    transition: transform .35s cubic-bezier(.34, 1.56, .64, 1);
+  }
+  .random-btn:hover .dice { transform: rotate(15deg) scale(1.1); }
+  .random-btn.spinning .dice {
+    animation: spinDice .55s ease-in-out;
+  }
+  @keyframes spinDice {
+    0%   { transform: rotate(0deg)   scale(1); }
+    50%  { transform: rotate(360deg) scale(1.35); }
+    100% { transform: rotate(720deg) scale(1); }
+  }
+  .random-hint {
+    display: block;
+    text-align: center;
+    color: var(--muted);
+    font-size: 12px;
+    margin: -12px 0 22px;
+  }
+
   /* Hide the inactive language block. .on reveals it; without .on it's hidden. */
   [data-lang] { display: none; }
   [data-lang].on { display: inline; }
@@ -121,6 +177,20 @@
       <span data-lang="zh" class="inline">HTML5 小游戏合集，零依赖，点开即玩。</span>
     </p>
   </header>
+
+  <div class="random">
+    <button class="random-btn" id="randomBtn" type="button">
+      <span class="dice" aria-hidden="true">🎲</span>
+      <span>
+        <span data-lang="en" class="inline on">Random game</span>
+        <span data-lang="zh" class="inline">随机挑一个</span>
+      </span>
+    </button>
+  </div>
+  <div class="random-hint">
+    <span data-lang="en" class="inline on">Can't decide? Let me pick one for you.</span>
+    <span data-lang="zh" class="inline">选不出来？让我帮你随机挑一个。</span>
+  </div>
 
   <div class="games">
 
@@ -332,6 +402,38 @@
         apply(lang);
         try { localStorage.setItem('litegame_lang', lang); } catch (e) {}
       });
+    });
+  })();
+
+  // Random game picker: bounce the dice then navigate to a random card.
+  (function () {
+    var btn = document.getElementById('randomBtn');
+    if (!btn) return;
+    var cards = document.querySelectorAll('.games .card');
+    var lastIdx = -1;
+    function pick() {
+      if (!cards.length) return;
+      var idx;
+      do { idx = Math.floor(Math.random() * cards.length); } while (idx === lastIdx && cards.length > 1);
+      lastIdx = idx;
+      return cards[idx].getAttribute('href');
+    }
+    function go() {
+      var href = pick();
+      if (!href) return;
+      btn.classList.remove('spinning');
+      void btn.offsetWidth;             // restart the dice animation
+      btn.classList.add('spinning');
+      setTimeout(function () { window.location.href = href; }, 260);
+    }
+    btn.addEventListener('click', go);
+    window.addEventListener('keydown', function (ev) {
+      if (ev.target && /input|textarea|select/i.test(ev.target.tagName)) return;
+      if (ev.key === ' ' || ev.key === 'Enter') {
+        if (ev.metaKey || ev.altKey || ev.shiftKey) return;
+        ev.preventDefault();
+        go();
+      }
     });
   })();
 </script>
