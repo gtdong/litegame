@@ -131,6 +131,52 @@
   }
   #dialog button.secondary { background: #fff; color: var(--text); border: 1px solid var(--border); }
   #dialog button:hover { filter: brightness(1.05); }
+
+  /* Keyboard hint strip under the canvas */
+  .hint {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 10px;
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .keyrow { display: inline-flex; align-items: center; gap: 6px; }
+  .key {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    height: 32px;
+    padding: 0 8px;
+    background: #fff;
+    border: 1.5px solid var(--border);
+    border-bottom-width: 3px;
+    border-radius: 7px;
+    color: var(--text);
+    font-weight: 700;
+    font-size: 14px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    transition: transform .08s ease-out, background .12s, border-color .12s, color .12s;
+  }
+  .key.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    transform: translateY(2px);
+    border-bottom-width: 1.5px;
+  }
+  .hand {
+    font-size: 26px;
+    line-height: 1;
+    display: inline-block;
+    transform-origin: 50% 80%;
+    transition: transform .12s ease-out;
+  }
+  .hand.left  { transform: rotate(-8deg); }
+  .hand.right { transform: rotate( 8deg); }
+  .hand.idle  { transform: rotate(0deg);  }
 </style>
 </head>
 <body>
@@ -170,6 +216,16 @@
     </div>
   </div>
 
+  <div class="hint" aria-label="Keyboard controls">
+    <span class="keyrow">
+      <kbd class="key" id="keyLeft">←</kbd>
+      <span class="hand idle" id="handL">👈</span>
+      <span data-i18n="move">移动</span>
+      <span class="hand idle" id="handR">👉</span>
+      <kbd class="key" id="keyRight">→</kbd>
+    </span>
+  </div>
+
 <script src="../assets/i18n.js"></script>
 <script>
   'use strict';
@@ -189,7 +245,8 @@
     perfect:  { en: 'Perfect harvest!',        zh: '完美丰收！' },
     great:    { en: 'Great catching!',         zh: '眼疾手快！' },
     nice:     { en: 'Nice work!',              zh: '手感不错！' },
-    keepon:   { en: 'Keep practicing!',        zh: '再练练手' }
+    keepon:   { en: 'Keep practicing!',        zh: '再练练手' },
+    move:     { en: 'Move',                    zh: '移动' }
   });
 
   // ---------- canvas setup ----------
@@ -318,13 +375,32 @@
   window.addEventListener('mouseup', function () { pointerActive = false; });
 
   var keys = {};
+  var keyLeft = document.getElementById('keyLeft');
+  var keyRight = document.getElementById('keyRight');
+  var handL = document.getElementById('handL');
+  var handR = document.getElementById('handR');
+
+  function updateKeyHints() {
+    var left = !!(keys.ArrowLeft || keys.a);
+    var right = !!(keys.ArrowRight || keys.d);
+    keyLeft.classList.toggle('active', left);
+    keyRight.classList.toggle('active', right);
+    handL.className = 'hand ' + (left && !right ? 'left' : right ? 'right' : 'idle');
+    handR.className = 'hand ' + (right && !left ? 'right' : left ? 'left' : 'idle');
+  }
+
   window.addEventListener('keydown', function (ev) {
     var k = ev.key;
     keys[k] = true;
     if (k === ' ' || k === 'Enter') { ev.preventDefault(); togglePause(); }
     if (k === 'Escape') { closeDialog(); }
+    updateKeyHints();
   });
-  window.addEventListener('keyup', function (ev) { keys[ev.key] = false; });
+  window.addEventListener('keyup', function (ev) { keys[ev.key] = false; updateKeyHints(); });
+  window.addEventListener('blur', function () {
+    Object.keys(keys).forEach(function (k) { keys[k] = false; });
+    updateKeyHints();
+  });
 
   function processKeys(dt) {
     if (keys.ArrowLeft || keys.a)  basket.x -= 360 * dt;
