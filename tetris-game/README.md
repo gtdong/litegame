@@ -24,6 +24,7 @@ The classic falling-block game, built to modern competitive rules — SRS rotati
 | `C` | Hold / swap the current piece |
 | `P` | Pause / resume |
 | `R` | New game |
+| `-` `=` | Gear the speed down / up |
 | `Esc` | Close the dialog |
 
 On touch devices an on-screen button pad sits below the board.
@@ -38,6 +39,7 @@ On touch devices an on-screen button pad sits below the board.
 - **T-spin detection** — the 3-corner rule for recognising T-spins, worth up to 1600 points
 - **Combo counter** — every consecutive line clear adds `50 × combo × level`
 - **Level speed-up** — one level per 10 lines; gravity falls from 800 ms/cell toward a 55 ms floor
+- **Manual speed gears** — a 0.5× / 1× / 2× / 3× multiplier on top of the level curve, switchable at any time from the row below the board or with `-` / `=`. Your pick is remembered
 
 Highest score is kept in `localStorage` under the `tetris_best` key.
 

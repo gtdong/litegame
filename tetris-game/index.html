@@ -94,6 +94,53 @@
   .pad button.wide-total { grid-column: span 4; margin-top: 2px; }
   .pad button:disabled { opacity: .4; cursor: not-allowed; }
 
+  /* Speed multiplier row */
+  .pad .speed-row {
+    grid-column: span 4;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 2px;
+  }
+  .pad .speed-row > .cap {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .06em;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .pad .speed-btns {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    flex: 1;
+  }
+  .pad .speed-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    padding: 6px 2px;
+    border-radius: 8px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    cursor: pointer;
+    font-family: inherit;
+    transition: background .12s, border-color .12s, color .12s, transform .08s;
+  }
+  .pad .speed-btn b { font-size: 13px; font-weight: 700; line-height: 1; }
+  .pad .speed-btn span { font-size: 10px; line-height: 1; opacity: .85; }
+  .pad .speed-btn:hover { border-color: var(--accent); color: var(--text); }
+  .pad .speed-btn:active { transform: scale(.95); }
+  .pad .speed-btn.on {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #12141c;
+    box-shadow: 0 0 0 2px rgba(77, 208, 225, .18);
+  }
+  .pad .speed-btn.on span { opacity: .75; }
+
   .pad .hintline {
     grid-column: span 4;
     text-align: center;
@@ -139,6 +186,7 @@
   .veil .glyph { font-size: 42px; line-height: 1; margin-bottom: 10px; }
   .veil h2 { margin: 0 0 8px; font-size: 20px; }
   .veil p { margin: 0 0 20px; font-size: 13px; color: var(--muted); line-height: 1.9; }
+  .veil p.tip { margin: -12px 0 20px; font-size: 12px; color: var(--muted); opacity: .8; }
   .veil p kbd { margin: 0 1px; }
   .veil button {
     border: none;
@@ -230,6 +278,7 @@
         <div class="glyph">🟦</div>
         <h2 data-i18n="readyTitle">准备好了吗？</h2>
         <p data-i18n-html="readyKeys"><kbd>←</kbd> <kbd>→</kbd> 移动 · <kbd>↑</kbd> 旋转 · <kbd>Space</kbd> 速降 · <kbd>C</kbd> 暂存</p>
+        <p class="tip" data-i18n-html="speedHint"><kbd>-</kbd> <kbd>=</kbd> 随时调速</p>
         <button id="btnStart" data-i18n="start">开始游戏</button>
       </div>
     </div>
@@ -245,6 +294,15 @@
     <button id="btnRight">→</button>
     <button id="btnHard" data-i18n="drop">速降</button>
     <button id="btnNew" class="wide-total" data-i18n="newGame">新游戏</button>
+    <div class="speed-row">
+      <span class="cap" data-i18n="speed">速度</span>
+      <div class="speed-btns">
+        <button class="speed-btn" data-speed="0.5"><b>0.5×</b><span data-i18n="spdSlow">悠闲</span></button>
+        <button class="speed-btn on" data-speed="1"><b>1×</b><span data-i18n="spdNormal">标准</span></button>
+        <button class="speed-btn" data-speed="2"><b>2×</b><span data-i18n="spdFast">快</span></button>
+        <button class="speed-btn" data-speed="3"><b>3×</b><span data-i18n="spdTurbo">极速</span></button>
+      </div>
+    </div>
     <div class="hintline">
       <kbd>←</kbd> <kbd>→</kbd>
       <kbd>↓</kbd>
@@ -253,6 +311,7 @@
       <kbd>Space</kbd>
       <kbd>C</kbd>
       <kbd>P</kbd>
+      <kbd>-</kbd><kbd>=</kbd>
     </div>
   </div>
 
@@ -276,6 +335,15 @@ var T = LiteI18N.create({
     zh: '<kbd>←</kbd> <kbd>→</kbd> 移动 · <kbd>↑</kbd> 旋转 · <kbd>Space</kbd> 速降 · <kbd>C</kbd> 暂存'
   },
   newGame:   { en: 'New game',         zh: '新游戏' },
+  speed:     { en: 'SPEED',            zh: '速度' },
+  spdSlow:   { en: 'chill',            zh: '悠闲' },
+  spdNormal: { en: 'normal',           zh: '标准' },
+  spdFast:   { en: 'fast',             zh: '快速' },
+  spdTurbo:  { en: 'turbo',            zh: '极速' },
+  speedHint: {
+    en: '<kbd>-</kbd> <kbd>=</kbd> change speed anytime',
+    zh: '<kbd>-</kbd> <kbd>=</kbd> 随时调速'
+  },
   playAgain: { en: 'Play again',       zh: '再玩一局' },
   close:     { en: 'Close',            zh: '关闭' },
   lines:     { en: 'Lines',            zh: '行数' },
@@ -355,6 +423,46 @@ var KICKS_I = {
 // Gravity in milliseconds per cell, by level (1-based). Classic-style curve.
 function gravityMs(level) {
   return Math.max(55, Math.round(800 * Math.pow(0.815, level - 1)));
+}
+
+// Player-selectable speed multipliers. They scale the level curve above, so the
+// automatic level-up ramp still works no matter which gear you pick.
+var SPEEDS = [0.5, 1, 2, 3];
+var speedMul = 1;
+
+(function loadSpeed() {
+  var saved = parseFloat(localStorage.getItem('tetris_speed'));
+  if (SPEEDS.indexOf(saved) !== -1) speedMul = saved;
+})();
+
+// Effective gravity after the multiplier, floored so turbo never turns into a
+// single-frame drop even at very high levels.
+function currentGravity() {
+  return Math.max(20, Math.round(gravityMs(level) / speedMul));
+}
+
+function setSpeed(mul) {
+  if (SPEEDS.indexOf(mul) === -1) return;
+  speedMul = mul;
+  try { localStorage.setItem('tetris_speed', String(mul)); } catch (e) {}
+  syncSpeedButtons();
+}
+
+// Move one gear up/down; used by the `-` / `=` shortcuts.
+function stepSpeed(dir) {
+  var i = SPEEDS.indexOf(speedMul);
+  if (i === -1) i = 1;
+  var next = Math.max(0, Math.min(SPEEDS.length - 1, i + dir));
+  if (next !== i) setSpeed(SPEEDS[next]);
+}
+
+function syncSpeedButtons() {
+  var btns = document.querySelectorAll('.speed-btn');
+  for (var i = 0; i < btns.length; i++) {
+    var b = btns[i];
+    var v = parseFloat(b.getAttribute('data-speed'));
+    b.classList.toggle('on', v === speedMul);
+  }
 }
 
 /* ------------------------------------------------------------------ canvas --- */
@@ -924,7 +1032,7 @@ function tick(ts) {
 
   if (state === 'playing' && piece) {
     dropAcc += dt;
-    var g = gravityMs(level);
+    var g = currentGravity();
 
     // Soft drop: holding ↓ multiplies gravity so the piece falls fast.
     var soft = keys.ArrowDown || keys.s;
@@ -983,6 +1091,13 @@ window.addEventListener('keydown', function (ev) {
   if (lower === 'escape') { closeDialog(); return; }
   if (lower === 'r') { newGame(); return; }
 
+  // Speed gears work in every state, including before the first piece spawns.
+  if (lower === '-' || lower === '=' || lower === '+') {
+    ev.preventDefault();
+    stepSpeed(lower === '-' ? -1 : 1);
+    return;
+  }
+
   // From the start screen, Space / Enter starts the game.
   if (state === 'ready') {
     if (lower === ' ' || lower === 'Enter') {
@@ -1026,6 +1141,17 @@ bind('btnHold',  function () { hold(); });
 bind('btnPause', function () { togglePause(); });
 bind('btnStart', newGame);
 bind('btnNew',   newGame);
+
+// Speed gear buttons (delegated on the row, so markup stays declarative).
+var speedBtns = document.querySelectorAll('.speed-btn');
+for (var si = 0; si < speedBtns.length; si++) {
+  (function (btn) {
+    btn.addEventListener('click', function () {
+      setSpeed(parseFloat(btn.getAttribute('data-speed')));
+    });
+  })(speedBtns[si]);
+}
+syncSpeedButtons();
 
 /* ------------------------------------------------------------------- HUD --- */
 

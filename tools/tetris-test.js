@@ -29,6 +29,7 @@ function boot() {
     constructor() {
       this.style = { setProperty() {}, removeProperty() {} };
       this.dataset = {};
+      this.attrs = {};
       this.handlers = {};
       this.children = [];
       this._cls = new Set();
@@ -42,8 +43,8 @@ function boot() {
     addEventListener(t, f) { (this.handlers[t] = this.handlers[t] || []).push(f); }
     fire(t, ev) { (this.handlers[t] || []).forEach(f => f(ev || {})); }
     appendChild(c) { this.children.push(c); return c; }
-    setAttribute() {}
-    getAttribute() { return null; }
+    setAttribute(k, v) { this.attrs[k] = String(v); }
+    getAttribute(k) { return k in this.attrs ? this.attrs[k] : null; }
     getContext() { return ctxProxy; }
     getBoundingClientRect() { return { left: 0, top: 0, width: 360, height: 480 }; }
     set textContent(v) { this._t = String(v); }
@@ -53,6 +54,14 @@ function boot() {
   }
 
   const els = {};
+  // Static markup that the game reaches with querySelectorAll: the speed gear
+  // row. Without this the row would bind to nothing and the gears would be
+  // untestable from here.
+  const speedBtns = [0.5, 1, 2, 3].map(v => {
+    const e = new El();
+    e.attrs['data-speed'] = String(v);
+    return e;
+  });
   let frame = null;
   const ctx = {
     console, Math, Date, JSON, Object, Array, String, Number, Boolean, Error, Set, Map,
@@ -70,7 +79,7 @@ function boot() {
       getElementById: id => els[id] || (els[id] = new El()),
       createElement: t => new El(t),
       createDocumentFragment: () => new El(),
-      querySelectorAll: () => [],
+      querySelectorAll: sel => (sel === '.speed-btn' ? speedBtns : []),
       addEventListener() {}
     },
     navigator: { language: 'en' }
@@ -86,6 +95,7 @@ function boot() {
 
   // Advance the game's requestAnimationFrame loop by one frame at time `ts`.
   ctx.__pump = ts => { const f = frame; frame = null; if (f) f(ts); };
+  ctx.__speedBtns = speedBtns;
   return ctx;
 }
 
@@ -307,6 +317,63 @@ console.log('\n[11] the start screen actually starts the game');
   check('the on-screen arrow moves the piece', g.piece.x === before - 1, `${before} -> ${g.piece.x}`);
   g.document.getElementById('btnHard').fire('click', {});
   check('the on-screen hard-drop button locks the piece', g.board.some(r => r.some(c => c !== null)));
+}
+
+console.log('\n[12] adjustable speed');
+{
+  check('speed starts at 1x', g.speedMul === 1, String(g.speedMul));
+
+  // The gear buttons are real clickable elements and drive the multiplier.
+  const btns = g.__speedBtns;
+  check('the speed row exposes four gears', btns.length === 4, String(btns.length));
+  btns[0].fire('click', {});
+  check('clicking 0.5x sets the multiplier', g.speedMul === 0.5, String(g.speedMul));
+  check('only the active gear is highlighted',
+    btns.filter(b => b.classList.contains('on')).length === 1 &&
+    btns[0].classList.contains('on'));
+  btns[3].fire('click', {});
+  check('clicking 3x sets the multiplier', g.speedMul === 3, String(g.speedMul));
+  check('the highlight follows the selection',
+    btns[3].classList.contains('on') && !btns[0].classList.contains('on'));
+
+  // The multiplier is applied on top of the level curve.
+  g.level = 1;
+  g.speedMul = 1;    const base = g.currentGravity();
+  g.speedMul = 0.5;  const half = g.currentGravity();
+  g.speedMul = 3;    const turbo = g.currentGravity();
+  check('gravity is the level curve divided by the gear',
+    base === 800 && half === 1600 && turbo === 267, `${half}/${base}/${turbo}`);
+
+  // ...and cannot break the safety floor at absurd levels.
+  g.level = 30;
+  check('turbo still respects the 20ms floor', g.currentGravity() >= 20, String(g.currentGravity()));
+  g.level = 1;
+
+  // Measure how far the piece really travels in a fixed time window.
+  let clock = 5000000;
+  function fallCells(mul, frames) {
+    g.setSpeed(mul);
+    g.newGame();
+    g.state = 'playing';
+    g.piece.x = 4; g.piece.y = 0;
+    for (let i = 0; i < frames; i++) { clock += 100; g.__pump(clock); }
+    return g.piece.y;
+  }
+  const slow = fallCells(0.5, 12);
+  const fast = fallCells(3, 12);
+  check('a 3x gear drops the piece much further than 0.5x', fast > slow, `slow=${slow} fast=${fast}`);
+  check('the 0.5x gear barely moves inside the same window', slow === 0, String(slow));
+
+  // Stepping saturates at both ends instead of running off the list.
+  g.setSpeed(3); g.stepSpeed(1);
+  check('stepping up past 3x stays at 3x', g.speedMul === 3, String(g.speedMul));
+  g.setSpeed(0.5); g.stepSpeed(-1);
+  check('stepping down past 0.5x stays at 0.5x', g.speedMul === 0.5, String(g.speedMul));
+  g.stepSpeed(1);
+  check('stepping up moves exactly one gear', g.speedMul === 1, String(g.speedMul));
+
+  g.setSpeed(1);
+  g.newGame();
 }
 
 console.log(`\n${pass} passed, ${fail} failed\n`);
