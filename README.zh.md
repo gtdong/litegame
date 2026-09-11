@@ -13,7 +13,7 @@
 [![repo size](https://img.shields.io/github/repo-size/gtdong/litegame?style=flat-square)](https://github.com/gtdong/litegame)
 [![stars](https://img.shields.io/github/stars/gtdong/litegame?style=flat-square)](https://github.com/gtdong/litegame/stargazers)
 
-![litegame — 13 款零依赖 HTML5 小游戏，100% 由 AI 生成](assets/social-preview.png)
+![litegame — 零依赖 HTML5 小游戏合集，100% 由 AI 生成](assets/social-preview.png)
 
 ---
 

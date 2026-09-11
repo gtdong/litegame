@@ -13,7 +13,7 @@
 [![repo size](https://img.shields.io/github/repo-size/gtdong/litegame?style=flat-square)](https://github.com/gtdong/litegame)
 [![stars](https://img.shields.io/github/stars/gtdong/litegame?style=flat-square)](https://github.com/gtdong/litegame/stargazers)
 
-![litegame — 13 zero-dependency HTML5 mini games, 100% AI-generated](assets/social-preview.png)
+![litegame — zero-dependency HTML5 mini games, 100% AI-generated](assets/social-preview.png)
 
 ---
 

@@ -207,9 +207,15 @@ def main():
     # Rule
     d.line([x, 366, x + 520, 366], fill=BORDER, width=2)
 
-    # Feature line (Arial Unicode so the CJK half renders too)
-    f_feat = font(UNICODE, 23)
-    feats = "13 games   ·   Zero dependencies   ·   Bilingual EN / 中文"
+    # Feature line (Arial Unicode so the CJK half renders too).
+    # Deliberately no game count: this card should never need re-rendering
+    # just because another game got added.
+    feats = "Zero dependencies   ·   No framework   ·   Bilingual EN / 中文"
+    feat_size = 23
+    f_feat = font(UNICODE, feat_size)
+    while d.textlength(feats, font=f_feat) > 614 and feat_size > 15:
+        feat_size -= 1
+        f_feat = font(UNICODE, feat_size)
     d.text((x, 396), feats, font=f_feat, fill=INK)
 
     # Call to action
