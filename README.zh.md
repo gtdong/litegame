@@ -22,3 +22,4 @@ AI 生成的 HTML5 小游戏合集，零依赖，用浏览器打开 `index.html`
 - [sudoku-game](sudoku-game) — 数独（唯一解出题，笔记模式）
 - [fruitcatcher-game](fruitcatcher-game) — 接水果（接物类）
 - [tetris-game](tetris-game) — 俄罗斯方块（SRS 旋转 / 7-bag / 暂存 / T-spin）
+- [sokoban-game](sokoban-game) — 推箱子（10 关推箱解谜，支持撤销）

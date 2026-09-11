@@ -22,4 +22,5 @@ Play online: <https://litegame-hub.github.io/>
 - [sudoku-game](sudoku-game) — Sudoku (unique-solution puzzles, notes mode)
 - [fruitcatcher-game](fruitcatcher-game) — Fruit Catcher (basket vs falling fruit and bombs)
 - [tetris-game](tetris-game) — Tetris (SRS rotation, 7-bag, hold, T-spin)
+- [sokoban-game](sokoban-game) — Sokoban (10 levels, push-only puzzles with undo)
 
