@@ -246,7 +246,7 @@ var T = LiteI18N.create({
 
 /* ---------- Constants & state (top-level vars are reachable from tests) ---------- */
 var EMPTY = 0, BLACK = 1, WHITE = 2;
-var board, turn, started, gameOver, lastMove, moveCount, history, passSide, result;
+var board, turn, started, gameOver, lastMove, moveCount, undoStack, passSide, result;
 
 /* DOM refs */
 var modeEl, levelEl, aiFirstEl, boardEl, statusEl, blackCountEl, whiteCountEl,
@@ -478,7 +478,7 @@ function render() {
   }
 
   btnNew.disabled = !started;
-  btnUndo.disabled = !started || history.length === 0;
+  btnUndo.disabled = !started || undoStack.length === 0;
 }
 
 function statusText() {
@@ -513,7 +513,7 @@ function onCellClick(i) {
 }
 
 function doPlay(mv, color) {
-  history.push(snapshot());
+  undoStack.push(snapshot());
   board[idx(mv.r, mv.c)] = color;
   for (var i = 0; i < mv.flips.length; i++) board[mv.flips[i]] = color;
   lastMove = { r: mv.r, c: mv.c };
@@ -564,17 +564,17 @@ function startGame() {
   started = true;
   board = initialBoard();
   turn = BLACK;
-  gameOver = false; result = null; lastMove = null; moveCount = 0; history = []; passSide = null;
+  gameOver = false; result = null; lastMove = null; moveCount = 0; undoStack = []; passSide = null;
   resultScreenEl.classList.add('hidden');
   startScreenEl.classList.add('hidden');
   render();
 }
 
 function undo() {
-  if (!history.length) return;
+  if (!undoStack.length) return;
   var steps = modeEl.value === 'pve' ? 2 : 1;
-  for (var k = 0; k < steps && history.length; k++) {
-    var s = history.pop();
+  for (var k = 0; k < steps && undoStack.length; k++) {
+    var s = undoStack.pop();
     board = s.board.slice();
     turn = s.turn; moveCount = s.moveCount; lastMove = s.lastMove; passSide = s.passSide;
   }
@@ -608,7 +608,7 @@ function init() {
 
   board = initialBoard();          // preview behind the start overlay
   started = false; turn = BLACK; gameOver = false; lastMove = null;
-  moveCount = 0; history = []; passSide = null; result = null;
+  moveCount = 0; undoStack = []; passSide = null; result = null;
 
   btnStart.addEventListener('click', startGame);
   btnNew.addEventListener('click', startGame);

@@ -223,11 +223,18 @@ const WINDOW_UNFORGEABLE = ['window', 'self', 'document', 'location', 'top', 'pa
   'history', 'navigator', 'external', 'length', 'origin', 'closed', 'opener', 'event'];
 
 function clobberedGlobals(html) {
+  // Strip comments so a stray mention in prose is not reported.
+  const code = html.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, ' ');
   const hits = new Set();
-  const re = /^var\s+([A-Za-z_$][\w$]*)\s*=/gm;
+  // Only line-leading `var` is global. It may declare several names at once
+  // (`var board, turn, history, ...`), so walk the whole declarator list.
+  const re = /^var\s+([^;]+);/gm;
   let m;
-  while ((m = re.exec(html))) {
-    if (WINDOW_UNFORGEABLE.includes(m[1])) hits.add(m[1]);
+  while ((m = re.exec(code))) {
+    for (const part of m[1].split(',')) {
+      const name = part.match(/^\s*([A-Za-z_$][\w$]*)\s*(?:=|$)/);
+      if (name && WINDOW_UNFORGEABLE.includes(name[1])) hits.add(name[1]);
+    }
   }
   return [...hits];
 }
