@@ -3,7 +3,77 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>litegame — HTML5 mini games</title>
+<title>litegame — 13 free HTML5 mini games, zero dependencies</title>
+
+<!-- Search / social metadata. Keeps the page findable and the shared link pretty. -->
+<meta name="description" content="13 zero-dependency HTML5 mini games in plain vanilla JavaScript — Snake, Tetris, Sokoban, Sudoku, Minesweeper, Chinese Chess and more. No build, no framework, just click and play. 13 款零依赖 HTML5 小游戏，原生 JS 手写，点开即玩。">
+<meta name="keywords" content="html5 games, javascript games, browser games, mini games, vanilla javascript, zero dependencies, free online games, tetris, sokoban, sudoku, minesweeper, snake, 2048, gomoku, chinese chess, canvas games, 小游戏, 网页游戏, 在线游戏, 免费游戏, 开源游戏, 俄罗斯方块, 推箱子, 数独, 扫雷, 贪吃蛇, 五子棋, 中国象棋">
+<meta name="author" content="gtdong">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta name="theme-color" content="#f7f8fa">
+<meta name="color-scheme" content="light">
+<link rel="canonical" href="https://litegame-hub.github.io/">
+<link rel="alternate" hreflang="en" href="https://litegame-hub.github.io/">
+<link rel="alternate" hreflang="zh-CN" href="https://litegame-hub.github.io/">
+<link rel="alternate" hreflang="x-default" href="https://litegame-hub.github.io/">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8E%AE%3C/text%3E%3C/svg%3E">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="litegame">
+<meta property="og:title" content="litegame — 13 free HTML5 mini games, zero dependencies">
+<meta property="og:description" content="A collection of HTML5 mini games written in plain vanilla JavaScript. No build step, no framework, no install — just click and play.">
+<meta property="og:url" content="https://litegame-hub.github.io/">
+<meta property="og:image" content="https://litegame-hub.github.io/assets/social-preview.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="litegame — a grid of 13 HTML5 mini games">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+
+<!-- Twitter card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="litegame — 13 free HTML5 mini games, zero dependencies">
+<meta name="twitter:description" content="Snake, Tetris, Sokoban, Sudoku, Minesweeper, Chinese Chess and more. Pure vanilla JS, no build step — click and play.">
+<meta name="twitter:image" content="https://litegame-hub.github.io/assets/social-preview.png">
+
+<!-- Structured data: helps search engines list the game collection -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "litegame",
+  "alternateName": "litegame — HTML5 mini games",
+  "url": "https://litegame-hub.github.io/",
+  "description": "A collection of 13 zero-dependency HTML5 mini games written in plain vanilla JavaScript.",
+  "inLanguage": ["en", "zh-CN"],
+  "isAccessibleForFree": true,
+  "license": "https://opensource.org/licenses/MIT",
+  "author": { "@type": "Person", "name": "gtdong", "url": "https://github.com/gtdong" },
+  "mainEntity": {
+    "@type": "ItemList",
+    "name": "Games",
+    "numberOfItems": 13,
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1,  "name": "Snake",           "url": "https://litegame-hub.github.io/snake-game/" },
+      { "@type": "ListItem", "position": 2,  "name": "Gomoku",          "url": "https://litegame-hub.github.io/gomoku-game/" },
+      { "@type": "ListItem", "position": 3,  "name": "Chinese Chess",   "url": "https://litegame-hub.github.io/xiangqi-game/" },
+      { "@type": "ListItem", "position": 4,  "name": "2048",            "url": "https://litegame-hub.github.io/2048-game/" },
+      { "@type": "ListItem", "position": 5,  "name": "Minesweeper",     "url": "https://litegame-hub.github.io/minesweeper-game/" },
+      { "@type": "ListItem", "position": 6,  "name": "Breakout",        "url": "https://litegame-hub.github.io/breakout-game/" },
+      { "@type": "ListItem", "position": 7,  "name": "Memory Match",    "url": "https://litegame-hub.github.io/memory-game/" },
+      { "@type": "ListItem", "position": 8,  "name": "Tic-Tac-Toe",     "url": "https://litegame-hub.github.io/tictactoe-game/" },
+      { "@type": "ListItem", "position": 9,  "name": "Whack-a-Mole",    "url": "https://litegame-hub.github.io/whackmole-game/" },
+      { "@type": "ListItem", "position": 10, "name": "Sudoku",          "url": "https://litegame-hub.github.io/sudoku-game/" },
+      { "@type": "ListItem", "position": 11, "name": "Fruit Catcher",   "url": "https://litegame-hub.github.io/fruitcatcher-game/" },
+      { "@type": "ListItem", "position": 12, "name": "Tetris",          "url": "https://litegame-hub.github.io/tetris-game/" },
+      { "@type": "ListItem", "position": 13, "name": "Sokoban",         "url": "https://litegame-hub.github.io/sokoban-game/" }
+    ]
+  }
+}
+</script>
+
 <style>
   /* Base tokens: light theme */
   :root {

@@ -2,24 +2,94 @@
 
 **[简体中文](README.zh.md)** · [English](README.md)
 
+[![games](https://img.shields.io/badge/games-13-blue?style=flat-square)](#游戏列表)
+[![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen?style=flat-square)](#为什么是-litegame)
+[![vanilla JS](https://img.shields.io/badge/vanilla-JS-f7df1e?style=flat-square&logo=javascript&logoColor=black)](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript)
+[![build](https://img.shields.io/badge/build-none%20required-success?style=flat-square)](#为什么是-litegame)
+[![license](https://img.shields.io/github/license/gtdong/litegame?style=flat-square)](LICENSE)
+[![CI](https://github.com/gtdong/litegame/actions/workflows/smoke.yml/badge.svg)](https://github.com/gtdong/litegame/actions/workflows/smoke.yml)
+[![last commit](https://img.shields.io/github/last-commit/gtdong/litegame?style=flat-square)](https://github.com/gtdong/litegame/commits)
+[![repo size](https://img.shields.io/github/repo-size/gtdong/litegame?style=flat-square)](https://github.com/gtdong/litegame)
+[![stars](https://img.shields.io/github/stars/gtdong/litegame?style=flat-square)](https://github.com/gtdong/litegame/stargazers)
+
+![litegame — 13 款零依赖 HTML5 小游戏](assets/social-preview.png)
+
 ---
 
-AI 生成的 HTML5 小游戏合集，零依赖，用浏览器打开 `index.html` 即可玩。
+**13 款零依赖的 HTML5 小游戏，全部用原生 JavaScript 手写。** 浏览器打开 `index.html` 就能玩 —— 不用构建、不用框架、不用 `npm install`。
 
-在线试玩：<https://litegame-hub.github.io/>
+### ▶ 在线试玩：<https://litegame-hub.github.io/>
+
+> 如果这些游戏让你玩得开心，点个 ⭐ **Star** 能让更多人发现它。
 
 ## 游戏列表
 
-- [snake-game](snake-game) — 贪吃蛇
-- [gomoku-game](gomoku-game) — 五子棋（禁手规则）
-- [xiangqi-game](xiangqi-game) — 中国象棋（人机对战）
-- [2048-game](2048-game) — 2048（滑动合并）
-- [minesweeper-game](minesweeper-game) — 扫雷（三档难度）
-- [breakout-game](breakout-game) — 打砖块
-- [memory-game](memory-game) — 记忆翻牌（配对所有成对的牌）
-- [tictactoe-game](tictactoe-game) — 井字棋（人机 / 双人对战）
-- [whackmole-game](whackmole-game) — 打地鼠（限时挑战）
-- [sudoku-game](sudoku-game) — 数独（唯一解出题，笔记模式）
-- [fruitcatcher-game](fruitcatcher-game) — 接水果（接物类）
-- [tetris-game](tetris-game) — 俄罗斯方块（SRS 旋转 / 7-bag / 暂存 / T-spin）
-- [sokoban-game](sokoban-game) — 推箱子（10 关推箱解谜，支持撤销）
+每个游戏各占一个目录，都是一个自包含的 `index.html`。标签标注了它的玩法类型。
+
+| 游戏 | 说明 | 标签 |
+| --- | --- | --- |
+| [snake-game](snake-game) | 贪吃蛇，吃食物变长，别咬到自己 | `街机` `Canvas` `滑动` |
+| [gomoku-game](gomoku-game) | 五子棋，含三三 / 四四 / 长连禁手 | `棋类` `AI` `双人` |
+| [xiangqi-game](xiangqi-game) | 中国象棋，内置引擎三档难度 | `棋类` `AI` `策略` |
+| [2048-game](2048-game) | 滑动合并数字，凑出 2048 | `益智` `滑动` `撤销` |
+| [minesweeper-game](minesweeper-game) | 扫雷，首点永不踩雷 | `益智` `逻辑` `难度` |
+| [breakout-game](breakout-game) | 打砖块，关卡越高球速越快 | `街机` `Canvas` `关卡` |
+| [memory-game](memory-game) | 记忆翻牌，配对全部表情 | `卡牌` `记忆` `儿童` |
+| [tictactoe-game](tictactoe-game) | 井字棋，从不会输的 Minimax AI | `棋类` `AI` `Minimax` |
+| [whackmole-game](whackmole-game) | 打地鼠，30 秒一局，炸弹扣分 | `反应` `限时` `键盘` |
+| [sudoku-game](sudoku-game) | 数独，唯一解出题 + 笔记模式 | `益智` `逻辑` `出题器` |
+| [fruitcatcher-game](fruitcatcher-game) | 接水果，躲开炸弹，等级越高越刺激 | `街机` `Canvas` `关卡` |
+| [tetris-game](tetris-game) | 俄罗斯方块，SRS / 7-bag / 暂存 / 幽灵 / T-spin | `街机` `Canvas` `SRS` |
+| [sokoban-game](sokoban-game) | 推箱子，10 关只能推不能拉，支持撤销 | `益智` `关卡` `撤销` |
+
+## 为什么是 litegame
+
+- **零依赖** —— 没有东西要安装，没有东西要审计，也没有东西会坏。
+- **无构建步骤** —— 仓库里的文件就是最终产物，clone 下来双击即可。
+- **真·原生** —— 纯 HTML / CSS / JavaScript，不用框架、不用打包器、不用转译器。
+- **中英双语界面** —— 每个游戏都能在中英文间切换，靠的是一个共享的 2 KB i18n 模块。
+- **处处能玩** —— 桌面端键盘鼠标，手机端点按滑动；每个游戏都会自适应铺满屏幕。
+- **有测试** —— 冒烟套件在桩 DOM 里加载全部 13 款游戏，另有专项逻辑测试（俄罗斯方块 98 项、推箱子 104 项）。
+
+## 技术实现
+
+- 纯 `HTML` / `CSS` / `JavaScript`，用 DOM 元素渲染，值得的地方才上 `<canvas>`。
+- 共享 i18n 工具：[`assets/i18n.js`](assets/i18n.js) —— 约 2 KB、零依赖，语言偏好存在 `localStorage`。
+- 直接用 **GitHub Pages** 从仓库发布（`.nojekyll` 让流水线别插手）。
+
+## Topics
+
+`html5-games` · `javascript-games` · `browser-games` · `mini-games` · `vanilla-javascript` · `zero-dependencies` · `no-build` · `github-pages` · `game-development` · `puzzle-game` · `arcade-games` · `canvas` · `tetris` · `sokoban` · `sudoku` · `minesweeper` · `snake-game` · `2048` · `gomoku` · `chinese-chess`
+
+## 仓库结构
+
+```text
+litegame/
+├── index.html              # 首页：游戏卡片墙 + 随机挑选
+├── assets/
+│   ├── i18n.js             # 共享语言切换模块
+│   └── social-preview.png  # 链接预览横幅
+├── <game>-game/            # 每个游戏一个自包含目录
+│   ├── index.html
+│   ├── README.md           # 英文
+│   └── README.zh.md        # 简体中文
+├── tools/                  # 冒烟测试、各游戏专项逻辑测试、横幅生成脚本
+├── .github/                # CI 工作流、Issue 表单、PR 模板
+└── robots.txt / sitemap.xml  # 给搜索引擎的站点提示
+```
+
+## 自己加一个游戏
+
+1. 复制一个现成的 `<game>-game/` 目录并改名。
+2. 把 `index.html` 里的游戏逻辑换成你的。
+3. 在根 `index.html` 的卡片墙和上面的表格里各加一条。
+4. 跑 `node tools/smoke.js` —— 它会自动发现所有 `*-game/` 目录，任何未捕获异常都会让它失败。
+5. 提一个 Pull Request。先看看 [CONTRIBUTING.zh.md](CONTRIBUTING.zh.md)。
+
+## 参与贡献
+
+欢迎提 Bug、加新游戏、补翻译或打磨视觉。开始前请先读一遍 [CONTRIBUTING.zh.md](CONTRIBUTING.zh.md)，它很短。
+
+## 开源许可
+
+基于 [MIT License](LICENSE) 发布。玩得开心。

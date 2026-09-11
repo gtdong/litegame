@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://litegame-hub.github.io/sitemap.xml

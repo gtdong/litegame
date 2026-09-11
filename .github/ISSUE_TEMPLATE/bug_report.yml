@@ -1,0 +1,74 @@
+name: Bug report
+description: Something is broken or behaves unexpectedly
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this. A couple of details make fixes much faster.
+
+  - type: dropdown
+    id: game
+    attributes:
+      label: Which game?
+      options:
+        - Landing page (index.html)
+        - snake-game
+        - gomoku-game
+        - xiangqi-game
+        - 2048-game
+        - minesweeper-game
+        - breakout-game
+        - memory-game
+        - tictactoe-game
+        - whackmole-game
+        - sudoku-game
+        - fruitcatcher-game
+        - tetris-game
+        - sokoban-game
+        - Not game specific / repository tooling
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+      placeholder: |
+        Steps: open tetris-game, press the down arrow twice, then ...
+        Expected: ...
+        Actual: ...
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Browser and OS
+      placeholder: e.g. Chrome 128 on macOS 15, or Safari on iPhone 15
+    validations:
+      required: true
+
+  - type: dropdown
+    id: language
+    attributes:
+      label: Which UI language?
+      options:
+        - English
+        - 简体中文
+        - Both
+        - Not applicable
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I checked this is not already reported in an existing issue
+          required: true
+        - label: I can reproduce it on the latest version of the default branch
+          required: false

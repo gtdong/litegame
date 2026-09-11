@@ -1,0 +1,39 @@
+name: smoke
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: node ${{ matrix.node }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        node: ['18', '20', '22']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Smoke test — load every game in a stub DOM
+        run: node tools/smoke.js
+
+      - name: Per-game logic suites
+        run: |
+          for t in tools/*-test.js; do
+            [ -e "$t" ] || continue
+            echo "::group::$t"
+            node "$t"
+            echo "::endgroup::"
+          done

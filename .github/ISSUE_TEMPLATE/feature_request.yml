@@ -1,0 +1,42 @@
+name: Feature or new game
+description: Suggest a new game, a mechanic, or a visual improvement
+title: "[idea] "
+labels: ["enhancement"]
+body:
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What kind of change is this?
+      options:
+        - A brand new game
+        - A new feature in an existing game
+        - Visual / UX polish
+        - Documentation or translation
+        - Repository tooling / tests
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: What do you have in mind?
+      description: Describe the idea and why it would make the project better.
+    validations:
+      required: true
+
+  - type: textarea
+    id: design
+    attributes:
+      label: How would it play?
+      description: Controls, win condition, difficulty. For a new game this is the useful part — sketches welcome.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Project constraints
+      description: Every game here must stay dependency-free and build-free.
+      options:
+        - label: This can be built with plain HTML/CSS/JavaScript and zero dependencies
+          required: true
