@@ -4,6 +4,8 @@
 
 感谢你愿意帮忙。这份指南故意写得很短。
 
+先说一件事：**这个仓库里的每一行代码都是 AI 写的，不是人敲的。** 这不是噱头，而是这个项目的设计约束 —— 也正因为如此，下面两条铁律才这么重要，测试套件才承担了这么重的责任。人的贡献和 AI 的贡献同样欢迎，标准也一样。
+
 ## 两条铁律
 
 这个仓库里的一切都遵守两条硬性约束：
@@ -42,9 +44,11 @@ node tools/smoke.js      # 应该输出：13/13 games smoke-clean
 
 6. **给游戏写两份 README**：`README.md`（英文）和 `README.zh.md`（简体中文），顶部都要有左对齐的语言切换行。
 
-7. **在三个地方登记这个游戏：**
+7. **在四个地方登记这个游戏：**
    - 根 `index.html` 卡片墙里加一张卡片（链接不带结尾斜杠，例如 `href="my-game/"`）；
-   - `README.md` 和 `README.zh.md` 的表格里各加一行。
+   - `index.html` head 里 JSON-LD `ItemList` 加一条 `<ListItem>`，并把 `numberOfItems` 加一；
+   - `README.md` 和 `README.zh.md` 的表格里各加一行；
+   - `sitemap.xml` 里加一条 `<url>`。
 
 ## 测试
 
@@ -73,7 +77,7 @@ node tools/sokoban-test.js    # 104 项 —— 关卡合法性、BFS 求解、�
 - [ ] `node tools/smoke.js` 通过
 - [ ] 每个 `node tools/*-test.js` 都通过
 - [ ] 新增文案的中英两版都在
-- [ ] 新游戏已在 `index.html`、`README.md`、`README.zh.md` 三处登记
+- [ ] 新游戏已在 `index.html`（卡片墙 **和** JSON-LD `ItemList`）、`README.md`、`README.zh.md`、`sitemap.xml` 四处登记
 - [ ] HTML 里没有残留 `data-page-node-id` 之类的编辑器注入属性
 - [ ] 没有提交密钥、内网主机名或本机绝对路径
 

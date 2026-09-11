@@ -185,12 +185,17 @@ def main():
 
     x = 88
 
-    # Eyebrow pill
-    f_eye = font(BOLD, 20)
-    eye = "13 GAMES   ·   ZERO DEPENDENCIES"
+    # Eyebrow pill — the positioning claim, so it gets the accent treatment.
+    eye = "100% AI-GENERATED   ·   0 HANDWRITTEN LINES"
+    eye_size = 21
+    f_eye = font(BOLD, eye_size)
+    while d.textlength(eye, font=f_eye) > 560 and eye_size > 13:
+        eye_size -= 1
+        f_eye = font(BOLD, eye_size)
     ew = d.textlength(eye, font=f_eye)
-    d.rounded_rectangle([x, 78, x + ew + 44, 122], radius=22, fill=WHITE, outline=BORDER, width=2)
-    d.text((x + 22, 88), eye, font=f_eye, fill=ACCENT)
+    d.rounded_rectangle([x, 78, x + ew + 44, 122], radius=22,
+                        fill=(245, 243, 255), outline=(221, 214, 254), width=2)
+    d.text((x + 22, 88), eye, font=f_eye, fill=VIOLET)
 
     # Title
     d.text((x, 168), "litegame", font=font(BOLD, 104), fill=INK)
@@ -203,13 +208,13 @@ def main():
     d.line([x, 366, x + 520, 366], fill=BORDER, width=2)
 
     # Feature line (Arial Unicode so the CJK half renders too)
-    f_feat = font(UNICODE, 24)
-    feats = "No build step   ·   No framework   ·   Bilingual EN / 中文"
+    f_feat = font(UNICODE, 23)
+    feats = "13 games   ·   Zero dependencies   ·   Bilingual EN / 中文"
     d.text((x, 396), feats, font=f_feat, fill=INK)
 
     # Call to action
     d.text((x, 470), "litegame-hub.github.io", font=font(BOLD, 34), fill=ACCENT)
-    d.text((x, 520), "MIT licensed  ·  free, no ads, no tracking",
+    d.text((x, 520), "MIT licensed  ·  no build step  ·  no ads, no tracking",
            font=font(REGULAR, 22), fill=MUTED)
 
     img.convert("RGB").save(OUT, "PNG", optimize=True)

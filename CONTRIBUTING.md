@@ -4,6 +4,8 @@
 
 Thanks for wanting to help. This guide is short on purpose.
 
+One thing to know up front: **every line of code in this repository was written by an AI agent, not typed by a human.** That is not a gimmick, it is the design constraint — which is why the two rules below matter so much, and why the test suite carries so much weight. Contributions from people and from agents are equally welcome, and held to the same bar.
+
 ## The two rules
 
 Everything in this repository follows two hard constraints:
@@ -42,9 +44,11 @@ Then just open `index.html` in a browser. There is nothing else to set up.
 
 6. **Write two READMEs** next to your game: `README.md` (English) and `README.zh.md` (简体中文), each with the left-aligned switcher line at the top.
 
-7. **Register the game in three places:**
+7. **Register the game in four places:**
    - a card in the grid in the root `index.html` (link without a trailing slash, e.g. `href="my-game/"`),
-   - a row in the tables in `README.md` and `README.zh.md`.
+   - a `<ListItem>` in the JSON-LD `ItemList` in the `index.html` head, and bump `numberOfItems`,
+   - a row in the tables in `README.md` and `README.zh.md`,
+   - a `<url>` entry in `sitemap.xml`.
 
 ## Tests
 
@@ -73,7 +77,7 @@ If you add a game with non-trivial rules, add a suite. Two habits matter more th
 - [ ] `node tools/smoke.js` passes
 - [ ] Every `node tools/*-test.js` passes
 - [ ] Both language variants of any new copy are present
-- [ ] New game registered in `index.html`, `README.md` and `README.zh.md`
+- [ ] New game registered in `index.html` (card grid **and** JSON-LD `ItemList`), `README.md`, `README.zh.md` and `sitemap.xml`
 - [ ] No `data-page-node-id` or other editor-injected attributes left behind in the HTML
 - [ ] No secrets, private hostnames or personal absolute paths committed
 

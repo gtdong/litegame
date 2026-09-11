@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>litegame — 13 free HTML5 mini games, zero dependencies</title>
+<title>litegame — 13 free HTML5 mini games, 100% AI-generated, zero dependencies</title>
 
 <!-- Search / social metadata. Keeps the page findable and the shared link pretty. -->
-<meta name="description" content="13 zero-dependency HTML5 mini games in plain vanilla JavaScript — Snake, Tetris, Sokoban, Sudoku, Minesweeper, Chinese Chess and more. No build, no framework, just click and play. 13 款零依赖 HTML5 小游戏，原生 JS 手写，点开即玩。">
-<meta name="keywords" content="html5 games, javascript games, browser games, mini games, vanilla javascript, zero dependencies, free online games, tetris, sokoban, sudoku, minesweeper, snake, 2048, gomoku, chinese chess, canvas games, 小游戏, 网页游戏, 在线游戏, 免费游戏, 开源游戏, 俄罗斯方块, 推箱子, 数独, 扫雷, 贪吃蛇, 五子棋, 中国象棋">
+<meta name="description" content="100% AI-generated, zero-dependency HTML5 mini games in plain vanilla JavaScript — Snake, Tetris, Sokoban, Sudoku, Chinese Chess and more. No build, no framework, no lines of hand-written code. 13 款纯 AI 生成的零依赖 HTML5 小游戏，零手写代码，点开即玩。">
+<meta name="keywords" content="html5 games, javascript games, browser games, mini games, vanilla javascript, zero dependencies, ai generated games, ai generated code, vibe coding, ai coding, free online games, tetris, sokoban, sudoku, minesweeper, snake, 2048, gomoku, chinese chess, canvas games, 小游戏, 网页游戏, 在线游戏, 免费游戏, 开源游戏, AI 生成, 纯 AI 制作, 零手写代码, 俄罗斯方块, 推箱子, 数独, 扫雷, 贪吃蛇, 五子棋, 中国象棋">
 <meta name="author" content="gtdong">
 <meta name="robots" content="index, follow, max-image-preview:large">
 <meta name="theme-color" content="#f7f8fa">
@@ -21,21 +21,21 @@
 <!-- Open Graph -->
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="litegame">
-<meta property="og:title" content="litegame — 13 free HTML5 mini games, zero dependencies">
-<meta property="og:description" content="A collection of HTML5 mini games written in plain vanilla JavaScript. No build step, no framework, no install — just click and play.">
+<meta property="og:title" content="litegame — 13 free HTML5 mini games, 100% AI-generated">
+<meta property="og:description" content="13 zero-dependency HTML5 mini games written in plain vanilla JavaScript. 100% AI-generated, zero hand-written lines. No build step, no framework — just click and play.">
 <meta property="og:url" content="https://litegame-hub.github.io/">
 <meta property="og:image" content="https://litegame-hub.github.io/assets/social-preview.png">
 <meta property="og:image:type" content="image/png">
 <meta property="og:image:width" content="1280">
 <meta property="og:image:height" content="640">
-<meta property="og:image:alt" content="litegame — a grid of 13 HTML5 mini games">
+<meta property="og:image:alt" content="litegame — 13 HTML5 mini games, 100% AI-generated, 0 hand-written lines">
 <meta property="og:locale" content="en_US">
 <meta property="og:locale:alternate" content="zh_CN">
 
 <!-- Twitter card -->
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="litegame — 13 free HTML5 mini games, zero dependencies">
-<meta name="twitter:description" content="Snake, Tetris, Sokoban, Sudoku, Minesweeper, Chinese Chess and more. Pure vanilla JS, no build step — click and play.">
+<meta name="twitter:title" content="litegame — 13 free HTML5 mini games, 100% AI-generated">
+<meta name="twitter:description" content="Snake, Tetris, Sokoban, Sudoku, Minesweeper, Chinese Chess and more. Pure vanilla JS, zero hand-written lines, no build step — click and play.">
 <meta name="twitter:image" content="https://litegame-hub.github.io/assets/social-preview.png">
 
 <!-- Structured data: helps search engines list the game collection -->
@@ -46,7 +46,8 @@
   "name": "litegame",
   "alternateName": "litegame — HTML5 mini games",
   "url": "https://litegame-hub.github.io/",
-  "description": "A collection of 13 zero-dependency HTML5 mini games written in plain vanilla JavaScript.",
+  "description": "13 zero-dependency HTML5 mini games written in plain vanilla JavaScript. 100% AI-generated, zero lines of hand-written code.",
+  "keywords": "html5 games, javascript games, vanilla javascript, zero dependencies, ai generated code, vibe coding, tetris, sokoban, sudoku, minesweeper, snake, 2048, gomoku, chinese chess",
   "inLanguage": ["en", "zh-CN"],
   "isAccessibleForFree": true,
   "license": "https://opensource.org/licenses/MIT",
@@ -126,10 +127,26 @@
     letter-spacing: -.02em;
   }
   header p {
-    margin: 0 0 36px;
+    margin: 0;
     color: var(--muted);
     font-size: 16px;
   }
+
+  /* Positioning pill: the AI-generated claim, deliberately set apart from the tagline. */
+  header .claim {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    margin: 14px 0 36px;
+    padding: 6px 15px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #7c3aed;
+    background: #f5f3ff;
+    border: 1px solid #ddd6fe;
+    border-radius: 999px;
+  }
+  header .claim::before { content: "✨"; font-size: 14px; }
 
   /* Game cards */
   .games {
@@ -245,6 +262,10 @@
     <p>
       <span data-lang="en" class="inline on">A collection of HTML5 mini games. Zero dependencies — just click and play.</span>
       <span data-lang="zh" class="inline">HTML5 小游戏合集，零依赖，点开即玩。</span>
+    </p>
+    <p class="claim">
+      <span data-lang="en" class="inline on">100% AI-generated · 0 lines of hand-written code</span>
+      <span data-lang="zh" class="inline">100% 由 AI 生成 · 零手写代码</span>
     </p>
   </header>
 

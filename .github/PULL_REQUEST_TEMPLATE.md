@@ -14,8 +14,7 @@
 
 - [ ] `node tools/smoke.js` passes (all games)
 - [ ] Per-game logic suites pass (`node tools/*-test.js`)
-- [ ] New game added to the card grid in the root `index.html`
-- [ ] New game added to the tables in `README.md` and `README.zh.md`
+- [ ] New game registered in `index.html` (card grid **and** JSON-LD `ItemList`), `README.md`, `README.zh.md` and `sitemap.xml`
 - [ ] Both `README.md` and `README.zh.md` exist for a new game folder
 - [ ] No dependencies added, no build step introduced
 - [ ] No `data-page-node-id` or other editor-injected attributes left in HTML
