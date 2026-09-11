@@ -72,10 +72,10 @@
   button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
   button:disabled { opacity: .45; cursor: not-allowed; }
 
-  /* HUD: live stats row */
+  /* HUD: live stats row (time / wpm / accuracy / words / combo / best) */
   .hud {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(6, 1fr);
     gap: 8px;
     margin-bottom: 12px;
   }
@@ -241,6 +241,7 @@
     <div class="cell"><b id="hudAcc">100%</b><span data-i18n="acc"></span></div>
     <div class="cell"><b id="hudWords">0</b><span data-i18n="words"></span></div>
     <div class="cell combo"><b id="hudCombo">0</b><span data-i18n="combo"></span></div>
+    <div class="cell best"><b id="hudBest">0</b><span data-i18n="best"></span></div>
   </div>
 
   <div id="textArea"></div>

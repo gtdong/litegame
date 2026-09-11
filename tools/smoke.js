@@ -197,6 +197,41 @@ function inlineScripts(html) {
 
 const KEYS = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', ' ', 'Enter', 'w', 'a', 's', 'd'];
 
+/* The stub getElementById lazily creates an element for *any* id, so a reference
+ * to an id that is not in the markup hands back an object here while a real
+ * browser hands back null - and the next property write throws, killing the
+ * whole script. typing-game shipped exactly that way and every runtime check
+ * below stayed green. Catch it statically. */
+function danglingIds(html) {
+  const used = [...html.matchAll(/getElementById\(\s*['"]([^'"]+)['"]\s*\)/g)].map(m => m[1]);
+  const defined = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map(m => m[1]));
+  // ids the script builds itself are legitimate
+  const created = new Set([
+    ...[...html.matchAll(/\.id\s*=\s*['"]([^'"]+)['"]/g)].map(m => m[1]),
+    ...[...html.matchAll(/setAttribute\(\s*['"]id['"]\s*,\s*['"]([^'"]+)['"]\s*\)/g)].map(m => m[1])
+  ]);
+  return [...new Set(used)].filter(id => !defined.has(id) && !created.has(id));
+}
+
+/* A top-level `var` becomes a property write on window. Several window members
+ * are unforgeable, so the write silently fails and the name keeps pointing at
+ * the browser object - solitaire had `var history = []` and threw on the first
+ * move. `let`/`const` create their own binding and shadow safely, so only a
+ * bare `var` is a hazard. The vm context used below has no such restriction,
+ * which is why the logic suites never noticed either. */
+const WINDOW_UNFORGEABLE = ['window', 'self', 'document', 'location', 'top', 'parent', 'frames',
+  'history', 'navigator', 'external', 'length', 'origin', 'closed', 'opener', 'event'];
+
+function clobberedGlobals(html) {
+  const hits = new Set();
+  const re = /^var\s+([A-Za-z_$][\w$]*)\s*=/gm;
+  let m;
+  while ((m = re.exec(html))) {
+    if (WINDOW_UNFORGEABLE.includes(m[1])) hits.add(m[1]);
+  }
+  return [...hits];
+}
+
 function smoke(dir) {
   const file = path.join(ROOT, dir, 'index.html');
   const html = fs.readFileSync(file, 'utf8');
@@ -205,6 +240,16 @@ function smoke(dir) {
 
   const env = makeContext();
   const problems = [];
+
+  const dangling = danglingIds(html);
+  if (dangling.length) {
+    problems.push(`getElementById target missing from markup: ${dangling.join(', ')}`);
+  }
+
+  const clobbered = clobberedGlobals(html);
+  if (clobbered.length) {
+    problems.push(`top-level var collides with a read-only window property: ${clobbered.join(', ')} (rename it, or use let/const)`);
+  }
 
   try {
     preselectOptions(html, env);
