@@ -2,7 +2,7 @@
 
 **[简体中文](README.zh.md)** · [English](README.md)
 
-[![games](https://img.shields.io/badge/games-13-blue?style=flat-square)](#游戏列表)
+[![games](https://img.shields.io/badge/games-20-blue?style=flat-square)](#游戏列表)
 [![AI-generated](https://img.shields.io/badge/AI--generated-100%25-8b5cf6?style=flat-square)](#这个项目是怎么做出来的)
 [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen?style=flat-square)](#为什么是-litegame)
 [![vanilla JS](https://img.shields.io/badge/vanilla-JS-f7df1e?style=flat-square&logo=javascript&logoColor=black)](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript)
@@ -17,7 +17,7 @@
 
 ---
 
-**13 款零依赖的 HTML5 小游戏，全部用原生 JavaScript 手写 —— 100% 由 AI 生成，零手写代码。** 浏览器打开 `index.html` 就能玩 —— 不用构建、不用框架、不用 `npm install`。
+**一个不断长大的零依赖 HTML5 小游戏合集，全部用原生 JavaScript 写成 —— 100% 由 AI 生成，零手写代码。** 浏览器打开 `index.html` 就能玩 —— 不用构建、不用框架、不用 `npm install`。
 
 ### ▶ 在线试玩：<https://litegame-hub.github.io/>
 
@@ -42,6 +42,13 @@
 | [fruitcatcher-game](fruitcatcher-game) | 接水果，躲开炸弹，等级越高越刺激 | `街机` `Canvas` `关卡` |
 | [tetris-game](tetris-game) | 俄罗斯方块，SRS / 7-bag / 暂存 / 幽灵 / T-spin | `街机` `Canvas` `SRS` |
 | [sokoban-game](sokoban-game) | 推箱子，10 关只能推不能拉，支持撤销 | `益智` `关卡` `撤销` |
+| [pong-game](pong-game) | 乒乓球，先得 7 分者胜，三档难度 | `街机` `Canvas` `AI` |
+| [bubble-game](bubble-game) | 泡泡龙，三个同色消除，悬空整片掉落 | `街机` `Canvas` `瞄准` |
+| [reversi-game](reversi-game) | 黑白棋，8×8 夹取翻面，三档 AI 或双人 | `棋类` `AI` `Minimax` |
+| [typing-game](typing-game) | 打字测速，60 秒，实时 WPM 与准确率 | `技能` `限时` `键盘` |
+| [klotski-game](klotski-game) | 华容道，五个经典布局，滑动解谜 | `益智` `关卡` `撤销` |
+| [maze-game](maze-game) | 迷宫，随机生成必定有解，可提示最短路径 | `益智` `生成器` `提示` |
+| [solitaire-game](solitaire-game) | 纸牌接龙，Klondike，抽 1 / 抽 3 | `卡牌` `经典` `撤销` |
 
 ## 为什么是 litegame
 
@@ -50,8 +57,8 @@
 - **真·原生** —— 纯 HTML / CSS / JavaScript，不用框架、不用打包器、不用转译器。
 - **中英双语界面** —— 每个游戏都能在中英文间切换，靠的是一个共享的 2 KB i18n 模块。
 - **处处能玩** —— 桌面端键盘鼠标，手机端点按滑动；每个游戏都会自适应铺满屏幕。
-- **有测试** —— 冒烟套件在桩 DOM 里加载全部 13 款游戏，另有专项逻辑测试（俄罗斯方块 98 项、推箱子 104 项）。
-- **从头到尾由 AI 写成** —— 约 9,000 行 HTML / CSS / JavaScript，没有一行是手敲的。详见[这个项目是怎么做出来的](#这个项目是怎么做出来的)。
+- **有测试** —— 冒烟套件在桩 DOM 里加载每一款游戏，规则复杂的游戏另有自己的专项逻辑测试，证明规则**真的生效**，而不只是页面能打开。
+- **从头到尾由 AI 写成** —— 上万行 HTML / CSS / JavaScript，没有一行是手敲的。详见[这个项目是怎么做出来的](#这个项目是怎么做出来的)。
 
 ## 这个项目是怎么做出来的
 
@@ -65,8 +72,8 @@ prompt  ->  生成  ->  跑测试  ->  浏览器里验收  ->  修  ->  发布
 
 这也是为什么下面两条铁律不容商量。一个偷偷引入框架和构建工具的 AI 代码库是没法审阅的；这里的全部价值就在于，你随便打开哪个文件都能从头读到尾。
 
-- 13 款游戏 + 一个首页，约 9,000 行，零依赖、零构建。
-- 测试也是同样方式写出来的，而它们是让这一堆代码不烂掉的关键：冒烟套件加载每一款游戏，规则复杂的游戏另有专项逻辑测试（俄罗斯方块 98 项、推箱子 104 项），证明的是游戏**真能玩**，而不只是能加载。
+- 一个游戏一个目录 + 一个首页，上万行代码，零依赖、零构建。
+- 测试也是同样方式写出来的，而它们是让这一堆代码不烂掉的关键：冒烟套件加载每一款游戏，规则复杂的游戏另有专项逻辑测试，证明的是游戏**真能玩**，而不只是能加载。
 - 那些 Bug 也都留在提交历史里了 —— 俄罗斯方块里按住状态永远读不到的 ↓ 键、箱子根本推不动的推箱子关卡、玩家根本进不去的开始界面。把这些问题公开地找出来修掉，本身就是重点之一。
 
 如果你想看看 AI 在无人辅助的情况下能做成什么样，这里算是一个还算诚实的样本。想知道它哪里还得靠人，去读提交日志。
@@ -79,7 +86,7 @@ prompt  ->  生成  ->  跑测试  ->  浏览器里验收  ->  修  ->  发布
 
 ## Topics
 
-`html5-games` · `javascript-games` · `browser-games` · `mini-games` · `vanilla-javascript` · `zero-dependencies` · `ai-generated` · `vibe-coding` · `github-pages` · `game-development` · `puzzle-game` · `canvas` · `tetris` · `sokoban` · `sudoku` · `minesweeper` · `snake-game` · `2048` · `gomoku` · `chinese-chess`
+`html5-games` · `javascript-games` · `browser-games` · `mini-games` · `vanilla-javascript` · `zero-dependencies` · `ai-generated` · `vibe-coding` · `github-pages` · `game-development` · `puzzle-game` · `canvas` · `tetris` · `sokoban` · `sudoku` · `minesweeper` · `snake-game` · `2048` · `gomoku` · `chinese-chess` · `solitaire` · `reversi` · `klotski` · `pong` · `bubble-shooter` · `typing-test` · `maze`
 
 ## 仓库结构
 

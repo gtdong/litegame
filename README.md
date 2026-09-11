@@ -2,7 +2,7 @@
 
 [简体中文](README.zh.md) · **[English](README.md)**
 
-[![games](https://img.shields.io/badge/games-13-blue?style=flat-square)](#games)
+[![games](https://img.shields.io/badge/games-20-blue?style=flat-square)](#games)
 [![AI-generated](https://img.shields.io/badge/AI--generated-100%25-8b5cf6?style=flat-square)](#how-this-was-made)
 [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen?style=flat-square)](#why-litegame)
 [![vanilla JS](https://img.shields.io/badge/vanilla-JS-f7df1e?style=flat-square&logo=javascript&logoColor=black)](https://developer.mozilla.org/docs/Web/JavaScript)
@@ -17,7 +17,7 @@
 
 ---
 
-**13 zero-dependency HTML5 mini games written in plain vanilla JavaScript — 100% AI-generated, 0 lines of hand-written code.** Open `index.html` in a browser and play — no build step, no framework, no `npm install`, no bundler.
+**A growing collection of zero-dependency HTML5 mini games written in plain vanilla JavaScript — 100% AI-generated, 0 lines of hand-written code.** Open `index.html` in a browser and play — no build step, no framework, no `npm install`, no bundler.
 
 ### ▶ Play online: <https://litegame-hub.github.io/>
 
@@ -42,6 +42,13 @@ Each game lives in its own folder and is a single self-contained `index.html`. T
 | [fruitcatcher-game](fruitcatcher-game) | Catch the fruit, dodge the bombs | `arcade` `canvas` `levels` |
 | [tetris-game](tetris-game) | SRS rotation, 7-bag, hold, ghost, T-spin | `arcade` `canvas` `srs` |
 | [sokoban-game](sokoban-game) | Push-only crate puzzles, 10 levels with undo | `puzzle` `levels` `undo` |
+| [pong-game](pong-game) | Paddle duel to 7 against the AI, three difficulties | `arcade` `canvas` `ai` |
+| [bubble-game](bubble-game) | Match three or more bubbles, cut whole clusters loose | `arcade` `canvas` `aim` |
+| [reversi-game](reversi-game) | Flip discs on an 8×8 board, three AI levels or 2-player | `board` `ai` `minimax` |
+| [typing-game](typing-game) | 60-second typing test with live WPM and accuracy | `skill` `timed` `keyboard` |
+| [klotski-game](klotski-game) | Slide the blocks aside to free Cao Cao, five layouts | `puzzle` `levels` `undo` |
+| [maze-game](maze-game) | Randomly generated mazes with a shortest-path hint | `puzzle` `generator` `hint` |
+| [solitaire-game](solitaire-game) | Klondike with draw-1 / draw-3, undo and scoring | `card` `classic` `undo` |
 
 ## Why litegame
 
@@ -50,7 +57,7 @@ Each game lives in its own folder and is a single self-contained `index.html`. T
 - **Genuinely vanilla** — plain HTML, CSS and JavaScript. No framework, no bundler, no transpiler.
 - **Bilingual UI** — every game switches between English and 简体中文 via one shared 2 KB i18n module.
 - **Plays anywhere** — desktop keyboard, mouse, and touch/swipe on phones; each game fills the screen and scales.
-- **Tested** — a smoke suite loads all 13 games in a stub DOM plus per-game logic suites (Tetris 98 checks, Sokoban 104 checks).
+- **Tested** — a smoke suite loads every game in a stub DOM, and rule-heavy games carry their own logic suite that proves the rules actually work, not merely that the page loads.
 - **AI-written, end to end** — roughly 9,000 lines of HTML, CSS and JavaScript, none of it typed by a human. See [How this was made](#how-this-was-made).
 
 ## How this was made
@@ -65,8 +72,8 @@ prompt  ->  generate  ->  run tests  ->  inspect in a browser  ->  fix  ->  publ
 
 That is also why the two constraints below are non-negotiable. An AI-written codebase that quietly pulled in frameworks and build tooling would be impossible to review; the whole value here is that you can open any file and read it top to bottom.
 
-- 13 games plus a landing page, ~9,000 lines, zero dependencies, zero build steps.
-- The tests were written the same way, and they are what keeps the pile honest: a smoke suite loads every game, and rule-heavy games get logic suites (Tetris 98 checks, Sokoban 104 checks) that prove a game *works*, not merely that it loads.
+- One folder per game plus a landing page, well over ten thousand lines of plain HTML, CSS and JavaScript, zero dependencies, zero build steps.
+- The tests were written the same way, and they are what keeps the pile honest: a smoke suite loads every game, and rule-heavy games get logic suites that prove a game *works*, not merely that it loads.
 - The bugs are in the history too — a down arrow in Tetris whose held state was never recorded, Sokoban levels whose crates could not be pushed, a start screen the player could not reach. Finding and fixing those in the open is part of the point.
 
 If you are curious what an AI can build unaided, this is a reasonably honest sample. If you want to see where it still needed a human, read the commit log.
@@ -79,7 +86,7 @@ If you are curious what an AI can build unaided, this is a reasonably honest sam
 
 ## Topics
 
-`html5-games` · `javascript-games` · `browser-games` · `mini-games` · `vanilla-javascript` · `zero-dependencies` · `ai-generated` · `vibe-coding` · `github-pages` · `game-development` · `puzzle-game` · `canvas` · `tetris` · `sokoban` · `sudoku` · `minesweeper` · `snake-game` · `2048` · `gomoku` · `chinese-chess`
+`html5-games` · `javascript-games` · `browser-games` · `mini-games` · `vanilla-javascript` · `zero-dependencies` · `ai-generated` · `vibe-coding` · `github-pages` · `game-development` · `puzzle-game` · `canvas` · `tetris` · `sokoban` · `sudoku` · `minesweeper` · `snake-game` · `2048` · `gomoku` · `chinese-chess` · `solitaire` · `reversi` · `klotski` · `pong` · `bubble-shooter` · `typing-test` · `maze`
 
 ## Repository layout
 

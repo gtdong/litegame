@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>litegame — 13 free HTML5 mini games, 100% AI-generated, zero dependencies</title>
+<title>litegame — free HTML5 mini games, 100% AI-generated, zero dependencies</title>
 
 <!-- Search / social metadata. Keeps the page findable and the shared link pretty. -->
-<meta name="description" content="100% AI-generated, zero-dependency HTML5 mini games in plain vanilla JavaScript — Snake, Tetris, Sokoban, Sudoku, Chinese Chess and more. No build, no framework, no lines of hand-written code. 13 款纯 AI 生成的零依赖 HTML5 小游戏，零手写代码，点开即玩。">
-<meta name="keywords" content="html5 games, javascript games, browser games, mini games, vanilla javascript, zero dependencies, ai generated games, ai generated code, vibe coding, ai coding, free online games, tetris, sokoban, sudoku, minesweeper, snake, 2048, gomoku, chinese chess, canvas games, 小游戏, 网页游戏, 在线游戏, 免费游戏, 开源游戏, AI 生成, 纯 AI 制作, 零手写代码, 俄罗斯方块, 推箱子, 数独, 扫雷, 贪吃蛇, 五子棋, 中国象棋">
+<meta name="description" content="100% AI-generated, zero-dependency HTML5 mini games in plain vanilla JavaScript — Snake, Tetris, Sokoban, Sudoku, Solitaire, Chinese Chess and more. No build, no framework, no lines of hand-written code. 纯 AI 生成的零依赖 HTML5 小游戏，零手写代码，点开即玩。">
+<meta name="keywords" content="html5 games, javascript games, browser games, mini games, vanilla javascript, zero dependencies, ai generated games, ai generated code, vibe coding, ai coding, free online games, tetris, sokoban, sudoku, minesweeper, snake, 2048, gomoku, chinese chess, solitaire, reversi, othello, klotski, pong, bubble shooter, typing test, maze, canvas games, 小游戏, 网页游戏, 在线游戏, 免费游戏, 开源游戏, AI 生成, 纯 AI 制作, 零手写代码, 俄罗斯方块, 推箱子, 数独, 扫雷, 贪吃蛇, 五子棋, 中国象棋, 纸牌接龙, 黑白棋, 华容道, 乒乓球, 泡泡龙, 打字, 迷宫">
 <meta name="author" content="gtdong">
 <meta name="robots" content="index, follow, max-image-preview:large">
 <meta name="theme-color" content="#f7f8fa">
@@ -21,8 +21,8 @@
 <!-- Open Graph -->
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="litegame">
-<meta property="og:title" content="litegame — 13 free HTML5 mini games, 100% AI-generated">
-<meta property="og:description" content="13 zero-dependency HTML5 mini games written in plain vanilla JavaScript. 100% AI-generated, zero hand-written lines. No build step, no framework — just click and play.">
+<meta property="og:title" content="litegame — free HTML5 mini games, 100% AI-generated">
+<meta property="og:description" content="Zero-dependency HTML5 mini games written in plain vanilla JavaScript. 100% AI-generated, zero hand-written lines. No build step, no framework — just click and play.">
 <meta property="og:url" content="https://litegame-hub.github.io/">
 <meta property="og:image" content="https://litegame-hub.github.io/assets/social-preview.png">
 <meta property="og:image:type" content="image/png">
@@ -34,7 +34,7 @@
 
 <!-- Twitter card -->
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="litegame — 13 free HTML5 mini games, 100% AI-generated">
+<meta name="twitter:title" content="litegame — free HTML5 mini games, 100% AI-generated">
 <meta name="twitter:description" content="Snake, Tetris, Sokoban, Sudoku, Minesweeper, Chinese Chess and more. Pure vanilla JS, zero hand-written lines, no build step — click and play.">
 <meta name="twitter:image" content="https://litegame-hub.github.io/assets/social-preview.png">
 
@@ -46,8 +46,8 @@
   "name": "litegame",
   "alternateName": "litegame — HTML5 mini games",
   "url": "https://litegame-hub.github.io/",
-  "description": "13 zero-dependency HTML5 mini games written in plain vanilla JavaScript. 100% AI-generated, zero lines of hand-written code.",
-  "keywords": "html5 games, javascript games, vanilla javascript, zero dependencies, ai generated code, vibe coding, tetris, sokoban, sudoku, minesweeper, snake, 2048, gomoku, chinese chess",
+  "description": "Zero-dependency HTML5 mini games written in plain vanilla JavaScript. 100% AI-generated, zero lines of hand-written code.",
+  "keywords": "html5 games, javascript games, vanilla javascript, zero dependencies, ai generated code, vibe coding, tetris, sokoban, sudoku, minesweeper, snake, 2048, gomoku, chinese chess, solitaire, reversi, klotski, pong, bubble shooter, typing test, maze",
   "inLanguage": ["en", "zh-CN"],
   "isAccessibleForFree": true,
   "license": "https://opensource.org/licenses/MIT",
@@ -55,7 +55,7 @@
   "mainEntity": {
     "@type": "ItemList",
     "name": "Games",
-    "numberOfItems": 13,
+    "numberOfItems": 20,
     "itemListElement": [
       { "@type": "ListItem", "position": 1,  "name": "Snake",           "url": "https://litegame-hub.github.io/snake-game/" },
       { "@type": "ListItem", "position": 2,  "name": "Gomoku",          "url": "https://litegame-hub.github.io/gomoku-game/" },
@@ -69,7 +69,14 @@
       { "@type": "ListItem", "position": 10, "name": "Sudoku",          "url": "https://litegame-hub.github.io/sudoku-game/" },
       { "@type": "ListItem", "position": 11, "name": "Fruit Catcher",   "url": "https://litegame-hub.github.io/fruitcatcher-game/" },
       { "@type": "ListItem", "position": 12, "name": "Tetris",          "url": "https://litegame-hub.github.io/tetris-game/" },
-      { "@type": "ListItem", "position": 13, "name": "Sokoban",         "url": "https://litegame-hub.github.io/sokoban-game/" }
+      { "@type": "ListItem", "position": 13, "name": "Sokoban",         "url": "https://litegame-hub.github.io/sokoban-game/" },
+      { "@type": "ListItem", "position": 14, "name": "Pong",            "url": "https://litegame-hub.github.io/pong-game/" },
+      { "@type": "ListItem", "position": 15, "name": "Bubble Shooter",  "url": "https://litegame-hub.github.io/bubble-game/" },
+      { "@type": "ListItem", "position": 16, "name": "Reversi",         "url": "https://litegame-hub.github.io/reversi-game/" },
+      { "@type": "ListItem", "position": 17, "name": "Typing Speed",    "url": "https://litegame-hub.github.io/typing-game/" },
+      { "@type": "ListItem", "position": 18, "name": "Klotski",         "url": "https://litegame-hub.github.io/klotski-game/" },
+      { "@type": "ListItem", "position": 19, "name": "Maze",            "url": "https://litegame-hub.github.io/maze-game/" },
+      { "@type": "ListItem", "position": 20, "name": "Solitaire",       "url": "https://litegame-hub.github.io/solitaire-game/" }
     ]
   }
 }
@@ -486,6 +493,118 @@
       <p>
         <span data-lang="en" class="inline on">Push every crate onto a goal tile — you can only push, never pull. 10 levels with undo.</span>
         <span data-lang="zh" class="inline">把所有木箱推到目标点上，只能推不能拉。10 关，支持撤销。</span>
+      </p>
+      <div class="go">
+        <span data-lang="en" class="inline on">Play →</span>
+        <span data-lang="zh" class="inline">开始游戏 →</span>
+      </div>
+    </a>
+
+    <a class="card" href="pong-game/">
+      <div class="icon">🏓</div>
+      <h2>
+        <span data-lang="en" class="inline on">Pong</span>
+        <span data-lang="zh" class="inline">乒乓球</span>
+      </h2>
+      <p>
+        <span data-lang="en" class="inline on">Classic paddle duel against the AI. Angle your returns and be first to 7. Three difficulty levels.</span>
+        <span data-lang="zh" class="inline">经典乒乓对战，靠击球点控制反弹角度，先得 7 分者胜。三档难度。</span>
+      </p>
+      <div class="go">
+        <span data-lang="en" class="inline on">Play →</span>
+        <span data-lang="zh" class="inline">开始游戏 →</span>
+      </div>
+    </a>
+
+    <a class="card" href="bubble-game/">
+      <div class="icon">🫧</div>
+      <h2>
+        <span data-lang="en" class="inline on">Bubble Shooter</span>
+        <span data-lang="zh" class="inline">泡泡龙</span>
+      </h2>
+      <p>
+        <span data-lang="en" class="inline on">Aim, bounce and shoot — match three or more to pop them, and cut whole clusters loose for bonus points.</span>
+        <span data-lang="zh" class="inline">瞄准、反弹、发射，三个同色即可消除；整片悬空的泡泡会掉落并额外加分。</span>
+      </p>
+      <div class="go">
+        <span data-lang="en" class="inline on">Play →</span>
+        <span data-lang="zh" class="inline">开始游戏 →</span>
+      </div>
+    </a>
+
+    <a class="card" href="reversi-game/">
+      <div class="icon">⚪</div>
+      <h2>
+        <span data-lang="en" class="inline on">Reversi</span>
+        <span data-lang="zh" class="inline">黑白棋</span>
+      </h2>
+      <p>
+        <span data-lang="en" class="inline on">Flip your opponent's discs on an 8×8 board. Three AI levels or two players, with undo.</span>
+        <span data-lang="zh" class="inline">8×8 棋盘上夹取翻面，三档 AI 或双人对战，支持撤销。</span>
+      </p>
+      <div class="go">
+        <span data-lang="en" class="inline on">Play →</span>
+        <span data-lang="zh" class="inline">开始游戏 →</span>
+      </div>
+    </a>
+
+    <a class="card" href="typing-game/">
+      <div class="icon">⌨️</div>
+      <h2>
+        <span data-lang="en" class="inline on">Typing Speed</span>
+        <span data-lang="zh" class="inline">打字速度</span>
+      </h2>
+      <p>
+        <span data-lang="en" class="inline on">How fast can you type? Live WPM, accuracy and combo tracking, three word pools, personal best saved.</span>
+        <span data-lang="zh" class="inline">60 秒限时测速，实时 WPM、准确率与连击，三种词库，记录个人最佳。</span>
+      </p>
+      <div class="go">
+        <span data-lang="en" class="inline on">Play →</span>
+        <span data-lang="zh" class="inline">开始游戏 →</span>
+      </div>
+    </a>
+
+    <a class="card" href="klotski-game/">
+      <div class="icon">🧩</div>
+      <h2>
+        <span data-lang="en" class="inline on">Klotski</span>
+        <span data-lang="zh" class="inline">华容道</span>
+      </h2>
+      <p>
+        <span data-lang="en" class="inline on">Slide the blocks aside and walk Cao Cao out of the exit. Five classic layouts with undo.</span>
+        <span data-lang="zh" class="inline">滑动棋子给曹操让出退路，五个经典布局，支持撤销与最佳步数记录。</span>
+      </p>
+      <div class="go">
+        <span data-lang="en" class="inline on">Play →</span>
+        <span data-lang="zh" class="inline">开始游戏 →</span>
+      </div>
+    </a>
+
+    <a class="card" href="maze-game/">
+      <div class="icon">🌀</div>
+      <h2>
+        <span data-lang="en" class="inline on">Maze</span>
+        <span data-lang="zh" class="inline">迷宫</span>
+      </h2>
+      <p>
+        <span data-lang="en" class="inline on">Every maze is randomly generated and always solvable. Three sizes, timer, step count and a shortest-path hint.</span>
+        <span data-lang="zh" class="inline">随机生成的迷宫必定有解。三档尺寸，计时计步，可高亮最短路径。</span>
+      </p>
+      <div class="go">
+        <span data-lang="en" class="inline on">Play →</span>
+        <span data-lang="zh" class="inline">开始游戏 →</span>
+      </div>
+    </a>
+
+    <a class="card" href="solitaire-game/">
+      <div class="icon">♠️</div>
+      <h2>
+        <span data-lang="en" class="inline on">Solitaire</span>
+        <span data-lang="zh" class="inline">纸牌接龙</span>
+      </h2>
+      <p>
+        <span data-lang="en" class="inline on">Classic Klondike solitaire with draw-1 and draw-3 modes, undo, scoring and win detection.</span>
+        <span data-lang="zh" class="inline">经典 Klondike 纸牌接龙，抽 1 / 抽 3 两种模式，支持撤销、计分与胜利判定。</span>
       </p>
       <div class="go">
         <span data-lang="en" class="inline on">Play →</span>

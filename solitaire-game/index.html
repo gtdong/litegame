@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>纸牌接龙 · Klondike Solitaire</title>
+<style>
+  :root {
+    --felt: #1f7a4d;
+    --felt2: #15603d;
+    --card: #fdfdfb;
+    --ink: #222;
+    --line: #e3e3dd;
+    --gold: #ffd34d;
+    --accent: #2e7d32;
+    --shadow: rgba(0, 0, 0, .28);
+    --text: #eaf3ee;
+    --muted: #bcd3c6;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    margin: 0;
+    padding: 20px 10px 44px;
+    background: radial-gradient(circle at 50% 0, #2a8a5b, #14603c 72%);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+  }
+
+  h1 { margin: 0 0 4px; font-size: 28px; letter-spacing: -.02em; }
+  .tip { margin: 0 0 16px; font-size: 13px; color: var(--muted); text-align: center; max-width: 460px; }
+
+  .panel {
+    background: rgba(0, 0, 0, .18);
+    border: 1px solid rgba(255, 255, 255, .15);
+    border-radius: 14px;
+    padding: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .25);
+  }
+
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  button {
+    font-family: inherit;
+    font-size: 13px;
+    color: #fff;
+    background: rgba(255, 255, 255, .12);
+    border: 1px solid rgba(255, 255, 255, .25);
+    border-radius: 8px;
+    padding: 7px 13px;
+    cursor: pointer;
+    transition: background .12s ease, border-color .12s ease, color .12s ease;
+  }
+  button:hover:not(:disabled) { background: rgba(255, 255, 255, .22); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+
+  .stat {
+    background: rgba(0, 0, 0, .32);
+    padding: 5px 10px;
+    border-radius: 8px;
+    font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 13px;
+    font-weight: 700;
+    min-width: 66px;
+    text-align: center;
+  }
+  .stat small { font-weight: 400; opacity: .7; font-size: 11px; display: block; }
+
+  /* ----------------------------------------------------------- board --- */
+  #board {
+    position: relative;
+    margin: 0 auto;
+    background: linear-gradient(160deg, var(--felt), var(--felt2));
+    border-radius: 14px;
+    box-shadow: inset 0 0 44px rgba(0, 0, 0, .28);
+    touch-action: manipulation;
+    user-select: none;
+  }
+
+  .card {
+    position: absolute;
+    left: 0; top: 0;
+    width: var(--cw);
+    height: var(--ch);
+    transform: translate(var(--x), var(--y));
+    transition: transform .14s ease;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px var(--shadow);
+    cursor: pointer;
+  }
+  .card .face, .card .back { position: absolute; inset: 0; border-radius: 8px; }
+  .card .face {
+    background: var(--card);
+    border: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .card .back {
+    background: repeating-linear-gradient(45deg, #2b4f9e, #2b4f9e 6px, #3a63bd 6px, #3a63bd 12px);
+    border: 1px solid #1d3a78;
+  }
+  .card .back::after {
+    content: '';
+    position: absolute;
+    inset: 16%;
+    border: 2px solid rgba(255, 255, 255, .35);
+    border-radius: 6px;
+  }
+  .card.down .face { display: none; }
+  .card.up .back { display: none; }
+
+  .card .corner {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 1;
+    font-weight: 800;
+  }
+  .card .corner.tl { top: 6%; left: 7%; }
+  .card .corner.br { bottom: 6%; right: 7%; transform: rotate(180deg); }
+  .card .corner .rk { font-size: calc(var(--cw) * .30); }
+  .card .corner .st { font-size: calc(var(--cw) * .24); }
+  .card .mid { font-size: calc(var(--cw) * .52); }
+
+  .card.red .face { color: #d11f2d; }
+  .card.black .face { color: #1a1a1a; }
+
+  .card.sel {
+    box-shadow: 0 0 0 3px var(--gold), 0 4px 12px var(--shadow);
+    transform: translate(var(--x), var(--y)) translateY(-4px);
+  }
+  .card.bad { animation: shake .22s; }
+  @keyframes shake {
+    0%, 100% { transform: translate(var(--x), var(--y)); }
+    25% { transform: translate(calc(var(--x) - 4px), var(--y)); }
+    75% { transform: translate(calc(var(--x) + 4px), var(--y)); }
+  }
+
+  .slot {
+    position: absolute;
+    left: 0; top: 0;
+    width: var(--cw);
+    height: var(--ch);
+    transform: translate(var(--x), var(--y));
+    border: 2px dashed rgba(255, 255, 255, .28);
+    border-radius: 8px;
+  }
+  .slot .cnt {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    color: rgba(255, 255, 255, .5);
+    font-size: calc(var(--cw) * .26);
+  }
+  .slot.found::before {
+    content: var(--suit, '★');
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255, 255, 255, .16);
+    font-size: calc(var(--cw) * .5);
+  }
+
+  .status {
+    margin-top: 10px;
+    min-height: 18px;
+    text-align: center;
+    font-weight: 700;
+    color: var(--gold);
+    font-size: 13px;
+  }
+
+  /* --------------------------------------------------------- overlays --- */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(8, 20, 14, .62);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 30;
+  }
+  .overlay.show { display: flex; }
+
+  .dialog {
+    background: #fff;
+    color: #222;
+    border-radius: 16px;
+    padding: 26px 30px;
+    width: min(380px, 100%);
+    text-align: center;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, .4);
+    animation: rise .2s ease-out;
+  }
+  @keyframes rise {
+    from { transform: translateY(12px); opacity: 0; }
+    to   { transform: translateY(0); opacity: 1; }
+  }
+  .dialog h2 { margin: 0 0 8px; font-size: 24px; }
+  .dialog p { margin: 0 0 20px; color: #555; font-size: 14px; line-height: 1.5; }
+  .dialog .actions { display: flex; gap: 10px; justify-content: center; }
+  .dialog button {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .dialog button:hover:not(:disabled) { filter: brightness(1.06); }
+  .dialog button.secondary { background: #fff; color: #222; border: 1px solid #ccc; }
+
+  @media (max-width: 560px) {
+    h1 { font-size: 22px; }
+    .panel { padding: 9px; }
+    .bar { gap: 6px; }
+    button { padding: 6px 10px; font-size: 12px; }
+    .stat { min-width: 56px; font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="lang-switch" data-lang-switch></div>
+
+<h1 data-i18n="title">Klondike Solitaire</h1>
+<p class="tip" data-i18n="tip">Build the four foundations from Ace to King. Tap a card, then tap where it goes.</p>
+
+<div class="panel">
+  <div class="bar">
+    <div class="stat"><small data-i18n="scoreL">Score</small><span id="score">0</span></div>
+    <div class="stat"><small data-i18n="movesL">Moves</small><span id="moves">0</span></div>
+    <div class="stat"><small data-i18n="timeL">Time</small><span id="time">00:00</span></div>
+    <button id="btnUndo" data-i18n="undo">Undo</button>
+    <button id="btnMode">Draw: 1</button>
+    <button id="btnNew" data-i18n="newGame">New Game</button>
+  </div>
+  <div id="board"></div>
+  <div class="status" id="status"></div>
+</div>
+
+<div id="startOverlay" class="overlay show">
+  <div class="dialog">
+    <h2 data-i18n="title">Klondike Solitaire</h2>
+    <p data-i18n="startTip">Classic Klondike. Draw 1 or 3, build the foundations, undo any move.</p>
+    <div class="actions">
+      <button id="btnStart" data-i18n="start">Start</button>
+    </div>
+  </div>
+</div>
+
+<div id="overlay" class="overlay">
+  <div class="dialog">
+    <h2 id="dlgTitle"></h2>
+    <p id="dlgSub"></p>
+    <div class="actions">
+      <button id="dlgNew" data-i18n="replay">Play again</button>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/i18n.js"></script>
+<script>
+'use strict';
+
+/* ===================================================================== *
+ *  Klondike Solitaire — single-file, zero-dependency.
+ *
+ *  Layout uses absolute positioning with CSS custom properties (--x/--y),
+ *  the same trick sokoban uses for its pieces. Every card's identity lives
+ *  in the JS objects and is mirrored onto the DOM element as `el.__card`
+ *  (NOT as a data-* attribute): the stub DOM used by the smoke test makes
+ *  getAttribute() return null, so we must never read a card back from the
+ *  markup. Click handling is delegated on #board and resolves the target
+ *  through `ev.target.__card` / `ev.target.__slot`, falling back to
+ *  closest('.card'|.slot) for real browsers where inner spans are the
+ *  actual target.
+ * ===================================================================== */
+
+var T = LiteI18N.create({
+  title:     { en: 'Klondike Solitaire', zh: '纸牌接龙' },
+  tip: {
+    en: 'Build the four foundations from Ace to King. Tap a card, then tap where it goes.',
+    zh: '把四个花色的牌从 A 到 K 叠放到右上角。先点一张牌，再点它要去的位置。'
+  },
+  scoreL:    { en: 'Score', zh: '得分' },
+  movesL:    { en: 'Moves', zh: '步数' },
+  timeL:     { en: 'Time', zh: '用时' },
+  undo:      { en: 'Undo', zh: '撤销' },
+  newGame:   { en: 'New Game', zh: '新游戏' },
+  start:     { en: 'Start', zh: '开始' },
+  startTip:  {
+    en: 'Classic Klondike. Draw 1 or 3, build the foundations, undo any move.',
+    zh: '经典接龙。可选发 1 张或 3 张，叠放花色牌，随时撤销。'
+  },
+  wonTitle:  { en: 'You win!', zh: '你赢了！' },
+  wonSub:    { en: 'Score {score} · {moves} moves · {time}', zh: '得分 {score} · {moves} 步 · {time}' },
+  replay:    { en: 'Play again', zh: '再玩一次' },
+  noMoves:   { en: 'No moves left — try a new game', zh: '没有可走的步了 —— 开一局新的吧' },
+  drawMode:  { en: 'Draw: {n}', zh: '发牌：{n}' }
+});
+
+/* ----------------------------------------------------------- constants */
+var SUITS = ['♠', '♥', '♦', '♣'];   // 0 spade(b) 1 heart(r) 2 diamond(r) 3 club(b)
+var RANKS = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+function isRed(suit) { return suit === 1 || suit === 2; }
+
+/* --------------------------------------------------------------- state */
+var stock = [];
+var waste = [];
+var founds = [[], [], [], []];
+var tableau = [[], [], [], [], [], [], []];
+var sel = null;                 // { type:'tableau',col,idx } | { type:'waste' } | { type:'foundation',suit }
+var history = [];
+var score = 0, moves = 0;
+var started = false, won = false;
+var drawCount = 1;
+var startTime = 0, elapsed = 0, winTime = 0, passCount = 0;
+var clockTimer = null;
+
+/* DOM references (all fetched via getElementById so the smoke stub tracks
+ * them, and exposed as globals so the logic test can drive the real UI). */
+var boardEl, scoreEl, movesEl, timeEl, statusEl;
+var btnUndoEl, btnModeEl, btnNewEl, btnStartEl;
+var overlayEl, dlgTitleEl, dlgSubEl, dlgNewEl, startOverlayEl;
+var stockEl, wasteEl, stockCntEl;
+var foundEl = [];
+var tabEl = [];
+var cardEls = {};               // id -> element
+
+/* layout (recomputed on resize) */
+var PAD = 10, CW = 54, CH = 76, COLSTEP = 60, GAPTOP = 22, TOPY = 10, TABY = 0;
+var FANDOWN = 10, FANUP = 20;
+
+/* --------------------------------------------------------------- dom */
+function dom() {
+  boardEl = document.getElementById('board');
+  scoreEl = document.getElementById('score');
+  movesEl = document.getElementById('moves');
+  timeEl = document.getElementById('time');
+  statusEl = document.getElementById('status');
+  btnUndoEl = document.getElementById('btnUndo');
+  btnModeEl = document.getElementById('btnMode');
+  btnNewEl = document.getElementById('btnNew');
+  btnStartEl = document.getElementById('btnStart');
+  overlayEl = document.getElementById('overlay');
+  dlgTitleEl = document.getElementById('dlgTitle');
+  dlgSubEl = document.getElementById('dlgSub');
+  dlgNewEl = document.getElementById('dlgNew');
+  startOverlayEl = document.getElementById('startOverlay');
+
+  createSlots();
+  createCards();
+  fit();
+}
+
+function createSlots() {
+  stockEl = document.createElement('div');
+  stockEl.className = 'slot';
+  stockCntEl = document.createElement('span');
+  stockCntEl.className = 'cnt';
+  stockEl.appendChild(stockCntEl);
+  stockEl.__slot = { type: 'stock' };
+  boardEl.appendChild(stockEl);
+
+  wasteEl = document.createElement('div');
+  wasteEl.className = 'slot';
+  wasteEl.__slot = { type: 'waste' };
+  boardEl.appendChild(wasteEl);
+
+  for (var s = 0; s < 4; s++) {
+    var f = document.createElement('div');
+    f.className = 'slot found';
+    f.style.setProperty('--suit', SUITS[s]);
+    f.__slot = { type: 'foundation', suit: s };
+    foundEl.push(f);
+    boardEl.appendChild(f);
+  }
+  for (var c = 0; c < 7; c++) {
+    var t = document.createElement('div');
+    t.className = 'slot';
+    t.__slot = { type: 'tableau', col: c };
+    tabEl.push(t);
+    boardEl.appendChild(t);
+  }
+}
+
+function createCards() {
+  for (var i = 0; i < 52; i++) {
+    var card = { suit: Math.floor(i / 13), rank: (i % 13) + 1, up: false, id: i };
+    var el = document.createElement('div');
+    el.className = 'card down';
+    el.innerHTML = buildFace(card);
+    el.__card = card;
+    cardEls[i] = el;
+    boardEl.appendChild(el);
+  }
+}
+
+function buildFace(card) {
+  var color = isRed(card.suit) ? 'red' : 'black';
+  var r = RANKS[card.rank];
+  var s = SUITS[card.suit];
+  return '<div class="back"></div>' +
+    '<div class="face ' + color + '">' +
+      '<div class="corner tl"><span class="rk">' + r + '</span><span class="st">' + s + '</span></div>' +
+      '<div class="mid">' + s + '</div>' +
+      '<div class="corner br"><span class="rk">' + r + '</span><span class="st">' + s + '</span></div>' +
+    '</div>';
+}
+
+/* --------------------------------------------------------------- deck */
+function newDeck() {
+  var a = [];
+  for (var s = 0; s < 4; s++)
+    for (var r = 1; r <= 13; r++)
+      a.push({ suit: s, rank: r, up: false, id: s * 13 + (r - 1) });
+  return a;
+}
+
+function makeRng(seed) {
+  var st = (seed >>> 0) || 1;
+  return function () {
+    st = (st * 1664525 + 1013904223) >>> 0;
+    return st / 4294967296;
+  };
+}
+
+function shuffle(arr, rng) {
+  for (var i = arr.length - 1; i > 0; i--) {
+    var j = Math.floor(rng() * (i + 1));
+    var t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+  }
+}
+
+function deal(seed) {
+  var deck = newDeck();
+  var rng = makeRng(seed == null ? (Date.now() >>> 0) : seed);
+  shuffle(deck, rng);
+
+  for (var s = 0; s < 4; s++) founds[s] = [];
+  for (var c = 0; c < 7; c++) tableau[c] = [];
+  stock = []; waste = [];
+
+  for (var col = 0; col < 7; col++) {
+    for (var k = 0; k <= col; k++) {
+      var card = deck.pop();
+      card.up = (k === col);
+      tableau[col].push(card);
+    }
+  }
+  stock = deck;
+  for (var i = 0; i < stock.length; i++) stock[i].up = false;
+
+  history = [];
+  score = 0; moves = 0; sel = null; won = false; passCount = 0;
+  render();
+  updateHud();
+}
+
+function totalCards() {
+  var n = stock.length + waste.length;
+  for (var s = 0; s < 4; s++) n += founds[s].length;
+  for (var c = 0; c < 7; c++) n += tableau[c].length;
+  return n;
+}
+
+/* -------------------------------------------------------- placement */
+function columnX(i) { return PAD + i * COLSTEP; }
+
+function fit() {
+  var avail = Math.min(560, (window.innerWidth || 480) - 12);
+  CW = Math.max(34, Math.min(84, Math.floor((avail - 8) / (7 * 1.12))));
+  CH = Math.round(CW * 1.4);
+  COLSTEP = Math.round(CW * 1.12);
+  GAPTOP = Math.round(CH * 0.30);
+  TOPY = PAD;
+  TABY = TOPY + CH + GAPTOP;
+  FANDOWN = Math.round(CH * 0.14);
+  FANUP = Math.round(CH * 0.28);
+
+  boardEl.style.setProperty('--cw', CW + 'px');
+  boardEl.style.setProperty('--ch', CH + 'px');
+
+  placeSlot(stockEl, 0, TOPY);
+  placeSlot(wasteEl, 1, TOPY);
+  for (var s = 0; s < 4; s++) placeSlot(foundEl[s], 3 + s, TOPY);
+  for (var c = 0; c < 7; c++) placeSlot(tabEl[c], c, TABY);
+
+  boardEl.style.width = (PAD * 2 + (6 * COLSTEP + CW)) + 'px';
+  render();
+}
+
+function placeSlot(el, col, y) {
+  el.style.setProperty('--x', columnX(col) + 'px');
+  el.style.setProperty('--y', y + 'px');
+}
+
+function render() {
+  var maxBottom = Math.max(TOPY + CH, TABY + CH);
+
+  for (var i = 0; i < stock.length; i++) {
+    placeCardEl(stock[i], columnX(0), TOPY, i + 1, false);
+  }
+  for (var w = 0; w < waste.length; w++) {
+    var fromTop = waste.length - 1 - w;
+    var off = fromTop < 3 ? fromTop * Math.round(CW * 0.20) : 2 * Math.round(CW * 0.20);
+    placeCardEl(waste[w], columnX(1) + off, TOPY, w + 1, true);
+  }
+  for (var s = 0; s < 4; s++) {
+    for (var f = 0; f < founds[s].length; f++)
+      placeCardEl(founds[s][f], columnX(3 + s), TOPY, f + 1, true);
+  }
+  for (var c = 0; c < 7; c++) {
+    var pile = tableau[c];
+    var y = TABY;
+    for (var k = 0; k < pile.length; k++) {
+      var card = pile[k];
+      placeCardEl(card, columnX(c), y, k + 1, card.up);
+      maxBottom = Math.max(maxBottom, y + CH);
+      y += card.up ? FANUP : FANDOWN;
+    }
+  }
+
+  boardEl.style.height = (maxBottom + PAD) + 'px';
+  updateSlotContents();
+  updateSelectionClasses();
+}
+
+function placeCardEl(card, x, y, z, faceUp) {
+  var el = cardEls[card.id];
+  el.style.setProperty('--x', x + 'px');
+  el.style.setProperty('--y', y + 'px');
+  el.style.zIndex = String(z);
+  if (faceUp) { el.classList.add('up'); el.classList.remove('down'); }
+  else { el.classList.add('down'); el.classList.remove('up'); }
+}
+
+function updateSlotContents() {
+  if (!stockCntEl) return;
+  if (stock.length > 0) stockCntEl.textContent = String(stock.length);
+  else if (waste.length > 0) stockCntEl.textContent = '↻';
+  else stockCntEl.textContent = '';
+}
+
+function updateSelectionClasses() {
+  for (var i = 0; i < 52; i++) cardEls[i].classList.remove('sel');
+  if (!sel) return;
+  var cards = getSelCards();
+  for (var j = 0; j < cards.length; j++) cardEls[cards[j].id].classList.add('sel');
+}
+
+/* ----------------------------------------------------------- rules */
+function canPlaceTableau(card, top) {
+  if (!top) return card.rank === 13;            // empty column accepts only a King
+  if (isRed(card.suit) === isRed(top.suit)) return false;   // must alternate colour
+  return card.rank === top.rank - 1;            // descending
+}
+
+function canPlaceFoundation(suit, card) {
+  if (card.suit !== suit) return false;         // foundations are per-suit
+  var f = founds[suit];
+  if (!f.length) return card.rank === 1;        // an empty foundation starts with an Ace
+  return card.rank === f[f.length - 1].rank + 1; // same suit, increasing
+}
+
+// Exposed for the logic test's negative controls.
+function canFoundation(card) {
+  var f = founds[card.suit];
+  if (!f.length) return card.rank === 1;
+  return card.rank === f[f.length - 1].rank + 1;
+}
+
+function isValidRun(cards) {
+  for (var i = 0; i < cards.length - 1; i++) {
+    var a = cards[i], b = cards[i + 1];
+    if (isRed(a.suit) === isRed(b.suit)) return false;
+    if (a.rank !== b.rank + 1) return false;
+  }
+  return true;
+}
+
+/* --------------------------------------------------------- selection */
+function findPileOf(card) {
+  for (var c = 0; c < 7; c++) {
+    var i = tableau[c].indexOf(card);
+    if (i >= 0) return { type: 'tableau', col: c, idx: i };
+  }
+  if (waste.indexOf(card) >= 0) return { type: 'waste' };
+  for (var s = 0; s < 4; s++)
+    if (founds[s].indexOf(card) >= 0) return { type: 'foundation', suit: s };
+  return null;
+}
+
+function getSelCards() {
+  if (!sel) return [];
+  if (sel.type === 'tableau') return tableau[sel.col].slice(sel.idx);
+  if (sel.type === 'waste') return waste.length ? [waste[waste.length - 1]] : [];
+  if (sel.type === 'foundation')
+    return founds[sel.suit].length ? [founds[sel.suit][founds[sel.suit].length - 1]] : [];
+  return [];
+}
+
+function doSelect(where) {
+  if (where.type === 'waste') {
+    if (!waste.length) return;
+    sel = { type: 'waste' };
+  } else if (where.type === 'foundation') {
+    if (!founds[where.suit].length) return;
+    sel = { type: 'foundation', suit: where.suit };
+  } else if (where.type === 'tableau') {
+    var pile = tableau[where.col];
+    if (!pile.length) return;
+    var k = where.idx;
+    if (k < 0 || k >= pile.length) return;
+    if (!pile[k].up) { clearSel(); return; }        // face-down cards are not selectable
+    if (k < pile.length - 1 && !isValidRun(pile.slice(k))) { clearSel(); return; }
+    sel = { type: 'tableau', col: where.col, idx: k };
+  } else return;
+  updateSelectionClasses();
+}
+
+function clearSel() {
+  sel = null;
+  updateSelectionClasses();
+}
+
+function sameSource(a, b) {
+  if (a.type !== b.type) return false;
+  if (a.type === 'tableau') return a.col === b.col && a.idx === b.idx;
+  if (a.type === 'foundation') return a.suit === b.suit;
+  return true;
+}
+
+/* ----------------------------------------------------------- moves */
+function removeFromSource(src, n) {
+  if (src.type === 'tableau') return tableau[src.col].splice(tableau[src.col].length - n, n);
+  if (src.type === 'waste') return waste.splice(waste.length - n, n);
+  if (src.type === 'foundation') return founds[src.suit].splice(founds[src.suit].length - n, n);
+  return [];
+}
+
+function flipExposed(src) {
+  if (src.type !== 'tableau') return null;
+  var sp = tableau[src.col];
+  if (sp.length && !sp[sp.length - 1].up) {
+    sp[sp.length - 1].up = true;
+    return sp[sp.length - 1];
+  }
+  return null;
+}
+
+function failFlash(card) {
+  if (!card) return;
+  var el = cardEls[card.id];
+  if (!el) return;
+  el.classList.add('bad');
+  if (typeof setTimeout === 'function')
+    setTimeout(function () { el.classList.remove('bad'); }, 220);
+}
+
+function tryTableauMove(dcol) {
+  if (!sel) return;
+  if (sel.type === 'tableau' && sel.col === dcol) { clearSel(); return; }
+  var cards = getSelCards();
+  if (!cards.length) { clearSel(); return; }
+  var dest = tableau[dcol];
+  if (dest.length === 0) {
+    if (cards[0].rank !== 13) { failFlash(cards[0]); clearSel(); return; }
+  } else {
+    var top = dest[dest.length - 1];
+    if (isRed(cards[0].suit) === isRed(top.suit)) { failFlash(cards[0]); clearSel(); return; }
+    if (cards[0].rank !== top.rank - 1) { failFlash(cards[0]); clearSel(); return; }
+  }
+  var src = sel;
+  removeFromSource(src, cards.length);
+  for (var i = 0; i < cards.length; i++) dest.push(cards[i]);
+  var flipped = flipExposed(src);
+  var delta = (src.type === 'foundation' ? -15 : (src.type === 'waste' ? 5 : 0)) + (flipped ? 5 : 0);
+  score += delta;
+  history.push({
+    src: src, dst: { type: 'tableau', col: dcol },
+    cards: cards.map(function (c) { return c.id; }),
+    flipped: flipped ? flipped.id : -1, scoreDelta: delta
+  });
+  moves++;
+  clearSel(); render(); updateHud(); afterMove();
+}
+
+function tryFoundationMove(dsuit) {
+  if (!sel) return;
+  if (sel.type === 'foundation') { clearSel(); return; }
+  var cards = getSelCards();
+  if (cards.length !== 1) { failFlash(cards[0]); clearSel(); return; }
+  var card = cards[0];
+  if (card.suit !== dsuit) { failFlash(card); clearSel(); return; }
+  var f = founds[dsuit];
+  if (f.length === 0) { if (card.rank !== 1) { failFlash(card); clearSel(); return; } }
+  else { if (card.rank !== f[f.length - 1].rank + 1) { failFlash(card); clearSel(); return; } }
+
+  var src = sel;
+  removeFromSource(src, 1);
+  f.push(card);
+  var flipped = flipExposed(src);
+  var delta = 10 + (flipped ? 5 : 0);
+  score += delta;
+  history.push({
+    src: src, dst: { type: 'foundation', suit: dsuit },
+    cards: [card.id],
+    flipped: flipped ? flipped.id : -1, scoreDelta: delta
+  });
+  moves++;
+  clearSel(); render(); updateHud(); afterMove(); checkWin();
+}
+
+function drawOrRecycle() {
+  if (!started || won) return;
+  if (stock.length > 0) {
+    var n = Math.min(drawCount, stock.length);
+    var drawn = stock.slice(stock.length - n).map(function (c) { return c.id; });
+    for (var i = 0; i < n; i++) {
+      var c = stock.pop();
+      c.up = true;
+      waste.push(c);
+    }
+    moves++;
+    history.push({ src: { type: 'stock' }, dst: { type: 'waste' }, cards: drawn, flipped: -1, scoreDelta: 0 });
+    render(); updateHud(); afterMove();
+  } else if (waste.length > 0) {
+    var rec = waste.slice().map(function (c) { return c.id; });
+    while (waste.length) {
+      var c2 = waste.pop();
+      c2.up = false;
+      stock.push(c2);
+    }
+    var pen = drawCount === 3 ? 20 : 100;
+    score = Math.max(0, score - pen);
+    moves++;
+    history.push({ src: { type: 'waste' }, dst: { type: 'stock' }, cards: rec, flipped: -1, scoreDelta: -pen });
+    render(); updateHud(); afterMove();
+  }
+}
+
+/* ------------------------------------------------------------- undo */
+function undo() {
+  if (won) return;
+  var h = history.pop();
+  if (!h) return;
+  var cards = h.cards.map(function (id) { return cardEls[id].__card; });
+
+  if (h.dst.type === 'tableau') {
+    var dp = tableau[h.dst.col];
+    dp.splice(dp.length - cards.length, cards.length);
+  } else if (h.dst.type === 'foundation') {
+    var fp = founds[h.dst.suit];
+    fp.splice(fp.length - cards.length, cards.length);
+  }
+  for (var i = 0; i < cards.length; i++) {
+    if (h.src.type === 'tableau') tableau[h.src.col].push(cards[i]);
+    else if (h.src.type === 'waste') waste.push(cards[i]);
+    else if (h.src.type === 'foundation') founds[h.src.suit].push(cards[i]);
+    else if (h.src.type === 'stock') stock.push(cards[i]);
+  }
+  for (var j = 0; j < cards.length; j++) cards[j].up = (h.src.type === 'stock') ? false : true;
+  if (h.flipped >= 0) {
+    var fc = cardEls[h.flipped].__card;
+    if (fc) fc.up = false;
+  }
+  score -= h.scoreDelta;
+  moves--;
+  clearSel(); render(); updateHud(); afterMove();
+}
+
+/* --------------------------------------------------------- win / end */
+function checkWin() {
+  for (var s = 0; s < 4; s++) if (founds[s].length !== 13) return;
+  won = true;
+  winTime = elapsed;
+  showWin();
+}
+
+function showWin() {
+  dlgTitleEl.textContent = T.t('wonTitle');
+  dlgSubEl.textContent = T.t('wonSub', { score: score, moves: moves, time: formatTime(winTime) });
+  overlayEl.classList.add('show');
+}
+
+function refreshWinText() {
+  if (!won) return;
+  dlgTitleEl.textContent = T.t('wonTitle');
+  dlgSubEl.textContent = T.t('wonSub', { score: score, moves: moves, time: formatTime(winTime) });
+}
+
+function afterMove() {
+  updateNoMoveHint();
+}
+
+function hasAnyMove() {
+  if (stock.length > 0) return true;
+  if (waste.length) {
+    var w = waste[waste.length - 1];
+    if (canFoundation(w)) return true;
+    for (var c = 0; c < 7; c++) if (canPlaceTableau(w, topOf(c))) return true;
+  }
+  for (var s = 0; s < 4; s++) {
+    var f = founds[s];
+    if (f.length) {
+      var t = f[f.length - 1];
+      for (var c2 = 0; c2 < 7; c2++) if (canPlaceTableau(t, topOf(c2))) return true;
+    }
+  }
+  for (var c3 = 0; c3 < 7; c3++) {
+    var pile = tableau[c3];
+    if (!pile.length) continue;
+    var top = pile[pile.length - 1];
+    if (top.up) {
+      if (canFoundation(top)) return true;
+      for (var d = 0; d < 7; d++) if (d !== c3 && canPlaceTableau(top, topOf(d))) return true;
+    }
+  }
+  return false;
+}
+
+function topOf(col) {
+  var p = tableau[col];
+  return p.length ? p[p.length - 1] : null;
+}
+
+function updateNoMoveHint() {
+  statusEl.textContent = (started && !won && !hasAnyMove()) ? T.t('noMoves') : '';
+}
+
+/* ----------------------------------------------------------- hud */
+function formatTime(ms) {
+  var s = Math.floor(ms / 1000);
+  var m = Math.floor(s / 60);
+  s = s % 60;
+  return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+}
+
+function updateClock() {
+  if (!started) return;
+  elapsed = Date.now() - startTime;
+  timeEl.textContent = formatTime(elapsed);
+}
+
+function startClock() {
+  if (clockTimer && typeof clearInterval === 'function') clearInterval(clockTimer);
+  if (typeof setInterval === 'function') clockTimer = setInterval(updateClock, 250);
+}
+
+function updateHud() {
+  scoreEl.textContent = String(score);
+  movesEl.textContent = String(moves);
+  timeEl.textContent = formatTime(elapsed);
+  if (btnNewEl) btnNewEl.disabled = !started;
+  if (btnUndoEl) btnUndoEl.disabled = !started || history.length === 0;
+  if (btnModeEl) btnModeEl.textContent = T.t('drawMode', { n: drawCount });
+  updateNoMoveHint();
+}
+
+/* --------------------------------------------------------- lifecycle */
+function startGame() {
+  if (started) return;
+  started = true;
+  startTime = Date.now();
+  elapsed = 0;
+  startOverlayEl.classList.remove('show');
+  startClock();
+  updateHud();
+}
+
+function newGame(seed) {
+  deal(seed);
+  started = true;
+  won = false;
+  startTime = Date.now();
+  elapsed = 0;
+  winTime = 0;
+  startOverlayEl.classList.remove('show');
+  overlayEl.classList.remove('show');
+  startClock();
+  updateHud();
+}
+
+/* -------------------------------------------------------- events */
+function locFromEvent(ev) {
+  var t = ev && ev.target;
+  if (!t) return null;
+  if (t.__card) return { kind: 'card', card: t.__card };
+  if (t.__slot) return { kind: 'slot', slot: t.__slot };
+  if (t.closest) {
+    var cc = t.closest('.card');
+    if (cc && cc.__card) return { kind: 'card', card: cc.__card };
+    var cs = t.closest('.slot');
+    if (cs && cs.__slot) return { kind: 'slot', slot: cs.__slot };
+  }
+  return null;
+}
+
+function onBoardClick(ev) {
+  if (!started || won) return;
+  var loc = locFromEvent(ev);
+  if (!loc) { clearSel(); return; }
+
+  if (loc.kind === 'slot') {
+    var s = loc.slot;
+    if (s.type === 'stock') { clearSel(); drawOrRecycle(); return; }
+    if (sel) {
+      if (s.type === 'tableau') tryTableauMove(s.col);
+      else if (s.type === 'foundation') tryFoundationMove(s.suit);
+      else clearSel();
+      return;
+    }
+    if (s.type === 'waste' && waste.length) { doSelect({ type: 'waste' }); return; }
+    if (s.type === 'tableau' && tableau[s.col].length === 0) { clearSel(); return; }
+    if (s.type === 'foundation' && founds[s.suit].length) { doSelect({ type: 'foundation', suit: s.suit }); return; }
+    return;
+  }
+
+  // a card was clicked
+  var card = loc.card;
+  var where = findPileOf(card);
+  if (!where) return;
+  if (sel) {
+    if (sameSource(sel, where)) { clearSel(); return; }
+    if (where.type === 'tableau') tryTableauMove(where.col);
+    else if (where.type === 'foundation') tryFoundationMove(where.suit);
+    else clearSel();
+    return;
+  }
+  doSelect(where);
+}
+
+function onBoardDbl(ev) {
+  if (!started || won) return;
+  var loc = locFromEvent(ev);
+  if (!loc || loc.kind !== 'card') return;
+  var card = loc.card;
+  var where = findPileOf(card);
+  if (!where) return;
+  var src = null;
+  if (where.type === 'waste') {
+    if (waste.length && card === waste[waste.length - 1]) src = { type: 'waste' };
+  } else if (where.type === 'tableau') {
+    var p = tableau[where.col];
+    if (p.length && card === p[p.length - 1] && card.up) src = { type: 'tableau', col: where.col, idx: p.length - 1 };
+  }
+  if (!src) return;
+  if (!canFoundation(card)) return;
+  sel = src;
+  tryFoundationMove(card.suit);
+}
+
+function onKey(ev) {
+  var k = ev.key;
+  var low = String(k || '').toLowerCase();
+  if (!started) {
+    if (k === 'Enter' || k === ' ') { if (ev.preventDefault) ev.preventDefault(); startGame(); }
+    return;
+  }
+  if (won) {
+    if (k === 'Enter' || low === 'n') { if (ev.preventDefault) ev.preventDefault(); newGame(); }
+    return;
+  }
+  if (k === ' ' || low === 'd') { if (ev.preventDefault) ev.preventDefault(); clearSel(); drawOrRecycle(); return; }
+  if (low === 'u') { if (ev.preventDefault) ev.preventDefault(); undo(); return; }
+  if (low === 'n') { if (ev.preventDefault) ev.preventDefault(); newGame(); return; }
+}
+
+function bind() {
+  boardEl.addEventListener('click', onBoardClick);
+  boardEl.addEventListener('dblclick', onBoardDbl);
+  btnStartEl.addEventListener('click', startGame);
+  btnNewEl.addEventListener('click', function () { newGame(); });
+  dlgNewEl.addEventListener('click', function () { newGame(); });
+  btnUndoEl.addEventListener('click', undo);
+  btnModeEl.addEventListener('click', function () {
+    drawCount = drawCount === 1 ? 3 : 1;
+    updateHud();
+  });
+  overlayEl.addEventListener('click', function (ev) {
+    if (ev.target === overlayEl) overlayEl.classList.remove('show');
+  });
+  window.addEventListener('keydown', onKey);
+  window.addEventListener('resize', function () { if (boardEl) fit(); });
+}
+
+/* ------------------------------------------------------------- boot */
+dom();
+bind();
+deal();          // initialise a valid board behind the start overlay
+T.start();       // mount language switcher + translate (project convention)
+T.onChange(function () {
+  if (won) refreshWinText();
+  updateHud();
+  updateSlotContents();
+});
+</script>
+</body>
+</html>

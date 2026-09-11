@@ -20,7 +20,7 @@
 ```sh
 git clone https://github.com/gtdong/litegame.git
 cd litegame
-node tools/smoke.js      # 应该输出：13/13 games smoke-clean
+node tools/smoke.js      # 应该输出：N/N games smoke-clean
 ```
 
 然后用浏览器打开 `index.html` 就行，没有别的要配置。

@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Typing Speed</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --panel: #ffffff;
+    --border: #dfe3e8;
+    --text: #1f2328;
+    --muted: #6b7280;
+    --accent: #3b6ef5;
+    --good: #2e7d32;
+    --bad: #e24b4a;
+    --warn: #e08a00;
+    --mono: "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    margin: 0;
+    padding: 20px 14px 48px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+  }
+
+  h1 { margin: 0 0 4px; font-size: 28px; letter-spacing: -.02em; }
+  .tip { margin: 0 0 14px; font-size: 13px; color: var(--muted); text-align: center; max-width: 540px; }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+    width: 100%;
+    max-width: 640px;
+    box-shadow: 0 1px 2px rgba(16,24,40,.05), 0 4px 12px rgba(16,24,40,.06);
+  }
+
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .bar .group { display: flex; gap: 6px; align-items: center; }
+  .bar .sep { width: 1px; align-self: stretch; background: var(--border); margin: 2px 4px; }
+
+  button {
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--text);
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 12px;
+    cursor: pointer;
+  }
+  button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+
+  /* HUD: live stats row */
+  .hud {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .hud .cell {
+    background: #2f3640;
+    color: #fff;
+    border-radius: 8px;
+    padding: 8px 6px;
+    text-align: center;
+  }
+  .hud .cell.best { background: #1f2937; }
+  .hud .cell b {
+    display: block;
+    font-family: var(--mono);
+    font-size: 20px;
+    line-height: 1.2;
+  }
+  .hud .cell span { font-size: 10px; color: #aab2c0; letter-spacing: .03em; }
+  .hud .cell.combo b { color: #ffd66b; }
+
+  /* The text the player must type. Monospace keeps characters aligned. */
+  #textArea {
+    font-family: var(--mono);
+    font-size: 22px;
+    line-height: 1.9;
+    background: #fafbfc;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 14px;
+    min-height: 120px;
+    word-break: break-word;
+    user-select: none;
+    letter-spacing: .02em;
+  }
+  #textArea .cur {
+    background: rgba(59,110,245,.12);
+    border-radius: 4px;
+    box-shadow: inset 0 -2px 0 var(--accent);
+  }
+  #textArea .up { color: var(--muted); }
+  #textArea .ok { color: var(--good); }
+  #textArea .bad { color: var(--bad); text-decoration: underline; }
+
+  /* Transparent capture input: present in the DOM so mobile brings up its
+     soft keyboard, but visually hidden so the styled #textArea is what shows. */
+  #typedInput {
+    position: absolute;
+    opacity: 0;
+    width: 1px; height: 1px;
+    border: 0; padding: 0; margin: 0;
+    left: -9999px;
+  }
+
+  .status {
+    margin-top: 10px;
+    font-size: 14px;
+    font-weight: 700;
+    min-height: 20px;
+    text-align: center;
+  }
+  .status.win { color: var(--good); }
+  .status.lose { color: var(--bad); }
+
+  /* On-screen keyboard (optional aid). Lit key = last pressed. */
+  #keyboard {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    justify-content: center;
+    margin-top: 12px;
+  }
+  #keyboard .key {
+    font-family: var(--mono);
+    font-size: 12px;
+    min-width: 20px;
+    text-align: center;
+    padding: 4px 5px;
+    border-radius: 5px;
+    background: #eef1f5;
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+  #keyboard .key.lit { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  .restart-row { margin-top: 14px; display: flex; justify-content: center; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary:hover:not(:disabled) { color: #fff; opacity: .9; }
+
+  /* Overlays: ready (start) and result share one host. */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(16, 24, 40, .55);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 50;
+  }
+  .overlay.show { display: flex; }
+
+  .dialog {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 26px 28px 24px;
+    text-align: center;
+    width: 100%;
+    max-width: 360px;
+    box-shadow: 0 20px 50px rgba(16, 24, 40, .3);
+    animation: dlgIn .2s ease-out;
+  }
+  @keyframes dlgIn {
+    from { transform: translateY(14px) scale(.94); opacity: 0; }
+    to   { transform: none; opacity: 1; }
+  }
+  .dlg-title { font-size: 14px; font-weight: 700; color: var(--muted); letter-spacing: .04em; }
+  .dlg-big {
+    font-family: var(--mono);
+    font-size: 56px; font-weight: 800; line-height: 1.15; color: var(--good);
+    margin: 4px 0 2px;
+  }
+  .dlg-big small { font-size: 14px; font-weight: 400; color: var(--muted); margin-left: 6px; }
+  .dlg-sub { font-size: 14px; font-weight: 700; color: var(--accent); margin-bottom: 16px; }
+  .dlg-stats { display: flex; gap: 8px; margin-bottom: 20px; }
+  .dlg-stats > div { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 9px 4px; }
+  .dlg-stats b { display: block; font-family: var(--mono); font-size: 19px; }
+  .dlg-stats span { font-size: 11px; color: var(--muted); }
+  .dlg-actions { display: flex; gap: 10px; justify-content: center; }
+  #readyPanel .dlg-big { color: var(--accent); }
+
+  @media (max-width: 560px) {
+    .hud { grid-template-columns: repeat(3, 1fr); }
+    #textArea { font-size: 19px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="lang-switch" data-lang-switch></div>
+
+<h1 data-i18n="title"></h1>
+<p class="tip" data-i18n="tip"></p>
+
+<div class="panel" id="panel">
+  <div class="bar">
+    <div class="group">
+      <button id="btnEasy" data-i18n="diffEasy"></button>
+      <button id="btnNormal" class="active" data-i18n="diffNormal"></button>
+      <button id="btnHard" data-i18n="diffHard"></button>
+    </div>
+    <div class="sep"></div>
+    <div class="group">
+      <button id="btn15" data-i18n="dur15"></button>
+      <button id="btn30" data-i18n="dur30"></button>
+      <button id="btn60" class="active" data-i18n="dur60"></button>
+    </div>
+  </div>
+
+  <div class="hud">
+    <div class="cell"><b id="hudTime">60</b><span data-i18n="time"></span></div>
+    <div class="cell"><b id="hudWpm">0</b><span data-i18n="wpm"></span></div>
+    <div class="cell"><b id="hudAcc">100%</b><span data-i18n="acc"></span></div>
+    <div class="cell"><b id="hudWords">0</b><span data-i18n="words"></span></div>
+    <div class="cell combo"><b id="hudCombo">0</b><span data-i18n="combo"></span></div>
+  </div>
+
+  <div id="textArea"></div>
+  <input id="typedInput" type="text" autocomplete="off" autocorrect="off"
+         autocapitalize="off" spellcheck="false" aria-label="typing input">
+
+  <div class="status" id="status"></div>
+
+  <div id="keyboard"></div>
+</div>
+
+<div class="restart-row">
+  <button id="btnNew" data-i18n="newGame"></button>
+</div>
+
+<div id="overlay" class="overlay">
+  <div class="dialog">
+    <!-- ready panel -->
+    <div id="readyPanel">
+      <div class="dlg-title" data-i18n="readyTitle"></div>
+      <div class="dlg-big" data-i18n="readyBig"></div>
+      <div class="dlg-sub" data-i18n="readyTip"></div>
+      <div class="dlg-actions">
+        <button id="btnStart" class="primary" data-i18n="start"></button>
+      </div>
+    </div>
+    <!-- result panel -->
+    <div id="resultPanel" style="display:none">
+      <div class="dlg-title" data-i18n="resultTitle"></div>
+      <div class="dlg-big"><span id="dlgWpm">0</span><small data-i18n="wpm"></small></div>
+      <div class="dlg-sub" id="dlgNewBest"></div>
+      <div class="dlg-stats">
+        <div><b id="dlgAcc">0%</b><span data-i18n="acc"></span></div>
+        <div><b id="dlgWords">0</b><span data-i18n="words"></span></div>
+        <div><b id="dlgErrors">0</b><span data-i18n="errors"></span></div>
+        <div><b id="dlgCombo">0</b><span data-i18n="maxCombo"></span></div>
+        <div><b id="dlgBest">0</b><span data-i18n="best"></span></div>
+      </div>
+      <div class="dlg-actions">
+        <button id="btnAgain" class="primary" data-i18n="playAgain"></button>
+        <button id="btnClose" data-i18n="closeBtn"></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/i18n.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  /* ------------------------------------------------- bilingual dictionary */
+  var T = LiteI18N.create({
+    title:     { en: 'Typing Speed', zh: '打字测速' },
+    tip: {
+      en: 'Type the words as fast and accurately as you can. 15 / 30 / 60 second rounds. A real keyboard works; on phones just tap the text and type.',
+      zh: '尽可能快且准地打出单词。每局 15 / 30 / 60 秒。电脑直接用键盘，手机点一下文字区域即可输入。'
+    },
+    diffEasy:   { en: 'Easy', zh: '简单' },
+    diffNormal: { en: 'Normal', zh: '普通' },
+    diffHard:   { en: 'Hard', zh: '困难' },
+    dur15:      { en: '15s', zh: '15秒' },
+    dur30:      { en: '30s', zh: '30秒' },
+    dur60:      { en: '60s', zh: '60秒' },
+    time:       { en: 'Time', zh: '剩余' },
+    wpm:        { en: 'WPM', zh: '词/分' },
+    acc:        { en: 'Acc', zh: '准确' },
+    words:      { en: 'Words', zh: '正确词' },
+    combo:      { en: 'Combo', zh: '连击' },
+    best:       { en: 'Best', zh: '最佳' },
+    newGame:    { en: 'New game', zh: '重新开始' },
+    start:      { en: 'Start', zh: '开始' },
+    readyTitle: { en: 'TYPING SPEED', zh: '打字测速' },
+    readyBig:   { en: 'Ready?', zh: '准备好了吗' },
+    readyTip:   { en: 'Pick a difficulty and duration, then press Start.', zh: '选择难度和时长，然后点「开始」。' },
+    resultTitle:{ en: "TIME'S UP", zh: '时间到' },
+    errors:     { en: 'Errors', zh: '错误' },
+    maxCombo:   { en: 'Max', zh: '最高连击' },
+    playAgain:  { en: 'Play again', zh: '再玩一局' },
+    closeBtn:   { en: 'Close', zh: '关闭' },
+    newBest:    { en: 'New personal best!', zh: '刷新个人最佳！' },
+    playing:    { en: 'Go! Type the highlighted word.', zh: '开始！打出高亮的单词。' },
+    tapHint:    { en: 'Tap here to focus the keyboard', zh: '点这里唤起键盘' }
+  });
+
+  /* -------------------------------------------------------- word banks */
+  // Easy: short, very common words. Normal: everyday words. Hard: long words
+  // plus punctuation and mixed case, so casing and symbols matter.
+  var BANKS = {
+    easy: ['the', 'and', 'you', 'can', 'cat', 'dog', 'sun', 'run', 'red', 'blue',
+           'go', 'up', 'see', 'we', 'big', 'hot', 'top', 'map', 'car', 'bus',
+           'bee', 'cow', 'rat', 'bat', 'hat', 'pen', 'cup', 'key', 'ice', 'sky',
+           'sea', 'old', 'new', 'low', 'far', 'fun', 'fly', 'now', 'how', 'who',
+           'boy', 'tree', 'fish', 'bird', 'book', 'star', 'moon', 'fire', 'wind',
+           'rain', 'snow', 'leaf', 'rock', 'milk', 'egg', 'ball'],
+    normal: ['keyboard', 'garden', 'please', 'water', 'morning', 'system', 'number',
+             'letter', 'window', 'simple', 'happy', 'orange', 'purple', 'planet',
+             'rocket', 'school', 'friend', 'family', 'animal', 'yellow', 'green',
+             'color', 'music', 'phone', 'table', 'chair', 'house', 'street', 'flower',
+             'weather', 'monkey', 'rabbit', 'turtle', 'dragon', 'castle', 'bridge',
+             'pencil', 'eraser', 'bottle', 'blanket', 'pillow', 'candle', 'engine',
+             'circle', 'square', 'planet', 'silver', 'bronze', 'jungle'],
+    hard: ['JavaScript', 'TypeScript', 'CamelCase', "don't", 'well-known', 'Hello,',
+           'World!', 'self-esteem', 'Mississippi', 'xylophone', 'encyclopedia',
+           'QWERTY', 'U.S.A.', 'IDs?', 'C++', 'state-of-the-art', 'mother-in-law',
+           'Email@', 'JSON.stringify', 'React.js', 'Node.js', 'HTML5', 'CSS3',
+           'a-zA-Z0-9', 'Wi-Fi', 'e-commerce', "o'clock", 'HP&Co', '2,000', '50%',
+           'Mr. Smith', 'back-end', 'front-end', 'open-source', 'read-only',
+           'User-Agent', 'localhost:8080', 'null/undefined', 'true/false']
+  };
+
+  function avgLen(list) {
+    var s = 0;
+    for (var i = 0; i < list.length; i++) s += list[i].length;
+    return s / list.length;
+  }
+
+  /* ------------------------------------------------------- DOM handles */
+  var overlayEl   = document.getElementById('overlay');
+  var readyPanel  = document.getElementById('readyPanel');
+  var resultPanel = document.getElementById('resultPanel');
+  var textEl      = document.getElementById('textArea');
+  var inputEl     = document.getElementById('typedInput');
+  var statusEl    = document.getElementById('status');
+  var keyboardEl  = document.getElementById('keyboard');
+
+  var hudTime  = document.getElementById('hudTime');
+  var hudWpm   = document.getElementById('hudWpm');
+  var hudAcc   = document.getElementById('hudAcc');
+  var hudWords = document.getElementById('hudWords');
+  var hudCombo = document.getElementById('hudCombo');
+  var hudBest  = document.getElementById('hudBest');
+
+  var dlgWpm    = document.getElementById('dlgWpm');
+  var dlgAcc    = document.getElementById('dlgAcc');
+  var dlgWords  = document.getElementById('dlgWords');
+  var dlgErrors = document.getElementById('dlgErrors');
+  var dlgCombo  = document.getElementById('dlgCombo');
+  var dlgBest   = document.getElementById('dlgBest');
+  var dlgNewBest= document.getElementById('dlgNewBest');
+
+  var btnStart  = document.getElementById('btnStart');
+  var btnAgain  = document.getElementById('btnAgain');
+  var btnClose  = document.getElementById('btnClose');
+  var btnNew    = document.getElementById('btnNew');
+  var diffBtns  = { easy: document.getElementById('btnEasy'),
+                    normal: document.getElementById('btnNormal'),
+                    hard: document.getElementById('btnHard') };
+  var durBtns   = { '15': document.getElementById('btn15'),
+                    '30': document.getElementById('btn30'),
+                    '60': document.getElementById('btn60') };
+
+  var BEST_KEY = 'typing_best';
+  var rafId = null;
+  var lastLit = null;
+  var keyEls = {};
+
+  /* ----------------------------------------------- persistence (best) */
+  function loadBest() {
+    try {
+      var v = parseInt(localStorage.getItem(BEST_KEY), 10);
+      return isNaN(v) ? 0 : v;
+    } catch (e) { return 0; }
+  }
+  function saveBest(v) {
+    try { localStorage.setItem(BEST_KEY, String(v)); } catch (e) {}
+  }
+
+  /* ----------------------------------------------------- engine state */
+  // Everything the game needs lives on TAPI so the test suite (which loads the
+  // script in a vm sandbox) can read and drive it through the real UI path.
+  var TAPI = {
+    phase: 'ready',          // 'ready' | 'playing' | 'ended'
+    difficulty: 'normal',
+    duration: 60,            // seconds
+    words: [],
+    wordIndex: 0,
+    typed: '',
+    keystrokes: 0,           // total printable chars accepted
+    errors: 0,               // wrong keystrokes (counted once each)
+    correctWords: 0,
+    combo: 0,
+    maxCombo: 0,
+    elapsed: 0,              // ms accumulated from rAF timestamps
+    lastTs: null,
+    best: 0,
+
+    bankFor: function (d) { return BANKS[d] || BANKS.normal; },
+
+    makeRound: function (diff) {
+      var bank = this.bankFor(diff);
+      var out = [];
+      for (var i = 0; i < 60; i++) {
+        out.push(bank[Math.floor(Math.random() * bank.length)]);
+      }
+      return out;
+    },
+
+    target: function () { return this.words[this.wordIndex] || ''; },
+
+    // Process a single key. Primary input path is ev.key based so the stub
+    // DOM (where the <input> has no real value) and real keydown tests both
+    // drive the game identically.
+    feedKey: function (key) {
+      if (this.phase !== 'playing') return;
+      var t = this.target();
+      if (key === 'Backspace') {
+        // Remove the last typed char. We do NOT touch the error/keystroke
+        // counters here: an earlier wrong keystroke stays counted once, and
+        // the corrected keystroke is simply correct — never double counted.
+        if (this.typed.length) this.typed = this.typed.slice(0, -1);
+        this.render();
+        return;
+      }
+      if (key === ' ' || key === 'Spacebar') {
+        this.submitWord(t);
+        return;
+      }
+      if (key && key.length === 1) {
+        if (this.typed.length < t.length) {
+          var correct = key === t.charAt(this.typed.length);
+          this.typed += key;
+          this.keystrokes++;
+          if (!correct) this.errors++;
+          lightKey(key);
+          if (this.typed.length === t.length && this.typed === t) {
+            this.completeWord(t);
+          }
+        }
+        this.render();
+        return;
+      }
+      // Ignore everything else (Enter, arrows, modifiers, ...).
+    },
+
+    submitWord: function (t) {
+      if (this.typed.length === 0) return;          // nothing to submit yet
+      if (this.typed === t) {
+        this.completeWord(t);
+      } else {
+        this.combo = 0;                              // wrong submission breaks combo
+        this.typed = '';
+        this.wordIndex++;
+        if (this.wordIndex >= this.words.length) this.appendWords();
+        this.render();
+      }
+    },
+
+    completeWord: function (t) {
+      this.correctWords++;
+      this.combo++;
+      if (this.combo > this.maxCombo) this.maxCombo = this.combo;
+      this.typed = '';
+      this.wordIndex++;
+      if (this.wordIndex >= this.words.length) this.appendWords();
+      this.render();
+    },
+
+    appendWords: function () {
+      var more = this.makeRound(this.difficulty);
+      for (var i = 0; i < more.length; i++) this.words.push(more[i]);
+    },
+
+    // WPM: a "word" is 5 characters. minutes come from the rAF clock.
+    wpm: function () {
+      var minutes = this.elapsed / 60000;
+      if (minutes <= 0) return 0;
+      var correct = this.keystrokes - this.errors;
+      return Math.round((correct / 5) / minutes);
+    },
+
+    // Accuracy: correct keystrokes / total keystrokes, as a percentage.
+    accuracy: function () {
+      if (this.keystrokes === 0) return 100;
+      return Math.round((this.keystrokes - this.errors) / this.keystrokes * 100);
+    },
+
+    start: function (diff, dur) {
+      this.difficulty = diff || this.difficulty;
+      this.duration = dur || this.duration;
+      this.words = this.makeRound(this.difficulty);
+      this.wordIndex = 0;
+      this.typed = '';
+      this.keystrokes = 0;
+      this.errors = 0;
+      this.correctWords = 0;
+      this.combo = 0;
+      this.maxCombo = 0;
+      this.elapsed = 0;
+      this.lastTs = null;
+      this.phase = 'playing';
+      this.best = loadBest();
+      hideOverlay();
+      setControls();
+      if (inputEl && typeof inputEl.focus === 'function') inputEl.focus();
+      this.render();
+      schedule();
+    },
+
+    endRound: function () {
+      this.phase = 'ended';
+      var wpm = this.wpm();
+      if (wpm > this.best) { this.best = wpm; saveBest(wpm); }
+      showResult(wpm);
+      setControls();
+    },
+
+    render: function () { render(); }
+  };
+
+  /* ----------------------------------------------------- rendering */
+  function esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function lightKey(ch) {
+    ch = (ch || '').toLowerCase();
+    if (lastLit && keyEls[lastLit]) keyEls[lastLit].classList.remove('lit');
+    if (keyEls[ch]) { keyEls[ch].classList.add('lit'); lastLit = ch; }
+  }
+
+  function buildKeyboard() {
+    keyboardEl.innerHTML = '';
+    var letters = 'abcdefghijklmnopqrstuvwxyz'.split('');
+    for (var i = 0; i < letters.length; i++) {
+      var k = document.createElement('span');
+      k.className = 'key';
+      k.textContent = letters[i];
+      keyboardEl.appendChild(k);
+      keyEls[letters[i]] = k;
+    }
+  }
+
+  function render() {
+    // Text stream: a small window of upcoming words, current one highlighted.
+    var win = TAPI.words.slice(TAPI.wordIndex, TAPI.wordIndex + 6);
+    var html = '';
+    for (var i = 0; i < win.length; i++) {
+      var w = win[i];
+      if (i === 0) {
+        var inner = '';
+        for (var j = 0; j < w.length; j++) {
+          var cls = j < TAPI.typed.length
+            ? (TAPI.typed.charAt(j) === w.charAt(j) ? 'ok' : 'bad')
+            : '';
+          inner += '<span class="' + cls + '">' + esc(w.charAt(j)) + '</span>';
+        }
+        html += '<span class="cur">' + inner + '</span>';
+      } else {
+        html += '<span class="up">' + esc(w) + '</span>';
+      }
+      html += ' ';
+    }
+    textEl.innerHTML = html;
+
+    // HUD numbers.
+    var remain = TAPI.duration * 1000 - TAPI.elapsed;
+    hudTime.textContent  = String(Math.max(0, Math.ceil(remain / 1000)));
+    hudWpm.textContent   = String(TAPI.wpm());
+    hudAcc.textContent   = TAPI.accuracy() + '%';
+    hudWords.textContent = String(TAPI.correctWords);
+    hudCombo.textContent = String(TAPI.combo);
+    hudBest.textContent  = String(TAPI.best);
+
+    // Status line follows the phase and the language.
+    if (TAPI.phase === 'playing') {
+      statusEl.textContent = T.t('playing');
+      statusEl.className = '';
+    } else if (TAPI.phase === 'ready') {
+      statusEl.textContent = T.t('readyTip');
+      statusEl.className = '';
+    }
+  }
+
+  /* --------------------------------------------------- timing (rAF) */
+  function loop(ts) {
+    if (TAPI.phase !== 'playing') return;
+    // In the stub DOM rAF is pumped without a timestamp; fall back to the
+    // clock so we never divide by / subtract NaN.
+    if (ts == null) ts = (typeof performance !== 'undefined' && performance.now) ? performance.now() : 0;
+    if (TAPI.lastTs == null) TAPI.lastTs = ts;
+    var dt = ts - TAPI.lastTs;
+    if (dt < 0) dt = 0;
+    TAPI.lastTs = ts;
+    TAPI.elapsed += dt;
+
+    if (TAPI.elapsed >= TAPI.duration * 1000) {
+      TAPI.elapsed = TAPI.duration * 1000;
+      TAPI.render();
+      TAPI.endRound();
+      return;
+    }
+    TAPI.render();
+    rafId = requestAnimationFrame(loop);
+  }
+  function schedule() { rafId = requestAnimationFrame(loop); }
+
+  /* -------------------------------------------------------- overlays */
+  function showOverlay() { overlayEl.classList.add('show'); }
+  function hideOverlay() { overlayEl.classList.remove('show'); }
+
+  function setControls() {
+    var playing = TAPI.phase === 'playing';
+    btnNew.disabled = (TAPI.phase === 'ready');
+    diffBtns.easy.disabled = playing;
+    diffBtns.normal.disabled = playing;
+    diffBtns.hard.disabled = playing;
+    durBtns['15'].disabled = playing;
+    durBtns['30'].disabled = playing;
+    durBtns['60'].disabled = playing;
+    diffBtns[TAPI.difficulty].classList.add('active');
+    ['easy', 'normal', 'hard'].forEach(function (d) {
+      if (d !== TAPI.difficulty) diffBtns[d].classList.remove('active');
+    });
+    durBtns[String(TAPI.duration)].classList.add('active');
+    ['15', '30', '60'].forEach(function (d) {
+      if (Number(d) !== TAPI.duration) durBtns[d].classList.remove('active');
+    });
+  }
+
+  function showReady() {
+    TAPI.phase = 'ready';
+    readyPanel.style.display = '';
+    resultPanel.style.display = 'none';
+    setControls();
+    TAPI.render();
+    showOverlay();
+  }
+
+  function showResult(wpm) {
+    readyPanel.style.display = 'none';
+    resultPanel.style.display = '';
+    dlgWpm.textContent = String(wpm);
+    dlgAcc.textContent = TAPI.accuracy() + '%';
+    dlgWords.textContent = String(TAPI.correctWords);
+    dlgErrors.textContent = String(TAPI.errors);
+    dlgCombo.textContent = String(TAPI.maxCombo);
+    dlgBest.textContent = String(TAPI.best);
+    dlgNewBest.textContent = (wpm >= TAPI.best && wpm > 0) ? T.t('newBest') : '';
+    showOverlay();
+  }
+
+  /* ------------------------------------------------------ input wiring */
+  // One handler drives state from ev.key. The <input> is the focused capture
+  // target (mobile soft keyboard), and document keydown is the fallback for
+  // when focus is elsewhere. To avoid double-processing a single physical key,
+  // the document handler bows out when the event already originated on input.
+  function handleKey(key) {
+    TAPI.feedKey(key);
+    if (inputEl) inputEl.value = '';   // keep the visible capture input empty
+  }
+
+  if (inputEl) {
+    inputEl.addEventListener('keydown', function (ev) {
+      handleKey(ev.key);
+      if (ev.key === ' ' || ev.key === 'Spacebar') { if (ev.preventDefault) ev.preventDefault(); }
+    });
+    // Lightweight listener so the capture input never accumulates stray text.
+    inputEl.addEventListener('input', function () { inputEl.value = ''; });
+  }
+
+  document.addEventListener('keydown', function (ev) {
+    if (ev.target === inputEl) return;   // the input handler already covered it
+    handleKey(ev.key);
+    if (ev.key === ' ' || ev.key === 'Spacebar') { if (ev.preventDefault) ev.preventDefault(); }
+  });
+
+  // Clicking the text area refocuses the capture input (mobile friendly).
+  textEl.addEventListener('click', function () {
+    if (inputEl && typeof inputEl.focus === 'function') inputEl.focus();
+  });
+
+  /* ----------------------------------------------------- button wiring */
+  btnStart.addEventListener('click', function () { TAPI.start(TAPI.difficulty, TAPI.duration); });
+  btnAgain.addEventListener('click', function () { TAPI.start(TAPI.difficulty, TAPI.duration); });
+  btnNew.addEventListener('click', function () { TAPI.start(TAPI.difficulty, TAPI.duration); });
+  btnClose.addEventListener('click', hideOverlay);
+
+  overlayEl.addEventListener('click', function (ev) {
+    // Click on the dark backdrop (not the dialog) closes the ready/result view
+    // without starting; ev.target may be null in the stub, so guard it.
+    if (ev.target === overlayEl && TAPI.phase === 'ended') hideOverlay();
+  });
+
+  function wireChoice(map, set) {
+    Object.keys(map).forEach(function (k) {
+      map[k].addEventListener('click', function () {
+        set(k);
+        setControls();
+      });
+    });
+  }
+  wireChoice(diffBtns, function (k) { TAPI.difficulty = k; });
+  wireChoice(durBtns, function (k) { TAPI.duration = Number(k); });
+
+  /* ----------------------------------------------- language re-render */
+  T.onChange(function () {
+    if (TAPI.phase === 'playing') statusEl.textContent = T.t('playing');
+    else if (TAPI.phase === 'ready') statusEl.textContent = T.t('readyTip');
+    if (TAPI.phase === 'ended') {
+      // Refresh the result dialog text for the new language.
+      dlgNewBest.textContent = (TAPI.wpm() >= TAPI.best && TAPI.wpm() > 0) ? T.t('newBest') : '';
+    }
+    render();
+  });
+
+  /* ----------------------------------------------------------- boot */
+  buildKeyboard();
+  TAPI.best = loadBest();
+  showReady();      // visible entry point: the Start overlay
+  T.start();        // apply language last (project convention)
+
+  // Expose the engine so the test suite can read state and drive the same
+  // code path the UI uses. Does not affect gameplay.
+  window.__typing = TAPI;
+})();
+</script>
+</body>
+</html>

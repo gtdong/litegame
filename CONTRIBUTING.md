@@ -20,7 +20,7 @@ Any pull request that adds a `package.json` dependency or a build pipeline will 
 ```sh
 git clone https://github.com/gtdong/litegame.git
 cd litegame
-node tools/smoke.js      # should print: 13/13 games smoke-clean
+node tools/smoke.js      # should print: N/N games smoke-clean
 ```
 
 Then just open `index.html` in a browser. There is nothing else to set up.

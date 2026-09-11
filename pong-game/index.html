@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pong · 乒乓球</title>
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --bg2: #111831;
+    --panel: #161d36;
+    --border: #273052;
+    --text: #e8ecf5;
+    --muted: #8b93a8;
+    --accent: #4dd0e1;
+    --accent2: #ff5d8f;
+    --good: #66bb6a;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    margin: 0;
+    padding: 18px 14px 36px;
+    background: radial-gradient(1200px 700px at 50% -10%, #182142 0%, var(--bg) 60%);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    user-select: none;
+    overflow-x: hidden;
+  }
+
+  h1 { margin: 0 0 4px; font-size: 22px; letter-spacing: -.01em; }
+  .tip { margin: 0 0 14px; font-size: 13px; color: var(--muted); text-align: center; }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 12px;
+    box-shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+    width: 100%;
+    max-width: 800px;
+  }
+
+  .hud {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    font-size: 14px;
+  }
+  .hud .score { display: flex; align-items: center; gap: 8px; font-size: 15px; }
+  .hud .score b { font-size: 20px; min-width: 22px; text-align: center; }
+  .hud .score .who { color: var(--muted); font-size: 13px; }
+  .hud .score .sep { opacity: .5; }
+  .hud .ctrl { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .hud label { color: var(--muted); font-size: 13px; }
+
+  select, button {
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--text);
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 12px;
+    cursor: pointer;
+  }
+  button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+
+  .stage { position: relative; }
+
+  canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 10px;
+    background: #0b1020;
+    touch-action: none;
+  }
+
+  #overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    background: rgba(10, 14, 26, .78);
+    border-radius: 10px;
+    color: #fff;
+    text-align: center;
+    padding: 20px;
+  }
+  #overlay.hide { display: none; }
+  #overlay .msg { font-size: 46px; font-weight: 800; letter-spacing: -.02em; }
+  #overlay .sub { font-size: 14px; color: #c7cedb; }
+  #overlay button {
+    color: #06222a;
+    background: var(--accent);
+    border-color: var(--accent);
+    padding: 10px 24px;
+    font-weight: 700;
+    font-size: 15px;
+  }
+  #overlay button:hover { color: #06222a; }
+
+  .footnote { margin-top: 14px; font-size: 12px; color: var(--muted); text-align: center; }
+</style>
+</head>
+<body>
+
+<div class="lang-switch" data-lang-switch></div>
+
+<h1 data-i18n="title"></h1>
+<p class="tip" data-i18n-html="tip"></p>
+
+<div class="panel">
+  <div class="hud">
+    <div class="score">
+      <span class="who" data-i18n="you"></span>
+      <b id="scoreL">0</b>
+      <span class="sep">:</span>
+      <b id="scoreR">0</b>
+      <span class="who" data-i18n="cpu"></span>
+    </div>
+    <div class="ctrl">
+      <label data-i18n="diff"></label>
+      <select id="diff">
+        <option value="easy">Easy</option>
+        <option value="normal" selected>Normal</option>
+        <option value="hard">Hard</option>
+      </select>
+      <button id="btnPause" data-i18n="pause"></button>
+      <button id="btnNew" data-i18n="newgame"></button>
+    </div>
+  </div>
+
+  <div class="stage">
+    <canvas id="cv" width="800" height="480"></canvas>
+    <div id="overlay">
+      <div class="msg" id="ovMsg"></div>
+      <div class="sub" id="ovSub"></div>
+      <button id="btnStart"></button>
+    </div>
+  </div>
+</div>
+
+<p class="footnote" data-i18n="foot"></p>
+
+<script src="../assets/i18n.js"></script>
+<script>
+/* Pong / 乒乓球 — single-file, zero-dependency Canvas game.
+ * All entity state lives in top-level `var`s so the headless test suite
+ * (tools/pong-test.js) can read and drive it from a vm sandbox. */
+
+var T = LiteI18N.create({
+  title:   { en: 'Pong', zh: '乒乓球' },
+  tip: {
+    en: 'Move the left paddle with ↑ ↓ / W S, the mouse or your finger<br>First to 7 wins — beat the AI on the right',
+    zh: '用 ↑ ↓ / W S、鼠标或手指控制左侧球拍<br>先得 7 分者获胜 — 击败右侧的 AI'
+  },
+  you:     { en: 'You', zh: '你' },
+  cpu:     { en: 'CPU', zh: '电脑' },
+  diff:    { en: 'Difficulty', zh: '难度' },
+  pause:   { en: 'Pause', zh: '暂停' },
+  resume:  { en: 'Resume', zh: '继续' },
+  newgame: { en: 'New game', zh: '新游戏' },
+  start:   { en: 'Start', zh: '开始游戏' },
+  ready:   { en: 'Ready?', zh: '准备好了吗？' },
+  readySub:{ en: 'Press Start, Space or click the field', zh: '点击开始、空格或点击场地' },
+  getReady:{ en: 'Get ready…', zh: '准备…' },
+  paused:  { en: 'Paused', zh: '已暂停' },
+  pausedSub:{ en: 'Press Space / P to resume', zh: '按空格 / P 继续' },
+  youWin:  { en: 'You win!', zh: '你赢了！' },
+  cpuWin:  { en: 'CPU wins', zh: '电脑获胜' },
+  finalScore:{ en: 'Final {a} : {b}', zh: '最终比分 {a} : {b}' },
+  again:   { en: 'Play again', zh: '再来一局' },
+  foot:    {
+    en: 'Space / P to pause · the ball speeds up on every rally',
+    zh: '空格 / P 暂停 · 每次对拉球都会加速'
+  }
+});
+
+/* -------------------------------------------------------------- constants */
+var W = 800, H = 480;
+var PADDLE_X = 30, PADDLE_W = 14, PADDLE_H = 94;
+var PADDLE_SPEED = 9;            // player paddle px per frame
+var BALL_R = 9;
+var MAX_BOUNCE_ANGLE = Math.PI / 3;   // 60° at the very edge of the paddle
+var WIN = 7;                     // first to 7 points
+var COUNTDOWN = 3;               // serve countdown seconds (3-2-1)
+var TRAIL_MAX = 14;
+
+// Three difficulty tiers tune the AI and the ball speed.
+var DIFF = {
+  easy:   { aiSpeed: 4.5, aiErr: 46, serve: 5.2, max: 9.0 },
+  normal: { aiSpeed: 7.0, aiErr: 22, serve: 6.2, max: 11.0 },
+  hard:   { aiSpeed: 10.5, aiErr: 8, serve: 7.2, max: 13.5 }
+};
+
+/* ------------------------------------------------------------------ state */
+var cv, ctx;
+var scoreLEl, scoreREl, overlayEl, ovMsgEl, ovSubEl, ovBtnEl, btnPause, btnNew, diffEl;
+var ball, paddleL, paddleR;
+var scoreL, scoreR, winSide;
+var state;                       // ready | countdown | playing | paused | over
+var diff = 'normal';
+var serveDir = 1;                // +1 serve toward CPU (right), -1 toward player
+var serveT = 0;                  // countdown timer in seconds
+var aiOffset = 0;                // AI aiming error, regenerated each serve
+var particles = [];
+var shake = 0;
+var rafId = 0;
+var lastTs = null;
+var overlayKind = null;
+var keys = { up: false, down: false };
+
+/* -------------------------------------------------------------- helpers */
+function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
+
+/* ----------------------------------------------------------- canvas setup */
+function setupCanvas() {
+  var dpr = window.devicePixelRatio || 1;
+  cv.width = W * dpr;
+  cv.height = H * dpr;
+  cv.style.aspectRatio = W + ' / ' + H;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+/* --------------------------------------------------------- entity setup */
+function buildEntities() {
+  paddleL = { x: PADDLE_X, y: (H - PADDLE_H) / 2, w: PADDLE_W, h: PADDLE_H };
+  paddleR = { x: W - PADDLE_X - PADDLE_W, y: (H - PADDLE_H) / 2, w: PADDLE_W, h: PADDLE_H };
+  ball = { x: W / 2, y: H / 2, vx: 0, vy: 0, r: BALL_R, trail: [] };
+}
+
+function newGame() {
+  scoreL = 0;
+  scoreR = 0;
+  winSide = null;
+  buildEntities();
+  aiOffset = 0;
+  particles = [];
+  shake = 0;
+  serveDir = Math.random() < 0.5 ? -1 : 1;
+  updateHud();
+  cancelAnimationFrame(rafId);
+  rafId = 0;
+  state = 'ready';
+  btnPause.disabled = true;
+  showOverlay('ready');
+  draw();
+}
+
+// Park the ball in the middle and begin the 3-2-1 serve countdown.
+function newServe() {
+  ball.x = W / 2;
+  ball.y = H / 2;
+  ball.vx = 0;
+  ball.vy = 0;
+  ball.trail = [];
+  serveT = COUNTDOWN;
+  aiOffset = (Math.random() * 2 - 1) * DIFF[diff].aiErr;
+  state = 'countdown';
+  btnPause.disabled = false;
+  showOverlay('countdown');
+}
+
+function launchBall() {
+  var speed = DIFF[diff].serve;
+  var ang = (Math.random() * 2 - 1) * (35 * Math.PI / 180);
+  ball.vx = Math.cos(ang) * speed * serveDir;
+  ball.vy = Math.sin(ang) * speed;
+  ball.trail = [];
+}
+
+/* --------------------------------------------------------------- hud */
+function updateHud() {
+  scoreLEl.textContent = scoreL;
+  scoreREl.textContent = scoreR;
+}
+
+// Overlay text is derived from state so it can be re-translated on language switch.
+function showOverlay(kind) {
+  overlayKind = kind;
+  var msg, sub, btn;
+  if (kind === 'ready') { msg = T.t('ready'); sub = T.t('readySub'); btn = T.t('start'); }
+  else if (kind === 'countdown') { msg = ''; sub = T.t('getReady'); btn = ''; }
+  else if (kind === 'paused') { msg = T.t('paused'); sub = T.t('pausedSub'); btn = T.t('resume'); }
+  else if (kind === 'over') {
+    msg = winSide === 'L' ? T.t('youWin') : T.t('cpuWin');
+    sub = T.t('finalScore', { a: scoreL, b: scoreR });
+    btn = T.t('again');
+  }
+  ovMsgEl.textContent = msg;
+  ovSubEl.textContent = sub;
+  ovBtnEl.textContent = btn;
+  overlayEl.classList.remove('hide');
+}
+
+function hideOverlay() {
+  overlayEl.classList.add('hide');
+}
+
+/* ------------------------------------------------------------- physics */
+function bounceOffWalls() {
+  if (ball.y - ball.r < 0) { ball.y = ball.r; ball.vy = -ball.vy; }
+  else if (ball.y + ball.r > H) { ball.y = H - ball.r; ball.vy = -ball.vy; }
+}
+
+// Reflect the ball off a paddle. `toRight` is the horizontal direction the
+// ball should leave in (player paddle sends it right, CPU paddle sends left).
+function reflectPaddle(p, toRight) {
+  var vxSign = toRight ? 1 : -1;
+  var xOverlap = toRight
+    ? (ball.x - ball.r <= p.x + p.w && ball.x >= p.x - ball.r)
+    : (ball.x + ball.r >= p.x && ball.x <= p.x + p.w + ball.r);
+  if (!xOverlap) return;
+  if (ball.y + ball.r < p.y || ball.y - ball.r > p.y + p.h) return;
+  // Only reflect when the ball is actually travelling toward this paddle.
+  if (toRight && ball.vx >= 0) return;
+  if (!toRight && ball.vx <= 0) return;
+
+  var cy = p.y + p.h / 2;
+  var offset = clamp((ball.y - cy) / (p.h / 2), -1, 1);
+  var speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
+  speed = Math.min(speed * 1.05, DIFF[diff].max);
+  var ang = offset * MAX_BOUNCE_ANGLE;
+  ball.vx = vxSign * Math.cos(ang) * speed;
+  ball.vy = Math.sin(ang) * speed;
+  ball.y = clamp(ball.y, p.y + ball.r, p.y + p.h - ball.r);
+  ball.x = toRight ? (p.x + p.w + ball.r + 0.5) : (p.x - ball.r - 0.5);
+  spawnHit(toRight ? p.x + p.w : p.x, ball.y);
+}
+
+function moveAI() {
+  var target = H / 2;
+  if (state === 'playing' && ball.vx > 0) target = ball.y + aiOffset;
+  var cy = paddleR.y + paddleR.h / 2;
+  var d = target - cy;
+  var step = clamp(d, -DIFF[diff].aiSpeed, DIFF[diff].aiSpeed);
+  paddleR.y = clamp(paddleR.y + step, 0, H - paddleR.h);
+}
+
+// Award a point and either start the next serve or end the match.
+function point(winner) {
+  if (winner === 'L') scoreL++; else scoreR++;
+  updateHud();
+  spawnBurst(ball.x < W / 2 ? 0 : W, ball.y);
+  shake = 9;
+  if (scoreL >= WIN || scoreR >= WIN) {
+    winSide = winner;
+    state = 'over';
+    btnPause.disabled = true;
+    showOverlay('over');
+    cancelAnimationFrame(rafId);
+    rafId = 0;
+    return;
+  }
+  // Serve toward whoever just conceded the point.
+  serveDir = (winner === 'L') ? 1 : -1;
+  newServe();
+}
+
+function update(dt) {
+  // Player paddle from held keys.
+  var dir = 0;
+  if (keys.up) dir -= 1;
+  if (keys.down) dir += 1;
+  paddleL.y = clamp(paddleL.y + dir * PADDLE_SPEED, 0, H - paddleL.h);
+
+  if (state === 'countdown') {
+    serveT -= dt;
+    ball.x = W / 2;
+    ball.y = H / 2;
+    ball.vx = 0;
+    ball.vy = 0;
+    ovMsgEl.textContent = String(Math.max(1, Math.ceil(serveT)));
+    moveAI();
+    if (serveT <= 0) {
+      launchBall();
+      state = 'playing';
+      hideOverlay();
+    }
+    return;
+  }
+
+  if (state !== 'playing') return;
+
+  moveAI();
+
+  ball.x += ball.vx;
+  ball.y += ball.vy;
+
+  ball.trail.push({ x: ball.x, y: ball.y });
+  if (ball.trail.length > TRAIL_MAX) ball.trail.shift();
+
+  bounceOffWalls();
+  reflectPaddle(paddleL, true);
+  reflectPaddle(paddleR, false);
+
+  if (ball.x - ball.r > W) point('L');
+  else if (ball.x + ball.r < 0) point('R');
+
+  updateParticles();
+  if (shake > 0) shake -= 0.6;
+}
+
+/* ----------------------------------------------------------- particles */
+function spawnHit(x, y) {
+  for (var i = 0; i < 8; i++) {
+    var a = Math.random() * Math.PI * 2;
+    particles.push({ x: x, y: y, vx: Math.cos(a) * 2, vy: Math.sin(a) * 2, life: 1 });
+  }
+}
+function spawnBurst(x, y) {
+  for (var i = 0; i < 26; i++) {
+    var a = Math.random() * Math.PI * 2;
+    var s = 1 + Math.random() * 3;
+    particles.push({ x: x, y: y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 1 });
+  }
+}
+function updateParticles() {
+  for (var i = particles.length - 1; i >= 0; i--) {
+    var p = particles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.life -= 0.04;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+}
+
+/* -------------------------------------------------------------- render */
+function drawPaddle(p, color) {
+  ctx.save();
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 16;
+  ctx.fillStyle = color;
+  roundRect(p.x, p.y, p.w, p.h, 7);
+  ctx.fill();
+  ctx.restore();
+}
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#0b1020';
+  ctx.fillRect(0, 0, W, H);
+
+  // Center dashed line.
+  ctx.strokeStyle = 'rgba(255,255,255,.16)';
+  ctx.lineWidth = 3;
+  ctx.setLineDash([12, 14]);
+  ctx.beginPath();
+  ctx.moveTo(W / 2, 0);
+  ctx.lineTo(W / 2, H);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Big score on the field.
+  ctx.fillStyle = 'rgba(255,255,255,.10)';
+  ctx.font = '700 90px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(String(scoreL), W / 2 - 70, 70);
+  ctx.fillText(String(scoreR), W / 2 + 70, 70);
+
+  // Ball trail.
+  for (var i = 0; i < ball.trail.length; i++) {
+    var t = ball.trail[i];
+    var a = (i + 1) / ball.trail.length;
+    ctx.fillStyle = 'rgba(255,255,255,' + (a * 0.35).toFixed(3) + ')';
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, ball.r * a, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  drawPaddle(paddleL, '#4dd0e1');
+  drawPaddle(paddleR, '#ff5d8f');
+
+  // Ball with a soft glow.
+  ctx.save();
+  ctx.shadowColor = '#ffffff';
+  ctx.shadowBlur = 18;
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // Particles.
+  for (var j = 0; j < particles.length; j++) {
+    var p = particles[j];
+    ctx.fillStyle = 'rgba(255,255,255,' + Math.max(0, p.life).toFixed(3) + ')';
+    ctx.fillRect(p.x - 1.5, p.y - 1.5, 3, 3);
+  }
+}
+
+/* --------------------------------------------------------------- loop */
+function loop(ts) {
+  var dt = 0;
+  if (lastTs != null) dt = (ts - lastTs) / 1000;
+  if (dt < 0) dt = 0;
+  lastTs = ts;
+
+  update(dt);
+
+  draw();
+
+  if (state === 'playing' || state === 'countdown') {
+    rafId = requestAnimationFrame(loop);
+  }
+}
+
+/* --------------------------------------------------------- game control */
+function startGame() {
+  // Begin a fresh match from the start screen or after a win.
+  if (state !== 'ready' && state !== 'over') return;
+  newGame();
+  newServe();
+  lastTs = null;
+  cancelAnimationFrame(rafId);
+  rafId = requestAnimationFrame(loop);
+}
+
+function restart() {
+  // The "New game" button always resets and starts a fresh match.
+  newGame();
+  newServe();
+  lastTs = null;
+  cancelAnimationFrame(rafId);
+  rafId = requestAnimationFrame(loop);
+}
+
+function pauseGame() {
+  if (state !== 'playing' && state !== 'countdown') return;
+  state = 'paused';
+  cancelAnimationFrame(rafId);
+  rafId = 0;
+  showOverlay('paused');
+}
+
+function resumePlay() {
+  if (state !== 'paused') return;
+  hideOverlay();
+  state = (serveT > 0 && ball.vx === 0) ? 'countdown' : 'playing';
+  if (state === 'countdown') showOverlay('countdown');
+  lastTs = null;
+  cancelAnimationFrame(rafId);
+  rafId = requestAnimationFrame(loop);
+}
+
+function togglePause() {
+  if (state === 'playing' || state === 'countdown') { pauseGame(); btnPause.textContent = T.t('resume'); }
+  else if (state === 'paused') { resumePlay(); btnPause.textContent = T.t('pause'); }
+}
+
+/* ------------------------------------------------------------- input */
+function pointerY(clientY) {
+  var rect = cv.getBoundingClientRect();
+  return (clientY - rect.top) / rect.height * H;
+}
+function movePaddleTo(y) {
+  paddleL.y = clamp(y - paddleL.h / 2, 0, H - paddleL.h);
+  if (state === 'ready') draw();
+}
+
+cv = document.getElementById('cv');
+ctx = cv.getContext('2d');
+scoreLEl = document.getElementById('scoreL');
+scoreREl = document.getElementById('scoreR');
+overlayEl = document.getElementById('overlay');
+ovMsgEl = document.getElementById('ovMsg');
+ovSubEl = document.getElementById('ovSub');
+ovBtnEl = document.getElementById('btnStart');
+btnPause = document.getElementById('btnPause');
+btnNew = document.getElementById('btnNew');
+diffEl = document.getElementById('diff');
+
+cv.addEventListener('mousemove', function (ev) { movePaddleTo(pointerY(ev.clientY)); });
+
+cv.addEventListener('touchstart', function (ev) {
+  ev.preventDefault();
+  movePaddleTo(pointerY(ev.touches[0].clientY));
+}, { passive: false });
+
+cv.addEventListener('touchmove', function (ev) {
+  ev.preventDefault();
+  movePaddleTo(pointerY(ev.touches[0].clientY));
+}, { passive: false });
+
+cv.addEventListener('click', function () {
+  if (state === 'ready') startGame();
+});
+
+document.addEventListener('keydown', function (ev) {
+  var k = ev.key;
+  if (k === 'ArrowUp' || k === 'w' || k === 'W') { keys.up = true; if (ev.preventDefault) ev.preventDefault(); }
+  else if (k === 'ArrowDown' || k === 's' || k === 'S') { keys.down = true; if (ev.preventDefault) ev.preventDefault(); }
+  else if (k === ' ' || k === 'p' || k === 'P') {
+    if (ev.preventDefault) ev.preventDefault();
+    if (state === 'ready' || state === 'over') startGame();
+    else if (state === 'playing' || state === 'countdown') pauseGame();
+    else if (state === 'paused') resumePlay();
+  }
+});
+
+document.addEventListener('keyup', function (ev) {
+  var k = ev.key;
+  if (k === 'ArrowUp' || k === 'w' || k === 'W') keys.up = false;
+  else if (k === 'ArrowDown' || k === 's' || k === 'S') keys.down = false;
+});
+
+ovBtnEl.addEventListener('click', function () {
+  if (state === 'ready' || state === 'over') startGame();
+  else if (state === 'paused') resumePlay();
+});
+
+btnPause.addEventListener('click', function () { togglePause(); });
+
+btnNew.addEventListener('click', function () { restart(); });
+
+diffEl.addEventListener('change', function () {
+  var v = diffEl.value;
+  if (v === 'easy' || v === 'normal' || v === 'hard') diff = v;
+});
+
+window.addEventListener('resize', function () {
+  setupCanvas();
+  draw();
+});
+
+T.onChange(function () {
+  if (overlayKind) showOverlay(overlayKind);
+  updateHud();
+  btnPause.textContent = (state === 'paused') ? T.t('resume') : T.t('pause');
+});
+
+setupCanvas();
+newGame();
+T.start();
+</script>
+</body>
+</html>

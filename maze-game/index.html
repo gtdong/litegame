@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>迷宫</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --panel: #ffffff;
+    --border: #dfe3e8;
+    --text: #1f2328;
+    --muted: #6b7280;
+    --accent: #3b6ef5;
+    --good: #2e7d32;
+    --wall: #4a5160;
+    --wall-top: #697184;
+    --floor: #eef1f5;
+    --floor-alt: #e6eaf1;
+    --trail: #d7e6ff;
+    --hint: #ffe6a3;
+    --hint-line: #e0a200;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    margin: 0;
+    padding: 24px 16px 40px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+  }
+
+  h1 { margin: 0 0 4px; font-size: 30px; letter-spacing: -.02em; }
+  .tip { margin: 0 0 18px; font-size: 13px; color: var(--muted); text-align: center; }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+    box-shadow: 0 1px 2px rgba(16,24,40,.05), 0 4px 12px rgba(16,24,40,.06);
+  }
+
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .seg { display: inline-flex; gap: 6px; }
+
+  button {
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--text);
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 13px;
+    cursor: pointer;
+    transition: border-color .12s ease, color .12s ease, background .12s ease;
+  }
+  button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  .stat {
+    background: #2f3640;
+    color: #9fd0ff;
+    font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 5px 10px;
+    border-radius: 4px;
+    min-width: 56px;
+    text-align: center;
+  }
+  .stat small { font-weight: 400; opacity: .65; font-size: 11px; }
+
+  /* ---------- board ---------- */
+  #stage {
+    --cell: 30px;
+    position: relative;
+    margin: 0 auto;
+    background: #cdd3dc;
+    border-radius: 10px;
+    touch-action: none;
+    user-select: none;
+  }
+
+  #tiles, #actors {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+  }
+  #actors { pointer-events: none; }
+
+  /* Tiles and the player are positioned purely through two custom properties
+     --r (row) and --c (column). Assigning them is all a move does; CSS turns
+     them into pixels, so resizing only has to change --cell. */
+  .tile, .actor {
+    position: absolute;
+    top: 0; left: 0;
+    width: var(--cell);
+    height: var(--cell);
+    transform: translate(calc(var(--c, 0) * var(--cell)), calc(var(--r, 0) * var(--cell)));
+  }
+
+  .tile.wall {
+    background: linear-gradient(180deg, var(--wall-top), var(--wall));
+    border-radius: 4px;
+    box-shadow: inset 0 -2px 0 rgba(0,0,0,.22), inset 0 2px 0 rgba(255,255,255,.12);
+  }
+
+  .tile.floor { background: var(--floor); }
+  .tile.floor.alt { background: var(--floor-alt); }
+
+  /* Footprints left by the player along the visited route. */
+  .tile.trail { background: var(--trail); }
+
+  /* Shortest-path highlight from the hint button. */
+  .tile.hint {
+    background: var(--hint);
+    box-shadow: inset 0 0 0 2px var(--hint-line);
+  }
+
+  /* Fog-of-war: cells far from the player fade out. */
+  .tile.fog { opacity: .1; }
+
+  .tile.start::after, .tile.goal::after {
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    font-size: calc(var(--cell) * .55);
+    line-height: 1;
+  }
+  .tile.start::after { content: '\1F6A9'; }   /* flag */
+  .tile.goal::after  { content: '\1F3C1'; }   /* checkered flag */
+
+  .actor.player {
+    transform:
+      translate(calc(var(--c, 0) * var(--cell)), calc(var(--r, 0) * var(--cell)))
+      scale(.82);
+    transition: transform .12s ease-out;
+    background: radial-gradient(circle at 35% 30%, #7aa6ff, #2f5fd0);
+    border-radius: 50%;
+    box-shadow: inset 0 -3px 5px rgba(0,0,0,.2), 0 1px 3px rgba(0,0,0,.25);
+  }
+
+  #status {
+    margin-top: 12px;
+    font-size: 13px;
+    font-weight: 600;
+    min-height: 18px;
+    text-align: center;
+    color: var(--muted);
+  }
+
+  /* ---------- touch pad ---------- */
+  .pad {
+    display: grid;
+    grid-template-columns: repeat(3, 58px);
+    grid-template-rows: repeat(2, 48px);
+    gap: 8px;
+    justify-content: center;
+    margin-top: 14px;
+  }
+  .pad button { font-size: 16px; padding: 0; }
+  .pad-up    { grid-column: 2; grid-row: 1; }
+  .pad-left  { grid-column: 1; grid-row: 2; }
+  .pad-down  { grid-column: 2; grid-row: 2; }
+  .pad-right { grid-column: 3; grid-row: 2; }
+
+  /* ---------- dialog / start overlay ---------- */
+  #overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(18, 22, 30, .5);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 20;
+  }
+  #overlay.show { display: flex; }
+
+  #dialog {
+    background: #fff;
+    border-radius: 14px;
+    padding: 28px 32px 24px;
+    width: min(380px, 100%);
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(0,0,0,.25);
+    animation: rise .2s ease-out;
+  }
+  @keyframes rise {
+    from { transform: translateY(12px); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+  }
+
+  #dlgTitle { margin: 0 0 6px; font-size: 24px; }
+  #dlgSub {
+    margin: 0 0 22px;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  #dialog .actions { display: flex; gap: 10px; justify-content: center; }
+  #dialog button {
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  #dialog button:hover { filter: brightness(1.06); color: #fff; }
+  #dialog button.secondary {
+    background: #fff;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  #dialog button.secondary:hover { color: var(--accent); border-color: var(--accent); }
+
+  @media (max-width: 560px) {
+    h1 { font-size: 24px; }
+    .panel { padding: 10px; }
+    .bar { gap: 6px; }
+    button { padding: 6px 10px; font-size: 12px; }
+    .stat { min-width: 50px; font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="lang-switch" data-lang-switch></div>
+
+<h1 data-i18n="title"></h1>
+<p class="tip" data-i18n-html="tip"></p>
+
+<div class="panel">
+  <div class="bar">
+    <div class="seg">
+      <button id="btnSmall" data-i18n="sizeSmall"></button>
+      <button id="btnMedium" class="active" data-i18n="sizeMedium"></button>
+      <button id="btnLarge" data-i18n="sizeLarge"></button>
+    </div>
+    <button id="btnFog" data-i18n="fog"></button>
+    <button id="btnHint" data-i18n="hint"></button>
+    <button id="btnNew" data-i18n="newGame"></button>
+    <div class="stat"><small data-i18n="timeL"></small> <span id="time">0s</span></div>
+    <div class="stat"><small data-i18n="stepsL"></small> <span id="steps">0</span></div>
+    <div class="stat"><small data-i18n="hintsL"></small> <span id="hints">0</span></div>
+  </div>
+  <div id="stage">
+    <div id="tiles"></div>
+    <div id="actors"><div id="player" class="actor player"></div></div>
+  </div>
+  <div id="status"></div>
+</div>
+
+<div class="pad">
+  <button id="btnUp" class="pad-up" type="button" aria-label="up">&#9650;</button>
+  <button id="btnLeft" class="pad-left" type="button" aria-label="left">&#9664;</button>
+  <button id="btnDown" class="pad-down" type="button" aria-label="down">&#9660;</button>
+  <button id="btnRight" class="pad-right" type="button" aria-label="right">&#9654;</button>
+</div>
+
+<div id="overlay">
+  <div id="dialog">
+    <h2 id="dlgTitle"></h2>
+    <p id="dlgSub"></p>
+    <div class="actions">
+      <button id="dlgMain"></button>
+      <button id="dlgSecondary" class="secondary" style="display:none"></button>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/i18n.js"></script>
+<script>
+/* Maze — a perfect-maze generator + walker.
+ *
+ * Everything is at the top level (no IIFE) on purpose: `var` declarations and
+ * `function` declarations attach to the VM context, so the logic suite in
+ * tools/maze-test.js can read internal state and call the pure helpers
+ * directly (generateMaze, solveBFS, isPerfectMaze, ...). */
+
+var T = LiteI18N.create({
+  title:     { en: 'Maze', zh: '迷宫' },
+  tip: {
+    en: 'Move with <kbd>\u2191\u2193\u2190\u2192</kbd> / <kbd>WASD</kbd>, swipe on touch, press <kbd>H</kbd> for a hint. Reach the \u1F3C1.',
+    zh: '用 <kbd>\u2191\u2193\u2190\u2192</kbd> / <kbd>WASD</kbd> 移动，触屏可滑动，按 <kbd>H</kbd> 获得提示。走到 \u1F3C1 即通关。'
+  },
+  sizeSmall:  { en: 'Small', zh: '小' },
+  sizeMedium: { en: 'Medium', zh: '中' },
+  sizeLarge:  { en: 'Large', zh: '大' },
+  fog:   { en: 'Fog', zh: '迷雾' },
+  hint:  { en: 'Hint (H)', zh: '提示 (H)' },
+  newGame: { en: 'New game', zh: '新游戏' },
+  timeL:  { en: 'Time', zh: '用时' },
+  stepsL: { en: 'Steps', zh: '步数' },
+  hintsL: { en: 'Hints', zh: '提示' },
+  startBtn: { en: 'Start', zh: '开始' },
+  startSub: {
+    en: 'Find the shortest path from \u1F6A9 to \u1F3C1. Walls block you; use Hint if you get lost.',
+    zh: '从 \u1F6A9 走到 \u1F3C1，墙会挡路。迷路就按「提示」看看最短路线。'
+  },
+  winTitle: { en: 'You escaped!', zh: '成功走出迷宫！' },
+  winSub: {
+    en: '{steps} steps \u00b7 {time}s \u00b7 {hints} hints',
+    zh: '步数 {steps} \u00b7 用时 {time} 秒 \u00b7 提示 {hints} 次'
+  },
+  playAgain: { en: 'Play again', zh: '再来一局' },
+  close: { en: 'Close', zh: '关闭' }
+});
+
+/* ---------------------------------------------------------------- sizes */
+var SIZE_VAL = { btnSmall: 11, btnMedium: 17, btnLarge: 25 };
+
+/* ---------------------------------------------------------------- state */
+var ROWS = 0, COLS = 0, cell = 30;
+var grid = null;                 // 2D: 1 = wall, 0 = passage
+var tileEls = [];                // 2D: tile element per cell
+var player = { r: 1, c: 1 };
+var startCell = { r: 1, c: 1 };
+var goalCell = { r: 1, c: 1 };
+var currentSize = 17;
+var steps = 0, hints = 0, seconds = 0;
+var started = false, running = false, won = false;
+var fogOn = false;
+var overlayMode = 'start';
+var timerStarted = false, timerId = null;
+var touchStart = null;
+
+/* ----------------------------------------------------------- dom refs */
+var stageEl = document.getElementById('stage');
+var tilesEl = document.getElementById('tiles');
+var playerEl = document.getElementById('player');
+var overlayEl = document.getElementById('overlay');
+var dlgTitleEl = document.getElementById('dlgTitle');
+var dlgSubEl = document.getElementById('dlgSub');
+var dlgMainEl = document.getElementById('dlgMain');
+var dlgSecondaryEl = document.getElementById('dlgSecondary');
+
+/* ============================================================ pure logic */
+
+// Seedable PRNG (mulberry32) so generation can be made deterministic in tests.
+function makeRng(seed) {
+  var a = seed >>> 0;
+  return function () {
+    a = (a + 0x6D2B79F5) | 0;
+    var t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function shuffle(arr, rng) {
+  rng = rng || Math.random;
+  for (var i = arr.length - 1; i > 0; i--) {
+    var j = Math.floor(rng() * (i + 1));
+    var tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+  }
+  return arr;
+}
+
+// Recursive-backtracker (DFS) perfect-maze generator.
+// `N` is the full odd grid dimension; cells live on odd coordinates.
+// Returns a fresh 2D grid (1 = wall, 0 = passage); never touches game state.
+function generateMaze(N, rng) {
+  rng = rng || Math.random;
+  var g = [];
+  var r, c;
+  for (r = 0; r < N; r++) {
+    g[r] = [];
+    for (c = 0; c < N; c++) g[r][c] = 1;
+  }
+  var stack = [[1, 1]];
+  g[1][1] = 0;
+  var dirs = [[-2, 0], [2, 0], [0, -2], [0, 2]];
+  while (stack.length) {
+    var cur = stack[stack.length - 1];
+    var cr = cur[0], cc = cur[1];
+    var order = shuffle(dirs.slice(), rng);
+    var carved = false;
+    for (var i = 0; i < order.length; i++) {
+      var dr = order[i][0], dc = order[i][1];
+      var nr = cr + dr, nc = cc + dc;
+      if (nr > 0 && nr < N - 1 && nc > 0 && nc < N - 1 && g[nr][nc] === 1) {
+        g[cr + dr / 2][cc + dc / 2] = 0;   // open the wall between
+        g[nr][nc] = 0;                     // open the destination cell
+        stack.push([nr, nc]);
+        carved = true;
+        break;
+      }
+    }
+    if (!carved) stack.pop();
+  }
+  return g;
+}
+
+/* ---- maze property helpers (also used by the test suite ---- */
+
+function isOpen(g, r, c, R, C) {
+  return r >= 0 && c >= 0 && r < R && c < C && g[r][c] === 0;
+}
+
+function countOpen(g, R, C) {
+  var n = 0;
+  for (var r = 0; r < R; r++) for (var c = 0; c < C; c++) if (g[r][c] === 0) n++;
+  return n;
+}
+
+// Number of orthogonal adjacencies between open cells (tree edge count).
+function countEdges(g, R, C) {
+  var e = 0;
+  for (var r = 0; r < R; r++) for (var c = 0; c < C; c++) {
+    if (g[r][c] === 0) {
+      if (isOpen(g, r + 1, c, R, C)) e++;
+      if (isOpen(g, r, c + 1, R, C)) e++;
+    }
+  }
+  return e;
+}
+
+// BFS over open cells from `start`; true when every open cell is reached.
+function passagesConnected(g, start, R, C) {
+  var seen = {};
+  var q = [start];
+  seen[start.r * C + start.c] = true;
+  var dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+  var head = 0;
+  while (head < q.length) {
+    var cur = q[head++];
+    for (var d = 0; d < 4; d++) {
+      var nr = cur.r + dirs[d][0], nc = cur.c + dirs[d][1];
+      if (isOpen(g, nr, nc, R, C) && !seen[nr * C + nc]) {
+        seen[nr * C + nc] = true;
+        q.push({ r: nr, c: nc });
+      }
+    }
+  }
+  return Object.keys(seen).length === countOpen(g, R, C);
+}
+
+// A perfect maze is fully connected and has exactly (open - 1) edges (a tree).
+function isPerfectMaze(g, start, R, C) {
+  return passagesConnected(g, start, R, C) && countEdges(g, R, C) === countOpen(g, R, C) - 1;
+}
+
+// Breadth-first shortest path. Returns array of {r,c} from `from` to `to`
+// inclusive, or null when unreachable. Used by the in-game hint.
+function solveBFS(g, from, to, R, C) {
+  if (!isOpen(g, from.r, from.c, R, C) || !isOpen(g, to.r, to.c, R, C)) return null;
+  var prev = {};
+  var seen = {};
+  var key = function (r, c) { return r * C + c; };
+  seen[key(from.r, from.c)] = true;
+  var q = [from];
+  var head = 0;
+  var dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+  while (head < q.length) {
+    var cur = q[head++];
+    if (cur.r === to.r && cur.c === to.c) break;
+    for (var d = 0; d < 4; d++) {
+      var nr = cur.r + dirs[d][0], nc = cur.c + dirs[d][1];
+      if (isOpen(g, nr, nc, R, C) && !seen[key(nr, nc)]) {
+        seen[key(nr, nc)] = true;
+        prev[key(nr, nc)] = cur;
+        q.push({ r: nr, c: nc });
+      }
+    }
+  }
+  if (!seen[key(to.r, to.c)]) return null;
+  var path = [];
+  var node = to;
+  while (node) {
+    path.unshift(node);
+    node = prev[key(node.r, node.c)];
+  }
+  return path;
+}
+
+// Independent shortest-distance check (used to confirm solveBFS length).
+function bfsDist(g, from, to, R, C) {
+  if (!isOpen(g, from.r, from.c, R, C) || !isOpen(g, to.r, to.c, R, C)) return -1;
+  var seen = {};
+  var key = function (r, c) { return r * C + c; };
+  seen[key(from.r, from.c)] = 0;
+  var q = [from];
+  var head = 0;
+  var dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+  while (head < q.length) {
+    var cur = q[head++];
+    if (cur.r === to.r && cur.c === to.c) return seen[key(cur.r, cur.c)];
+    for (var d = 0; d < 4; d++) {
+      var nr = cur.r + dirs[d][0], nc = cur.c + dirs[d][1];
+      if (isOpen(g, nr, nc, R, C) && seen[key(nr, nc)] === undefined) {
+        seen[key(nr, nc)] = seen[key(cur.r, cur.c)] + 1;
+        q.push({ r: nr, c: nc });
+      }
+    }
+  }
+  return -1;
+}
+
+/* ============================================================ rendering */
+
+function fitCell(c, r) {
+  var availW = Math.min(620, (window.innerWidth || 480) - 44);
+  var availH = Math.max(200, (window.innerHeight || 700) - 360);
+  return Math.max(14, Math.min(44, Math.floor(availW / c), Math.floor(availH / r)));
+}
+
+function place(el, r, c) {
+  el.style.setProperty('--r', r);
+  el.style.setProperty('--c', c);
+}
+
+function clearTrails() {
+  for (var r = 0; r < ROWS; r++) {
+    if (!tileEls[r]) continue;
+    for (var c = 0; c < COLS; c++) {
+      if (tileEls[r][c]) tileEls[r][c].classList.remove('trail');
+    }
+  }
+}
+
+function clearHint() {
+  for (var r = 0; r < ROWS; r++) {
+    if (!tileEls[r]) continue;
+    for (var c = 0; c < COLS; c++) {
+      if (tileEls[r][c]) tileEls[r][c].classList.remove('hint');
+    }
+  }
+}
+
+function applyFog() {
+  for (var r = 0; r < ROWS; r++) {
+    if (!tileEls[r]) continue;
+    for (var c = 0; c < COLS; c++) {
+      var t = tileEls[r][c];
+      if (!t) continue;
+      var near = Math.abs(r - player.r) <= 1 && Math.abs(c - player.c) <= 1;
+      if (near) t.classList.remove('fog');
+      else t.classList.add('fog');
+    }
+  }
+}
+
+function clearFog() {
+  for (var r = 0; r < ROWS; r++) {
+    if (!tileEls[r]) continue;
+    for (var c = 0; c < COLS; c++) {
+      if (tileEls[r][c]) tileEls[r][c].classList.remove('fog');
+    }
+  }
+}
+
+function renderBoard() {
+  cell = fitCell(COLS, ROWS);
+  stageEl.style.setProperty('--cell', cell + 'px');
+  stageEl.style.width = (COLS * cell) + 'px';
+  stageEl.style.height = (ROWS * cell) + 'px';
+
+  tilesEl.innerHTML = '';
+  tileEls = [];
+  for (var r = 0; r < ROWS; r++) {
+    tileEls[r] = [];
+    for (var c = 0; c < COLS; c++) {
+      var el = document.createElement('div');
+      if (grid[r][c] === 1) {
+        el.className = 'tile wall';
+      } else {
+        var cls = 'tile floor' + ((r + c) % 2 ? ' alt' : '');
+        if (r === startCell.r && c === startCell.c) cls += ' start';
+        else if (r === goalCell.r && c === goalCell.c) cls += ' goal';
+        el.className = cls;
+      }
+      place(el, r, c);
+      tilesEl.appendChild(el);
+      tileEls[r][c] = el;
+    }
+  }
+  if (fogOn) applyFog();
+}
+
+/* ============================================================ game flow */
+
+function updateHud() {
+  var s = document.getElementById('steps'); if (s) s.textContent = String(steps);
+  var t = document.getElementById('time');  if (t) t.textContent = seconds + 's';
+  var h = document.getElementById('hints'); if (h) h.textContent = String(hints);
+  ['btnSmall', 'btnMedium', 'btnLarge'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.classList.toggle('active', SIZE_VAL[id] === currentSize);
+  });
+}
+
+function updateTimer() {
+  var t = document.getElementById('time');
+  if (t) t.textContent = seconds + 's';
+}
+
+function setControls(on) {
+  ['btnUp', 'btnDown', 'btnLeft', 'btnRight', 'btnHint'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.disabled = !on;
+  });
+}
+
+function showStart() {
+  overlayMode = 'start';
+  if (dlgTitleEl) dlgTitleEl.textContent = T.t('title');
+  if (dlgSubEl) dlgSubEl.textContent = T.t('startSub');
+  if (dlgMainEl) dlgMainEl.textContent = T.t('startBtn');
+  if (dlgSecondaryEl) dlgSecondaryEl.style.display = 'none';
+  if (overlayEl) overlayEl.classList.add('show');
+}
+
+function showWin() {
+  overlayMode = 'win';
+  won = true;
+  running = false;
+  if (dlgTitleEl) dlgTitleEl.textContent = T.t('winTitle');
+  if (dlgSubEl) dlgSubEl.textContent = T.t('winSub', { steps: steps, time: seconds, hints: hints });
+  if (dlgMainEl) dlgMainEl.textContent = T.t('playAgain');
+  if (dlgSecondaryEl) { dlgSecondaryEl.style.display = ''; dlgSecondaryEl.textContent = T.t('close'); }
+  if (overlayEl) overlayEl.classList.add('show');
+  setControls(false);
+}
+
+function refreshOverlayText() {
+  if (overlayMode === 'win') showWin(); else showStart();
+}
+
+function closeOverlay() {
+  if (overlayEl) overlayEl.classList.remove('show');
+}
+
+function tick() {
+  if (!running) return;
+  seconds++;
+  updateTimer();
+}
+
+function startGame() {
+  closeOverlay();
+  started = true;
+  running = true;
+  won = false;
+  seconds = 0; steps = 0; hints = 0;
+  player.r = 1; player.c = 1;
+  place(playerEl, 1, 1);
+  clearTrails();
+  clearHint();
+  if (fogOn) applyFog();
+  setControls(true);
+  updateHud();
+  updateTimer();
+  if (!timerStarted) { timerId = setInterval(tick, 1000); timerStarted = true; }
+}
+
+function playAgain() {
+  newMaze(currentSize);
+  startGame();
+}
+
+function onMain() {
+  // The single primary dialog button: Start when ready, Play again when won.
+  if (won) playAgain();
+  else startGame();
+}
+
+function newMaze(size) {
+  currentSize = size;
+  ROWS = size; COLS = size;
+  grid = generateMaze(size, makeRng((Math.random() * 1e9) >>> 0));
+  startCell = { r: 1, c: 1 };
+  goalCell = { r: size - 2, c: size - 2 };
+  player = { r: 1, c: 1 };
+  steps = 0; hints = 0; seconds = 0;
+  won = false; started = false; running = false;
+  renderBoard();
+  place(playerEl, 1, 1);
+  clearHint();
+  clearTrails();
+  setControls(false);
+  showStart();
+  updateHud();
+}
+
+/* ============================================================ rules */
+
+function move(dr, dc) {
+  if (!running || won) return;
+  var nr = player.r + dr, nc = player.c + dc;
+  if (nr < 0 || nc < 0 || nr >= ROWS || nc >= COLS) return;
+  if (grid[nr][nc] === 1) return;            // wall blocks the move
+
+  if (tileEls[player.r] && tileEls[player.r][player.c]) {
+    tileEls[player.r][player.c].classList.add('trail');
+  }
+  player.r = nr; player.c = nc;
+  steps++;
+  place(playerEl, nr, nc);
+  clearHint();
+  if (fogOn) applyFog();
+  updateHud();
+
+  if (player.r === goalCell.r && player.c === goalCell.c) showWin();
+}
+
+function showHint() {
+  if (!running || won) return;
+  var path = solveBFS(grid, player, goalCell, ROWS, COLS);
+  if (!path || path.length < 2) return;
+  clearHint();
+  for (var i = 0; i < path.length; i++) {
+    var cellPos = path[i];
+    if (tileEls[cellPos.r] && tileEls[cellPos.r][cellPos.c]) {
+      tileEls[cellPos.r][cellPos.c].classList.add('hint');
+    }
+  }
+  hints++;
+  updateHud();
+}
+
+/* ============================================================ events */
+
+function bind(id, fn) {
+  var el = document.getElementById(id);
+  if (el) el.addEventListener('click', fn);
+}
+
+function initGame() {
+  // Build a preview maze immediately; the start overlay gates play.
+  newMaze(currentSize);
+
+  bind('btnSmall', function () { newMaze(SIZE_VAL.btnSmall); });
+  bind('btnMedium', function () { newMaze(SIZE_VAL.btnMedium); });
+  bind('btnLarge', function () { newMaze(SIZE_VAL.btnLarge); });
+  bind('btnFog', function () {
+    fogOn = !fogOn;
+    document.getElementById('btnFog').classList.toggle('active', fogOn);
+    if (fogOn) applyFog(); else clearFog();
+  });
+  bind('btnHint', function () { showHint(); });
+  bind('btnNew', function () { newMaze(currentSize); });
+
+  bind('btnUp', function () { move(-1, 0); });
+  bind('btnDown', function () { move(1, 0); });
+  bind('btnLeft', function () { move(0, -1); });
+  bind('btnRight', function () { move(0, 1); });
+
+  bind('dlgMain', onMain);
+  bind('dlgSecondary', closeOverlay);
+
+  overlayEl.addEventListener('click', function (ev) {
+    if (ev.target === overlayEl && won) closeOverlay();
+  });
+
+  window.addEventListener('keydown', function (ev) {
+    var k = ev.key;
+    var lower = String(k || '').toLowerCase();
+
+    if (k === 'Escape') { if (won) closeOverlay(); return; }
+    if (lower === 'h') { showHint(); return; }
+    if (!running || won) return;
+
+    var dr = 0, dc = 0;
+    if (k === 'ArrowUp' || lower === 'w') dr = -1;
+    else if (k === 'ArrowDown' || lower === 's') dr = 1;
+    else if (k === 'ArrowLeft' || lower === 'a') dc = -1;
+    else if (k === 'ArrowRight' || lower === 'd') dc = 1;
+    else return;
+
+    ev.preventDefault();
+    move(dr, dc);
+  });
+
+  // Swipe anywhere on the board on touch devices.
+  stageEl.addEventListener('touchstart', function (ev) {
+    var t = ev.changedTouches && ev.changedTouches[0];
+    if (t) touchStart = { x: t.clientX, y: t.clientY };
+  }, { passive: true });
+
+  stageEl.addEventListener('touchend', function (ev) {
+    var t = ev.changedTouches && ev.changedTouches[0];
+    if (!touchStart || !t) return;
+    var dx = t.clientX - touchStart.x;
+    var dy = t.clientY - touchStart.y;
+    touchStart = null;
+    if (Math.abs(dx) < 24 && Math.abs(dy) < 24) return;   // a tap, not a swipe
+    if (Math.abs(dx) > Math.abs(dy)) move(0, dx > 0 ? 1 : -1);
+    else move(dy > 0 ? 1 : -1, 0);
+  }, { passive: true });
+
+  window.addEventListener('resize', function () {
+    if (ROWS && COLS) { renderBoard(); place(playerEl, player.r, player.c); }
+  });
+
+  T.onChange(function () {
+    updateHud();
+    if (overlayEl && overlayEl.classList.contains('show')) refreshOverlayText();
+  });
+}
+
+/* ============================================================ boot */
+initGame();
+T.start();
+</script>
+</body>
+</html>
