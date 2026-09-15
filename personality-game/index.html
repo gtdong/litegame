@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>人格测评 Personality Test</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --panel: #ffffff;
+    --border: #dfe3e8;
+    --text: #1f2328;
+    --muted: #6b7280;
+    --accent: #3b6ef5;
+    --accent-soft: #eaf0ff;
+    --good: #2e7d32;
+    --danger: #e24b4a;
+    --track: #eceff3;
+    --a: #3b6ef5;
+    --b: #8b5cf6;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    margin: 0;
+    padding: 24px 12px 48px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    line-height: 1.6;
+  }
+
+  h1 { margin: 0 0 4px; font-size: 30px; letter-spacing: -.02em; }
+  .tip { margin: 0 0 18px; font-size: 13px; color: var(--muted); text-align: center; max-width: 560px; }
+
+  .panel {
+    width: 100%;
+    max-width: 620px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 22px;
+    box-shadow: 0 1px 2px rgba(16,24,40,.05), 0 6px 18px rgba(16,24,40,.06);
+  }
+
+  .screen { display: none; }
+  .screen.show { display: block; animation: rise .22s ease; }
+  @keyframes rise { from { transform: translateY(8px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+  h2 { margin: 0 0 8px; font-size: 21px; line-height: 1.4; }
+  h3 { margin: 26px 0 10px; font-size: 15px; color: var(--muted); font-weight: 600;
+       text-transform: uppercase; letter-spacing: .06em; }
+
+  p { margin: 0 0 10px; }
+  .lead { color: var(--muted); font-size: 14px; }
+
+  button {
+    font-family: inherit;
+    font-size: 14px;
+    color: var(--text);
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 16px;
+    cursor: pointer;
+    transition: border-color .12s ease, color .12s ease, background .12s ease, transform .08s ease;
+  }
+  button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button.primary:hover:not(:disabled) { filter: brightness(1.06); color: #fff; }
+  button.ghost { border-style: dashed; color: var(--muted); }
+
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 22px; }
+
+  /* ---------------------------------------------------------- start screen */
+  .axes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 18px 0 4px; }
+  .axis-card {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 12.5px;
+  }
+  .axis-card b { display: block; font-size: 13px; margin-bottom: 3px; }
+  .axis-card span { color: var(--muted); }
+
+  /* ----------------------------------------------------------- quiz screen */
+  .meta { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .counter { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .progress { flex: 1; height: 6px; background: var(--track); border-radius: 999px; overflow: hidden; }
+  .progress > i { display: block; height: 100%; width: 0; background: var(--accent);
+                  border-radius: 999px; transition: width .25s ease; }
+
+  #qText { font-size: 19px; margin-bottom: 18px; }
+
+  .opt {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    border-radius: 12px;
+    font-size: 15px;
+    line-height: 1.5;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  .opt .kbd {
+    flex: none;
+    width: 22px; height: 22px;
+    border-radius: 6px;
+    background: var(--track);
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    margin-top: 1px;
+  }
+  .opt:hover:not(:disabled) .kbd { background: var(--accent); color: #fff; }
+  .opt.picked { border-color: var(--accent); background: var(--accent-soft); }
+
+  .nav { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; }
+  .hint-keys { font-size: 12px; color: var(--muted); }
+
+  /* --------------------------------------------------------- result screen */
+  .code {
+    font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 40px;
+    font-weight: 700;
+    letter-spacing: .14em;
+    color: var(--accent);
+    line-height: 1.1;
+  }
+  .rname { font-size: 25px; font-weight: 700; margin-top: 2px; }
+  .rtag { color: var(--muted); font-size: 14.5px; margin: 6px 0 22px; }
+
+  .bars { display: flex; flex-direction: column; gap: 14px; }
+  .bar-row { font-size: 13px; }
+  .bar-head { display: flex; justify-content: space-between; margin-bottom: 5px; }
+  .bar-head .lbl { font-weight: 600; }
+  .bar-head .pct { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .bar-head .strength { color: var(--muted); font-weight: 400; font-size: 12px; margin-left: 6px; }
+  .bar-track { position: relative; height: 8px; background: var(--track); border-radius: 999px; overflow: hidden; }
+  .bar-track > i { position: absolute; inset: 0 auto 0 0; border-radius: 999px; background: var(--accent); }
+  .bar-row.odd .bar-track > i { background: var(--b); }
+  .bar-poles { display: flex; justify-content: space-between; margin-top: 4px;
+               font-size: 11.5px; color: var(--muted); letter-spacing: .04em; }
+
+  .trait { border-left: 3px solid var(--border); padding: 2px 0 2px 12px; margin-bottom: 14px; }
+  .trait b { font-size: 14px; }
+  .trait p { margin: 3px 0 0; font-size: 13.5px; color: var(--muted); }
+
+  .rtip {
+    margin: 22px 0 0;
+    padding: 13px 15px;
+    background: var(--accent-soft);
+    border-radius: 10px;
+    font-size: 14px;
+  }
+  .rtip b { color: var(--accent); }
+
+  .reco { display: flex; flex-direction: column; gap: 8px; }
+  .reco a {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 11px 14px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    text-decoration: none;
+    color: var(--text);
+    font-size: 14px;
+    transition: border-color .12s ease, color .12s ease;
+  }
+  .reco a:hover { border-color: var(--accent); color: var(--accent); }
+  .reco a span { color: var(--muted); font-size: 12.5px; }
+
+  .msg { font-size: 12.5px; color: var(--good); min-height: 18px; margin-top: 10px; }
+  .msg.warn { color: var(--danger); }
+
+  textarea {
+    width: 100%;
+    min-height: 74px;
+    margin-top: 8px;
+    padding: 10px;
+    font-family: inherit;
+    font-size: 13px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    resize: vertical;
+    color: var(--text);
+  }
+
+  .fine { font-size: 11.5px; color: var(--muted); margin-top: 20px; line-height: 1.55; }
+
+  @media (max-width: 560px) {
+    h1 { font-size: 24px; }
+    .panel { padding: 16px 14px; }
+    .axes { grid-template-columns: 1fr; }
+    .code { font-size: 33px; }
+    .rname { font-size: 21px; }
+    #qText { font-size: 17px; }
+    .opt { font-size: 14px; padding: 12px 13px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="lang-switch" data-lang-switch></div>
+
+<h1 data-i18n="title"></h1>
+<p class="tip" data-i18n="tip"></p>
+
+<main class="panel">
+
+  <!-- ======================================================= start screen -->
+  <section id="startScreen" class="screen show">
+    <h2 data-i18n="startTitle"></h2>
+    <p class="lead" data-i18n="startSub"></p>
+    <div id="axisPreview" class="axes"></div>
+    <div class="actions">
+      <button id="btnStart" class="primary" data-i18n="start"></button>
+      <button id="btnLast" class="ghost" hidden></button>
+    </div>
+    <p class="fine" data-i18n="disclaimer"></p>
+  </section>
+
+  <!-- ======================================================== quiz screen -->
+  <section id="quizScreen" class="screen">
+    <div class="meta">
+      <span id="qCount" class="counter"></span>
+      <div class="progress"><i id="bar"></i></div>
+    </div>
+    <h2 id="qText"></h2>
+    <div id="options"></div>
+    <div class="nav">
+      <button id="btnBack" data-i18n="back"></button>
+      <span class="hint-keys" data-i18n="keysHint"></span>
+    </div>
+  </section>
+
+  <!-- ====================================================== result screen -->
+  <section id="resultScreen" class="screen">
+    <div id="rCode" class="code"></div>
+    <div id="rName" class="rname"></div>
+    <p id="rTag" class="rtag"></p>
+    <div id="bars" class="bars"></div>
+    <h3 data-i18n="traitTitle"></h3>
+    <div id="traits"></div>
+    <p id="rTip" class="rtip"></p>
+    <h3 data-i18n="recoTitle"></h3>
+    <div id="reco" class="reco"></div>
+    <div class="actions">
+      <button id="btnCopy" data-i18n="copy"></button>
+      <button id="btnRetake" class="primary" data-i18n="retake"></button>
+    </div>
+    <div id="copyMsg" class="msg"></div>
+    <textarea id="shareBox" readonly hidden></textarea>
+    <p class="fine" data-i18n="disclaimer"></p>
+  </section>
+
+</main>
+
+<script src="../assets/i18n.js"></script>
+<script>
+/* =========================================================================
+ * Personality test — zero-dependency single-file quiz.
+ *
+ * 12 forced-choice questions, 3 per axis, so an axis score can never tie
+ * (3 is odd). The four axes use the familiar four-letter shorthand; the type
+ * names are our own. This is an entertainment piece, not a psychometric
+ * instrument — see the disclaimer rendered on both screens.
+ *
+ * All question/type/trait copy lives in the content blocks below as
+ * { en, zh } pairs and is read through L(); nothing user-facing is hardcoded
+ * to one language, and every dynamic string goes through T.t() on T.onChange.
+ * ========================================================================= */
+
+var DICT = {
+  title:      { en: 'Personality Test', zh: '人格测评' },
+  tip:        { en: '12 quick either/or questions. No right answers — pick the one that sounds more like you.',
+                zh: '12 道二选一，没有对错，选更像你的那个。' },
+  startTitle: { en: 'Which of the 16 types are you?', zh: '你是 16 型里的哪一种？' },
+  startSub:   { en: 'Four axes, three questions each. About two minutes, and you get a type code, four trait bars and a few games picked for you.',
+                zh: '四个维度、每个维度 3 道题。大约两分钟，结束后会给出类型代号、四条特征条，以及几款适合你的游戏。' },
+  start:      { en: 'Start', zh: '开始测评' },
+  back:       { en: '← Back', zh: '← 上一题' },
+  keysHint:   { en: 'Press 1 / 2 to answer · ← to go back', zh: '按 1 / 2 作答 · ← 返回上一题' },
+  copy:       { en: 'Copy my result', zh: '复制我的结果' },
+  retake:     { en: 'Take it again', zh: '重新测一次' },
+  copied:     { en: 'Copied to clipboard.', zh: '已复制到剪贴板。' },
+  copyFail:   { en: 'Could not use the clipboard — select the text below and copy it by hand.',
+                zh: '无法自动复制 —— 请手动选中下面这段文字复制。' },
+  lastResult: { en: 'Last time: {code} · {name}', zh: '上次结果：{code} · {name}' },
+  traitTitle: { en: 'What that says about you', zh: '这说明了什么' },
+  recoTitle:  { en: 'Games picked for this type', zh: '适合这一型的游戏' },
+  play:       { en: 'Play →', zh: '去玩 →' },
+  qCounter:   { en: 'Question {n} / {total}', zh: '第 {n} / {total} 题' },
+  strengthStrong: { en: 'clear', zh: '明显' },
+  strengthSlight: { en: 'slight', zh: '轻微' },
+  scoreLine:  { en: '{a} {pa}% · {b} {pb}%', zh: '{a} {pa}% · {b} {pb}%' },
+  shareText:  { en: 'My type: {code} · {name} — "{tag}" — 12 questions, what are you?\n{url}',
+                zh: '我的人格类型：{code} · {name} —— 「{tag}」12 道题测出来的，你是哪一种？\n{url}' },
+  disclaimer: { en: 'For fun and self-reflection only. This is an original quiz, not a diagnosis, and it is not affiliated with or equivalent to any commercial personality instrument.',
+                zh: '仅供娱乐与自我探索。本测评为原创题目，不是心理诊断，也不等同于或隶属于任何商业人格量表。' }
+};
+
+var T = LiteI18N.create(DICT);
+
+/* ------------------------------------------------------------- the content
+ * Axes in order; the type code is the four chosen poles concatenated, so the
+ * axis order here defines the code (EI, SN, TF, JP -> e.g. "INFJ"). */
+var AXES = [
+  { key: 'EI', poles: ['E', 'I'],
+    name: { en: 'Social energy', zh: '社交能量' },
+    low:  { en: 'Outward',       zh: '向外' },
+    high: { en: 'Inward',        zh: '向内' } },
+  { key: 'SN', poles: ['S', 'N'],
+    name: { en: 'Information',  zh: '信息偏好' },
+    low:  { en: 'Concrete',     zh: '具体' },
+    high: { en: 'Possibilities',zh: '可能性' } },
+  { key: 'TF', poles: ['T', 'F'],
+    name: { en: 'Decisions',    zh: '决策依据' },
+    low:  { en: 'Logic',        zh: '逻辑' },
+    high: { en: 'People',       zh: '人情' } },
+  { key: 'JP', poles: ['J', 'P'],
+    name: { en: 'Structure',    zh: '行事风格' },
+    low:  { en: 'Planned',      zh: '计划' },
+    high: { en: 'Open',         zh: '随意' } }
+];
+
+/* 12 questions, 3 per axis. `a` is the question's axis index; every option
+ * carries its own pole letter in `p`, and the two options are always the two
+ * poles of that axis. The on-screen order is shuffled per question (see
+ * optOrder) so a fixed "the first one is always E" pattern cannot bias answers
+ * or be gamed by always pressing 1. */
+var QUESTIONS = [
+  /* --- axis 0: EI --- */
+  { a: 0,
+    q: { en: 'Two days off in a row. What do you actually want?',
+         zh: '连着两天假，你最想要的是？' },
+    opts: [
+      { p: 'E', en: 'Get people together and go do something.',      zh: '约上人出门，热闹一场。' },
+      { p: 'I', en: 'Stay in and put nothing on the calendar.',      zh: '待在家里，谁也不安排。' }
+    ] },
+  { a: 0,
+    q: { en: 'An hour into a party where you know nobody…',
+         zh: '在一个谁都不认识的聚会上，过了一小时……' },
+    opts: [
+      { p: 'E', en: 'You are a few conversations deep and enjoying it.', zh: '已经跟几个人聊开了，还挺起劲。' },
+      { p: 'I', en: 'You would happily find a quiet corner for a bit.',  zh: '有点想找个角落缓一缓。' }
+    ] },
+  { a: 0,
+    q: { en: 'Something is bothering you. Your first move is to…',
+         zh: '心里有件烦心事，你第一反应是……' },
+    opts: [
+      { p: 'E', en: 'Say it out loud to someone and sort it as you talk.', zh: '找人说出来，边聊边理清。' },
+      { p: 'I', en: 'Sit with it alone until it makes sense, then speak.', zh: '自己先消化，想明白了再说。' }
+    ] },
+
+  /* --- axis 1: SN --- */
+  { a: 1,
+    q: { en: 'Walking out of a film, what stuck with you?',
+         zh: '看完一部电影，你更容易记住什么？' },
+    opts: [
+      { p: 'S', en: 'Specific shots, lines, details.',            zh: '具体的画面、台词、细节。' },
+      { p: 'N', en: 'Where it took your head afterwards.',        zh: '它让你想到的别的东西和余味。' }
+    ] },
+  { a: 1,
+    q: { en: 'Someone pitches you a brand-new idea. You ask…',
+         zh: '别人给你讲一个新点子，你第一句会问？' },
+    opts: [
+      { p: 'S', en: '"How would this actually work? Show me an example."', zh: '「具体怎么做？有例子吗？」' },
+      { p: 'N', en: '"Wait — what else could this lead to?"',              zh: '「等等，这还能延伸到哪里？」' }
+    ] },
+  { a: 1,
+    q: { en: 'You trust something more when…',
+         zh: '什么情况下你更容易信一件事？' },
+    opts: [
+      { p: 'S', en: 'It is right in front of you and you can verify it.',  zh: '亲眼看过、能验证的。' },
+      { p: 'N', en: 'It somehow fits, even if you cannot explain why.',    zh: '说不清但隐隐成立的那种直觉。' }
+    ] },
+
+  /* --- axis 2: TF --- */
+  { a: 2,
+    q: { en: 'A friend asks whether the decision they made was right.',
+         zh: '朋友来问你，他做的那个决定对不对。' },
+    opts: [
+      { p: 'T', en: 'You tell them straight what is off and how to fix it.', zh: '直接说哪儿有问题、怎么改。' },
+      { p: 'F', en: 'You take the feeling first, then get to the facts.',   zh: '先接住情绪，再说事。' }
+    ] },
+  { a: 2,
+    q: { en: 'Two people on your team are arguing. What matters more?',
+         zh: '团队里两个人吵起来了，你更在意？' },
+    opts: [
+      { p: 'T', en: 'Whose reasoning actually holds up.',    zh: '谁的道理站得住。' },
+      { p: 'F', en: 'That they still get along afterwards.', zh: '大家的关系别坏了。' }
+    ] },
+  { a: 2,
+    q: { en: 'What persuades you in a decision?',
+         zh: '做决定时，你更容易被什么说服？' },
+    opts: [
+      { p: 'T', en: 'Numbers, logic, a clean list of trade-offs.', zh: '数据、逻辑、利弊清单。' },
+      { p: 'F', en: 'What it means for the actual people involved.', zh: '这件事对具体的人意味着什么。' }
+    ] },
+
+  /* --- axis 3: JP --- */
+  { a: 3,
+    q: { en: 'Before a trip, you…',
+         zh: '出门旅行之前，你会？' },
+    opts: [
+      { p: 'J', en: 'Have the route set and the bookings done.', zh: '把行程排好，住处门票都订掉。' },
+      { p: 'P', en: 'Book the flights and figure it out there.', zh: '只订往返，到了再说。' }
+    ] },
+  { a: 3,
+    q: { en: 'A deadline is three days out. You usually…',
+         zh: '有个三天后的 deadline，你通常？' },
+    opts: [
+      { p: 'J', en: 'Finish early and keep a buffer.',                    zh: '提前做完，留出缓冲。' },
+      { p: 'P', en: 'Think about other things, then go all in at the end.', zh: '前几天想别的，最后一晚爆发。' }
+    ] },
+  { a: 3,
+    q: { en: 'Your plan gets disrupted. How does it feel?',
+         zh: '计划突然被打乱，你的感觉是？' },
+    opts: [
+      { p: 'J', en: 'Slightly annoying — you want to re-plan right away.', zh: '有点烦躁，想赶紧重新排一下。' },
+      { p: 'P', en: 'Fine, it was never that fixed anyway.',               zh: '无所谓，反正本来也没多确定。' }
+    ] }
+];
+
+/* The eight poles, with the paragraph the result screen shows for each one. */
+var POLES = {
+  E: { name: { en: 'Outward', zh: '向外' },
+       desc: { en: 'Your battery charges around people and activity — talking and moving makes you clearer, not more tired. Too much solitude and you go flat.',
+               zh: '你的电量来自人和现场 —— 聊起来、动起来，你反而更清醒，不是更累。独处太久会发闷。' } },
+  I: { name: { en: 'Inward', zh: '向内' },
+       desc: { en: 'Your battery charges in quiet. You can handle a crowded room, but being alone is what actually refills you, and you would rather speak after you have thought.',
+               zh: '你的电量来自安静。人多的场合你能应付，但真正回血的还是独处；想清楚了才愿意开口。' } },
+  S: { name: { en: 'Concrete', zh: '具体' },
+       desc: { en: 'You trust what you can see and check. When someone paints a big picture you want the "how", the example, the number. Details do not slip past you.',
+               zh: '你相信看得见、能验证的东西。别人画大饼时，你会先要「怎么做」、要例子、要数字。细节从你手里溜不掉。' } },
+  N: { name: { en: 'Possibilities', zh: '可能性' },
+       desc: { en: 'You keep drifting to the next step and the side path. Facts are a starting point for you, not the destination, and "where could this lead" is what pulls you in.',
+               zh: '你总在往下一步、往旁边想。事实对你是起点而不是终点，「这可能通向哪」最能打动你。' } },
+  T: { name: { en: 'Logic', zh: '逻辑' },
+       desc: { en: 'You take things apart into right and wrong, pros and cons. You are hard to sweep away by feeling — but you can forget that what someone wants first is to be understood.',
+               zh: '你习惯把事情拆成对错和利弊。你不太容易被情绪带走 —— 但有时会忘了，对方先要的其实是被理解。' } },
+  F: { name: { en: 'People', zh: '人情' },
+       desc: { en: 'You put people into the calculation. You cannot be indifferent between "correct" and "hurtful", which sometimes costs you a detour to keep the peace.',
+               zh: '你做判断时会把人算进去。你很难在「对」和「伤人」之间无动于衷，有时为了和气宁可多绕一圈。' } },
+  J: { name: { en: 'Planned', zh: '计划' },
+       desc: { en: 'You like things settled. A plan calms you; a disruption makes you want to re-sort it immediately, and the feeling of a thing being finished matters a lot.',
+               zh: '你喜欢把事情定下来。有安排你不慌，被打乱就想赶紧重新排；「这件事完成了」的踏实感对你很重要。' } },
+  P: { name: { en: 'Open', zh: '随意' },
+       desc: { en: 'You like keeping room to move. A plan is a reference, not a rule — and that last-minute burst of focus is something you know well and rather enjoy.',
+               zh: '你喜欢保留余地。计划是参考、不是纪律；最后一刻的集中爆发你其实很熟悉，也挺享受。' } }
+};
+
+/* The 16 types. Code -> our own name, one-line tagline, and one thing worth
+ * knowing about living with this type. */
+var TYPES = {
+  ISTJ: { name: { en: 'Bedrock',    zh: '磐石' },
+          tag:  { en: 'If they said it, it is going to happen.',
+                  zh: '说出口的事，就一定会落地。' },
+          tip:  { en: 'Give them the real facts up front and you will get reliability nothing else matches.',
+                  zh: '把真实情况原原本本告诉他们，你会得到别处换不来的可靠。' } },
+  ISFJ: { name: { en: 'Keeper',     zh: '守灯' },
+          tag:  { en: 'Remembers what everyone likes, and quietly makes sure they get it.',
+                  zh: '记得每个人喜欢什么，并且悄悄安排好。' },
+          tip:  { en: 'They rarely ask for anything. Check in on them, or you will not know they needed it.',
+                  zh: '他们很少开口要什么。主动问一句，否则你永远不会知道。' } },
+  INFJ: { name: { en: 'Deepwell',   zh: '深井' },
+          tag:  { en: 'Sees the part of you that never got said out loud.',
+                  zh: '总能看到别人没说出口的那一部分。' },
+          tip:  { en: 'They absorb other people\'s moods. Say out loud that you are fine, and mean it.',
+                  zh: '他们会把别人的情绪吸进自己身上。明确说一句「我没事」，而且要是真的。' } },
+  INTJ: { name: { en: 'Weaver',     zh: '织网' },
+          tag:  { en: 'Thinks three moves ahead, then takes one step.',
+                  zh: '先想三步，再走一步。' },
+          tip:  { en: 'They are not being cold — they just trust a plan over reassurances. Bring the plan.',
+                  zh: '他们不是冷 —— 只是比起安慰，更信一份方案。那就带着方案来。' } },
+  ISTP: { name: { en: 'Tinkerer',   zh: '拆解' },
+          tag:  { en: 'Not many words, very quick hands.',
+                  zh: '嘴上不多说，手上很利索。' },
+          tip:  { en: 'They fix by taking apart. Give them room and do not narrate the process at them.',
+                  zh: '他们靠「拆开」来解决问题。给点空间，别在旁边一直讲流程。' } },
+  ISFP: { name: { en: 'Glow',       zh: '微光' },
+          tag:  { en: 'Notices texture, mood and the small thing everyone walked past.',
+                  zh: '对质感、气氛，还有大家都忽略的小事格外敏感。' },
+          tip:  { en: 'They will not push back out loud. Ask directly, or their no never gets heard.',
+                  zh: '他们不会当面顶回来。要直接问，否则那句「不想」你永远听不到。' } },
+  INFP: { name: { en: 'Drifter',    zh: '云游' },
+          tag:  { en: 'Keeps an entire private world running in the background.',
+                  zh: '心里一直有一套自己的世界在运转。' },
+          tip:  { en: 'They need the thing to mean something. Skip the "because it is practical" pitch.',
+                  zh: '他们需要这件事「有意义」。别拿「因为实用」来说服他们。' } },
+  INTP: { name: { en: 'Questioner', zh: '追问' },
+          tag:  { en: 'Takes any claim apart first, agrees to it second.',
+                  zh: '任何说法都要先拆开看看，再决定要不要同意。' },
+          tip:  { en: 'The questions are not an attack. They are how the idea gets tested before it is kept.',
+                  zh: '那些追问不是针对你 —— 那是他们把想法留下之前的必经测试。' } },
+  ESTP: { name: { en: 'Spark',      zh: '火花' },
+          tag:  { en: 'Does it first; the method arrives on the way.',
+                  zh: '先做了再说，办法在路上就有了。' },
+          tip:  { en: 'They think out loud with their hands. Slow them down too much and they stop caring.',
+                  zh: '他们靠动手来思考。压得太慢，他们就不想干了。' } },
+  ESFP: { name: { en: 'Firework',   zh: '焰火' },
+          tag:  { en: 'Wherever they are, that is where the room is.',
+                  zh: '人在哪儿，场子就热在哪儿。' },
+          tip:  { en: 'They read the room better than any report. Give them the mood, not the spreadsheet.',
+                  zh: '他们对气氛的判断胜过任何报表。给他们讲感受，别给他们看表格。' } },
+  ENFP: { name: { en: 'Kite',       zh: '风筝' },
+          tag:  { en: 'All the ideas — and the moment wind shows up, they are airborne.',
+                  zh: '点子很多，风一来就飞。' },
+          tip:  { en: 'They will start ten things and finish three. Do not call it flakiness; help them pick.',
+                  zh: '他们会开十个头、做成三个。别叫这「不靠谱」，帮他们挑一个就行。' } },
+  ENTP: { name: { en: 'Crowbar',    zh: '撬棍' },
+          tag:  { en: 'Goes looking for the seam in the rule, on purpose.',
+                  zh: '专门去找规则的那道缝。' },
+          tip:  { en: 'Arguing the other side is how they test it. It is not a commitment to that side.',
+                  zh: '他们辩反方，是为了验证这道题。那不代表他们真站那一边。' } },
+  ESTJ: { name: { en: 'Foreman',    zh: '工头' },
+          tag:  { en: 'If it has not landed, it is not done.',
+                  zh: '事情不落地，就不算完。' },
+          tip:  { en: 'They will carry the logistics for everyone. Let them know it was noticed.',
+                  zh: '他们会替所有人把琐事扛下来。记得让他们知道这被看见了。' } },
+  ESFJ: { name: { en: 'Link',       zh: '纽带' },
+          tag:  { en: 'Quietly keeps everyone in the group connected to each other.',
+                  zh: '默默把一群人一个个连起来。' },
+          tip:  { en: 'They feel the group\'s mood as their own responsibility. Take that weight off now and then.',
+                  zh: '他们把全组的情绪当成自己的责任。偶尔把这份重量接过去。' } },
+  ENFJ: { name: { en: 'Lighthouse', zh: '灯塔' },
+          tag:  { en: 'Very good at making people see what is good about themselves.',
+                  zh: '很擅长让人看见自己的好。' },
+          tip:  { en: 'They will over-give and call it fine. Ask what they want for once.',
+                  zh: '他们会过度付出然后说「没事」。偶尔反过来问一句他们想要什么。' } },
+  ENTJ: { name: { en: 'Captain',    zh: '号令' },
+          tag:  { en: 'Sets the direction, then expects everyone to move.',
+                  zh: '方向我来定，然后大家一起走。' },
+          tip:  { en: 'They push because they assume you can take it. Tell them when the pace is wrong.',
+                  zh: '他们推你，是因为默认你扛得住。节奏不对就直接说。' } }
+};
+
+/* Games from this site, by directory (relative link is ../<dir>/). Names are
+ * copied from the landing page so they never drift. */
+var GAMES = {
+  'snake-game':        { en: 'Snake',          zh: '贪吃蛇' },
+  'gomoku-game':       { en: 'Gomoku',         zh: '五子棋' },
+  'xiangqi-game':      { en: 'Chinese Chess',  zh: '中国象棋' },
+  '2048-game':         { en: '2048',           zh: '2048' },
+  'minesweeper-game':  { en: 'Minesweeper',    zh: '扫雷' },
+  'breakout-game':     { en: 'Breakout',       zh: '打砖块' },
+  'memory-game':       { en: 'Memory Match',   zh: '记忆翻牌' },
+  'tictactoe-game':    { en: 'Tic-Tac-Toe',    zh: '井字棋' },
+  'whackmole-game':    { en: 'Whack-a-Mole',   zh: '打地鼠' },
+  'sudoku-game':       { en: 'Sudoku',         zh: '数独' },
+  'fruitcatcher-game': { en: 'Fruit Catcher',  zh: '接水果' },
+  'tetris-game':       { en: 'Tetris',         zh: '俄罗斯方块' },
+  'sokoban-game':      { en: 'Sokoban',        zh: '推箱子' },
+  'pong-game':         { en: 'Pong',           zh: '乒乓球' },
+  'bubble-game':       { en: 'Bubble Shooter', zh: '泡泡龙' },
+  'reversi-game':      { en: 'Reversi',        zh: '黑白棋' },
+  'typing-game':       { en: 'Typing Speed',   zh: '打字速度' },
+  'klotski-game':      { en: 'Klotski',        zh: '华容道' },
+  'maze-game':         { en: 'Maze',           zh: '迷宫' },
+  'solitaire-game':    { en: 'Solitaire',      zh: '纸牌接龙' },
+  'nonogram-game':     { en: 'Nonogram',       zh: '数织' }
+};
+
+/* Which games suit which pole. The result picks one from each chosen pole in
+ * turn (round-robin) so a type never gets three near-identical suggestions. */
+var RECO = {
+  E: ['fruitcatcher-game', 'whackmole-game', 'breakout-game'],
+  I: ['solitaire-game',    'nonogram-game',  'sudoku-game'],
+  S: ['minesweeper-game',  'klotski-game',   '2048-game'],
+  N: ['maze-game',         'sokoban-game',   'gomoku-game'],
+  T: ['tetris-game',       'minesweeper-game', '2048-game'],
+  F: ['memory-game',       'reversi-game',   'bubble-game'],
+  J: ['nonogram-game',     'sudoku-game',    'klotski-game'],
+  P: ['2048-game',         'bubble-game',    'pong-game']
+};
+
+var SITE_URL = 'https://litegame-hub.github.io/personality-game/';
+var STORE_KEY = 'litegame_personality';
+
+/* ---------------------------------------------------------------- helpers */
+
+// Pick the copy for the current language out of an { en, zh } pair.
+function L(pair) {
+  if (pair == null) return '';
+  if (typeof pair === 'string') return pair;
+  return pair[T.lang] != null ? pair[T.lang] : pair.en;
+}
+
+/* ------------------------------------------------------------------- state */
+var idx = 0;                  // index of the question being asked
+var answers = [];             // picked pole letter per answered question
+var view = 'start';           // 'start' | 'quiz' | 'result'
+var shown = null;             // the result object currently on screen
+var optionEls = [];           // live option buttons, indexed to match optOrder
+var optOrder = [0, 1];        // display order of QUESTIONS[idx].opts (shuffled per question)
+var optOrders = [];           // remembered order per question, reset on each attempt
+
+/* ------------------------------------------------------------------- nodes */
+var elStartScreen = document.getElementById('startScreen');
+var elQuizScreen  = document.getElementById('quizScreen');
+var elResultScreen= document.getElementById('resultScreen');
+var elAxisPreview = document.getElementById('axisPreview');
+var elStartBtn    = document.getElementById('btnStart');
+var elLastBtn     = document.getElementById('btnLast');
+var elQCount      = document.getElementById('qCount');
+var elBar         = document.getElementById('bar');
+var elQText       = document.getElementById('qText');
+var elOptions     = document.getElementById('options');
+var elBackBtn     = document.getElementById('btnBack');
+var elRCode       = document.getElementById('rCode');
+var elRName       = document.getElementById('rName');
+var elRTag        = document.getElementById('rTag');
+var elBars        = document.getElementById('bars');
+var elTraits      = document.getElementById('traits');
+var elRTip        = document.getElementById('rTip');
+var elReco        = document.getElementById('reco');
+var elCopyBtn     = document.getElementById('btnCopy');
+var elRetakeBtn   = document.getElementById('btnRetake');
+var elCopyMsg     = document.getElementById('copyMsg');
+var elShareBox    = document.getElementById('shareBox');
+
+/* ------------------------------------------------------------ persistence */
+function saveResult(res) {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify({ code: res.code, counts: res.counts })); } catch (e) {}
+}
+
+function loadResult() {
+  try {
+    var raw = localStorage.getItem(STORE_KEY);
+    if (!raw) return null;
+    var obj = JSON.parse(raw);
+    if (obj && typeof obj.code === 'string' && TYPES[obj.code]) return obj;
+  } catch (e) {}
+  return null;
+}
+
+/* ----------------------------------------------------------------- scoring */
+
+// Count how many times each pole was chosen.
+function countPoles(list) {
+  var counts = {};
+  for (var i = 0; i < list.length; i++) counts[list[i]] = (counts[list[i]] || 0) + 1;
+  return counts;
+}
+
+/* Turn pole counts into the type code plus one bar per axis. An axis can never
+ * tie because every axis has an odd number of questions; if it somehow does
+ * (e.g. a partial run), the first pole wins. */
+function buildBars(counts) {
+  var bars = [];
+  for (var i = 0; i < AXES.length; i++) {
+    var ax = AXES[i];
+    var a = counts[ax.poles[0]] || 0;
+    var b = counts[ax.poles[1]] || 0;
+    var total = a + b;
+    var pick = a >= b ? ax.poles[0] : ax.poles[1];
+    var major = Math.max(a, b);
+    bars.push({
+      axis: ax,
+      pick: pick,
+      a: a, b: b, total: total,
+      pct: total ? Math.round(100 * major / total) : 50,
+      strength: total && total % 2 === 1 && major * 2 > total ? (major === total ? 'strong' : 'slight') : 'slight'
+    });
+  }
+  return bars;
+}
+
+function resultFrom(counts) {
+  var bars = buildBars(counts);
+  var code = '';
+  for (var i = 0; i < bars.length; i++) code += bars[i].pick;
+  return { code: code, counts: counts, bars: bars };
+}
+
+// Recommendations: round-robin across the four picked poles, de-duplicated.
+function recommend(bars) {
+  var picked = [];
+  for (var i = 0; i < bars.length; i++) picked.push(RECO[bars[i].pick] || []);
+  var out = [], seen = {};
+  for (var round = 0; round < 3 && out.length < 3; round++) {
+    for (var p = 0; p < picked.length && out.length < 3; p++) {
+      var dir = picked[p][round];
+      if (dir && !seen[dir] && GAMES[dir]) { seen[dir] = 1; out.push(dir); }
+    }
+  }
+  return out;
+}
+
+/* ------------------------------------------------------------- rendering */
+
+// Wipe an element's children (the stub DOM has no replaceChildren).
+function clear(el) {
+  while (el.children.length) el.removeChild(el.children[0]);
+}
+
+function showView(name) {
+  view = name;
+  elStartScreen.classList.toggle('show', name === 'start');
+  elQuizScreen.classList.toggle('show', name === 'quiz');
+  elResultScreen.classList.toggle('show', name === 'result');
+}
+
+function renderStart() {
+  clear(elAxisPreview);
+  for (var i = 0; i < AXES.length; i++) {
+    var ax = AXES[i];
+    var card = document.createElement('div');
+    card.className = 'axis-card';
+    var b = document.createElement('b');
+    b.textContent = L(ax.name);
+    var s = document.createElement('span');
+    s.textContent = L(ax.low) + ' / ' + L(ax.high);
+    card.appendChild(b);
+    card.appendChild(s);
+    elAxisPreview.appendChild(card);
+  }
+
+  var last = loadResult();
+  if (last) {
+    var name = TYPES[last.code].name;
+    elLastBtn.textContent = T.t('lastResult', { code: last.code, name: L(name) });
+    elLastBtn.hidden = false;
+  } else {
+    elLastBtn.hidden = true;
+  }
+}
+
+function renderQuestion() {
+  var q = QUESTIONS[idx];
+  elQCount.textContent = T.t('qCounter', { n: idx + 1, total: QUESTIONS.length });
+  elBar.style.width = Math.round(100 * idx / QUESTIONS.length) + '%';
+  elQText.textContent = L(q.q);
+  elBackBtn.disabled = idx === 0;
+
+  // Shuffle the two options so neither pole is always "the first one". The
+  // order is remembered per question, so going back does not silently swap the
+  // two options the player just read.
+  if (!optOrders[idx]) optOrders[idx] = Math.random() < 0.5 ? [1, 0] : [0, 1];
+  optOrder = optOrders[idx];
+
+  clear(elOptions);
+  optionEls = [];
+  for (var i = 0; i < optOrder.length; i++) {
+    var opt = q.opts[optOrder[i]];
+    var btn = document.createElement('button');
+    btn.className = 'opt';
+    btn.type = 'button';
+    var kbd = document.createElement('span');
+    kbd.className = 'kbd';
+    kbd.textContent = String(i + 1);
+    var txt = document.createElement('span');
+    txt.textContent = L(opt);
+    btn.appendChild(kbd);
+    btn.appendChild(txt);
+    elOptions.appendChild(btn);
+    optionEls.push(btn);
+  }
+}
+
+function renderBars(bars) {
+  clear(elBars);
+  for (var i = 0; i < bars.length; i++) {
+    var bar = bars[i], ax = bar.axis;
+    var row = document.createElement('div');
+    row.className = 'bar-row' + (i % 2 ? ' odd' : '');
+
+    var head = document.createElement('div');
+    head.className = 'bar-head';
+    var lbl = document.createElement('span');
+    lbl.className = 'lbl';
+    lbl.textContent = L(ax.name);
+    var pct = document.createElement('span');
+    pct.className = 'pct';
+    var strength = document.createElement('span');
+    strength.className = 'strength';
+    strength.textContent = T.t(bar.strength === 'strong' ? 'strengthStrong' : 'strengthSlight');
+    var other = bar.pick === ax.poles[0] ? ax.poles[1] : ax.poles[0];
+    // "Outward 67% · Inward 33%" — kept as one translatable string so the
+    // separator and order are not hardcoded to English.
+    pct.textContent = T.t('scoreLine', {
+      a: L(POLES[bar.pick].name), pa: bar.pct,
+      b: L(POLES[other].name), pb: 100 - bar.pct
+    });
+    head.appendChild(lbl);
+    head.appendChild(pct);
+    pct.appendChild(strength);
+
+    var track = document.createElement('div');
+    track.className = 'bar-track';
+    var fill = document.createElement('i');
+    fill.style.width = bar.pct + '%';
+    track.appendChild(fill);
+
+    var poles = document.createElement('div');
+    poles.className = 'bar-poles';
+    var pl = document.createElement('span');
+    pl.textContent = L(ax.low);
+    var pr = document.createElement('span');
+    pr.textContent = L(ax.high);
+    poles.appendChild(pl);
+    poles.appendChild(pr);
+
+    row.appendChild(head);
+    row.appendChild(track);
+    row.appendChild(poles);
+    elBars.appendChild(row);
+  }
+}
+
+function renderTraits(bars) {
+  clear(elTraits);
+  for (var i = 0; i < bars.length; i++) {
+    var pole = bars[i].pick;
+    var wrap = document.createElement('div');
+    wrap.className = 'trait';
+    var b = document.createElement('b');
+    b.textContent = L(POLES[pole].name) + ' · ' + pole;
+    var p = document.createElement('p');
+    p.textContent = L(POLES[pole].desc);
+    wrap.appendChild(b);
+    wrap.appendChild(p);
+    elTraits.appendChild(wrap);
+  }
+}
+
+function renderReco(bars) {
+  clear(elReco);
+  var dirs = recommend(bars);
+  for (var i = 0; i < dirs.length; i++) {
+    var dir = dirs[i];
+    var a = document.createElement('a');
+    a.href = '../' + dir + '/';
+    var name = document.createElement('span');
+    name.className = 'name';
+    name.textContent = L(GAMES[dir]);
+    var go = document.createElement('span');
+    go.textContent = T.t('play');
+    a.appendChild(name);
+    a.appendChild(go);
+    elReco.appendChild(a);
+  }
+}
+
+function renderResult(res) {
+  shown = res;
+  var type = TYPES[res.code];
+  var name = type ? type.name : { en: res.code, zh: res.code };
+  var tag = type ? type.tag : '';
+  var tip = type ? type.tip : '';
+
+  elRCode.textContent = res.code;
+  elRName.textContent = L(name);
+  elRTag.textContent = L(tag);
+  renderBars(res.bars);
+  renderTraits(res.bars);
+  elRTip.textContent = '';
+  if (tip) {
+    var strong = document.createElement('b');
+    strong.textContent = L({ en: 'Worth knowing: ', zh: '值得知道：' });
+    // A <span> rather than document.createTextNode(): the fake DOM used by the
+    // smoke test has no createTextNode.
+    var body = document.createElement('span');
+    body.textContent = L(tip);
+    elRTip.appendChild(strong);
+    elRTip.appendChild(body);
+  }
+  renderReco(res.bars);
+  elCopyMsg.textContent = '';
+  elCopyMsg.className = 'msg';
+  elShareBox.hidden = true;
+  elShareBox.value = '';
+}
+
+/* --------------------------------------------------------------- actions */
+
+function startQuiz() {
+  idx = 0;
+  answers = [];
+  optOrders = [];
+  showView('quiz');
+  renderQuestion();
+}
+
+function answer(choice) {
+  if (view !== 'quiz') return;
+  var q = QUESTIONS[idx];
+  if (choice < 0 || choice >= optOrder.length) return;
+  var opt = q.opts[optOrder[choice]];
+  if (!opt) return;
+  // Reset any previous answer for this question, then record the new one.
+  answers = answers.slice(0, idx);
+  answers[idx] = opt.p;
+  idx++;
+  if (idx >= QUESTIONS.length) {
+    finish();
+  } else {
+    renderQuestion();
+  }
+}
+
+function goBack() {
+  if (view !== 'quiz' || idx === 0) return;
+  idx--;
+  answers = answers.slice(0, idx);
+  renderQuestion();
+}
+
+function finish() {
+  var counts = countPoles(answers);
+  var res = resultFrom(counts);
+  saveResult(res);
+  elBar.style.width = '100%';     // the last question never renders, so fill it here
+  renderResult(res);
+  showView('result');
+}
+
+function shareText() {
+  var type = TYPES[shown.code];
+  return T.t('shareText', {
+    code: shown.code,
+    name: L(type ? type.name : shown.code),
+    tag: L(type ? type.tag : ''),
+    url: SITE_URL
+  });
+}
+
+/* Clipboard support is optional and can reject (permissions, insecure origin),
+ * so fall back to showing the text for manual copying. No promise chain is
+ * required to be available, and nothing here may throw. */
+function copyShare() {
+  if (!shown) return;
+  var text = shareText();
+  elShareBox.value = text;
+  var copied = false;
+  try {
+    var clip = (typeof navigator !== 'undefined') && navigator.clipboard;
+    if (clip && clip.writeText) {
+      var p = clip.writeText(text);
+      copied = true;
+      if (p && typeof p.catch === 'function') {
+        p.catch(function () {
+          elShareBox.hidden = false;
+          elCopyMsg.textContent = T.t('copyFail');
+          elCopyMsg.className = 'msg warn';
+        });
+      }
+    }
+  } catch (e) { copied = false; }
+
+  if (copied) {
+    elShareBox.hidden = true;
+    elCopyMsg.textContent = T.t('copied');
+    elCopyMsg.className = 'msg';
+  } else {
+    elShareBox.hidden = false;
+    elCopyMsg.textContent = T.t('copyFail');
+    elCopyMsg.className = 'msg warn';
+  }
+}
+
+/* --------------------------------------------------------------- bindings */
+// Delegated so it works for freshly created option buttons, and so the fake
+// DOM in tests can fire a click on the container with a child as ev.target.
+function onOptionsClick(ev) {
+  var node = ev && ev.target;
+  if (node && node.closest) {
+    var hit = node.closest('.opt');
+    if (hit) node = hit;
+  }
+  var i = optionEls.indexOf(node);
+  if (i >= 0) answer(i);
+}
+
+elOptions.addEventListener('click', onOptionsClick);
+elStartBtn.addEventListener('click', function () { startQuiz(); });
+elBackBtn.addEventListener('click', function () { goBack(); });
+elRetakeBtn.addEventListener('click', function () { startQuiz(); });
+elCopyBtn.addEventListener('click', function () { copyShare(); });
+elLastBtn.addEventListener('click', function () {
+  var last = loadResult();
+  if (!last) return;
+  renderResult(resultFrom(last.counts || countPoles([])));
+  showView('result');
+});
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('keydown', function (ev) {
+    var k = ev.key;
+    if (view === 'quiz') {
+      if (k === '1' || k === 'a' || k === 'A') { answer(0); }
+      else if (k === '2' || k === 'b' || k === 'B') { answer(1); }
+      else if (k === 'Backspace' || k === 'ArrowLeft') { goBack(); }
+    } else if (view === 'start' && k === 'Enter') {
+      startQuiz();
+    }
+  });
+}
+
+/* Re-render everything that was assembled in JS when the language changes.
+ * Static [data-i18n] nodes are handled by the shared module; anything built at
+ * runtime has to be rebuilt here or it keeps the old language. */
+T.onChange(function () {
+  if (view === 'start') renderStart();
+  else if (view === 'quiz') renderQuestion();
+  else if (view === 'result' && shown) renderResult(shown);
+});
+
+// Initialise the game first, then apply the language (this order matters:
+// T.start() triggers onChange, which re-renders against live state).
+renderStart();
+showView('start');
+T.start();
+
+/* --------------------------------------------------- test harness bridge */
+var PTEST = {
+  AXES: AXES,
+  QUESTIONS: QUESTIONS,
+  TYPES: TYPES,
+  POLES: POLES,
+  GAMES: GAMES,
+  RECO: RECO,
+  SITE_URL: SITE_URL,
+  countPoles: countPoles,
+  buildBars: buildBars,
+  resultFrom: resultFrom,
+  recommend: recommend,
+  shareKey: STORE_KEY,
+  getState: function () {
+    return {
+      view: view, idx: idx,
+      answers: answers.slice(),
+      code: shown ? shown.code : null,
+      bars: shown ? shown.bars : null,
+      optionEls: optionEls,
+      optOrder: optOrder.slice(),
+      // pole letter for each on-screen option, so a test can answer "as E"
+      optionPoles: optionEls.map(function (el, i) {
+        var opt = QUESTIONS[idx] && QUESTIONS[idx].opts[optOrder[i]];
+        return opt ? opt.p : null;
+      })
+    };
+  }
+};
+if (typeof window !== 'undefined') window.PTEST = PTEST;
+else if (typeof global !== 'undefined') global.PTEST = PTEST;
+</script>
+</body>
+</html>

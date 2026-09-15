@@ -218,9 +218,19 @@ function danglingIds(html) {
  * the browser object - solitaire had `var history = []` and threw on the first
  * move. `let`/`const` create their own binding and shadow safely, so only a
  * bare `var` is a hazard. The vm context used below has no such restriction,
- * which is why the logic suites never noticed either. */
+ * which is why the logic suites never noticed either.
+ *
+ * The list started out with the obvious members and missed several read-only
+ * viewport/geometry getters - `screen` in particular, which is exactly the name
+ * a UI state variable wants to be called. Only properties that are genuinely
+ * read-only belong here: a writable one (e.g. `name`) would be a false positive. */
 const WINDOW_UNFORGEABLE = ['window', 'self', 'document', 'location', 'top', 'parent', 'frames',
-  'history', 'navigator', 'external', 'length', 'origin', 'closed', 'opener', 'event'];
+  'history', 'navigator', 'external', 'length', 'origin', 'closed', 'opener', 'event',
+  'screen', 'screenX', 'screenY', 'screenLeft', 'screenTop',
+  'innerWidth', 'innerHeight', 'outerWidth', 'outerHeight', 'devicePixelRatio',
+  'scrollX', 'scrollY', 'pageXOffset', 'pageYOffset',
+  'performance', 'localStorage', 'sessionStorage', 'indexedDB', 'crypto',
+  'isSecureContext', 'clientInformation', 'visualViewport'];
 
 function clobberedGlobals(html) {
   // Strip comments so a stray mention in prose is not reported.
