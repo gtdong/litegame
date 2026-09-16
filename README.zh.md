@@ -2,7 +2,7 @@
 
 **[简体中文](README.zh.md)** · [English](README.md)
 
-[![games](https://img.shields.io/badge/games-22-blue?style=flat-square)](#游戏列表)
+[![games](https://img.shields.io/badge/games-23-blue?style=flat-square)](#游戏列表)
 [![AI-generated](https://img.shields.io/badge/AI--generated-100%25-8b5cf6?style=flat-square)](#这个项目是怎么做出来的)
 [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen?style=flat-square)](#为什么是-litegame)
 [![vanilla JS](https://img.shields.io/badge/vanilla-JS-f7df1e?style=flat-square&logo=javascript&logoColor=black)](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript)
@@ -51,6 +51,7 @@
 | [solitaire-game](solitaire-game) | 纸牌接龙，Klondike，抽 1 / 抽 3 | `卡牌` `经典` `撤销` |
 | [nonogram-game](nonogram-game) | 数织，按线索填色揭开像素画，唯一解 | `益智` `逻辑` `出题器` |
 | [personality-game](personality-game) | 人格测评，12 道二选一，四个维度 16 型 | `测评` `问答` `可分享` |
+| [wordguess-game](wordguess-game) | 猜词游戏，六次机会，中英双语词库 | `文字` `解谜` `双语` |
 
 ## 为什么是 litegame
 

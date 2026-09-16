@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>猜词 Word Guess</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --panel: #ffffff;
+    --border: #dfe3e8;
+    --text: #1f2328;
+    --muted: #6b7280;
+    --accent: #3b6ef5;
+    --accent-soft: #eaf0ff;
+    --danger: #e24b4a;
+    --hit: #2f9e50;
+    --present: #c9a227;
+    --miss: #8b929c;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  [hidden] { display: none !important; }
+
+  body {
+    margin: 0;
+    padding: 24px 12px 48px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    line-height: 1.6;
+  }
+
+  h1 { margin: 0 0 4px; font-size: 30px; letter-spacing: -.02em; }
+  .tip { margin: 0 0 18px; font-size: 13px; color: var(--muted); text-align: center; max-width: 560px; }
+
+  .panel {
+    width: 100%;
+    max-width: 620px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 22px;
+    box-shadow: 0 1px 2px rgba(16,24,40,.05), 0 6px 18px rgba(16,24,40,.06);
+  }
+
+  button {
+    font-family: inherit;
+    font-size: 14px;
+    color: var(--text);
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 16px;
+    cursor: pointer;
+    transition: border-color .12s ease, color .12s ease, background .12s ease, filter .12s ease;
+  }
+  button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button.primary:hover:not(:disabled) { filter: brightness(1.06); color: #fff; }
+  button.ghost { border-style: dashed; color: var(--muted); }
+
+  /* -------------------------------------------------------------- top row */
+  .topbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .hint { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  .msg { font-size: 13px; color: var(--accent); min-height: 20px; margin: 8px 0 2px; font-weight: 600; }
+  .msg.warn { color: var(--danger); }
+
+  /* ---------------------------------------------------------------- board */
+  .board { --cell: 52px; display: flex; flex-direction: column; gap: 6px; align-items: center; margin: 6px 0 18px; }
+  .row { display: flex; gap: 6px; }
+  .cell {
+    width: var(--cell);
+    height: var(--cell);
+    border: 2px solid var(--border);
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: calc(var(--cell) * .5);
+    font-weight: 700;
+    line-height: 1;
+    color: var(--text);
+    transition: background .16s ease, border-color .16s ease, color .16s ease;
+  }
+  .cell.filled { border-color: #9aa3af; }
+  .cell.hit     { background: var(--hit);     border-color: var(--hit);     color: #fff; }
+  .cell.present { background: var(--present); border-color: var(--present); color: #fff; }
+  .cell.miss    { background: var(--miss);    border-color: var(--miss);    color: #fff; }
+
+  /* ------------------------------------------------------------------ pad */
+  .pad { display: grid; gap: 5px; margin-bottom: 10px; }
+  .pad.en { grid-template-columns: repeat(9, 1fr); }
+  .pad.zh { grid-template-columns: repeat(10, 1fr); max-height: 330px; overflow-y: auto; }
+  .pad button.key {
+    padding: 9px 0;
+    min-width: 0;
+    font-size: 14px;
+    font-weight: 700;
+    border-radius: 8px;
+    line-height: 1.2;
+  }
+  .pad button.key.hit     { background: var(--hit);     border-color: var(--hit);     color: #fff; }
+  .pad button.key.present { background: var(--present); border-color: var(--present); color: #fff; }
+  .pad button.key.miss    { background: var(--miss);    border-color: var(--miss);    color: #fff; opacity: .42; }
+
+  .pad-actions { display: flex; gap: 10px; }
+  .pad-actions button { flex: 1; }
+  .keys-hint { font-size: 12px; color: var(--muted); margin-top: 10px; }
+
+  /* ---------------------------------------------------------------- over */
+  .over { margin-top: 20px; padding-top: 18px; border-top: 1px dashed var(--border); }
+  .over h2 { margin: 0 0 4px; font-size: 21px; }
+  .over .sub { margin: 0 0 14px; font-size: 14px; color: var(--muted); }
+  .share { white-space: pre; font-size: 19px; line-height: 1.3; letter-spacing: 1px; margin-bottom: 12px; }
+  .over .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+
+  textarea {
+    width: 100%;
+    min-height: 78px;
+    margin-top: 10px;
+    padding: 10px;
+    font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 12.5px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    resize: vertical;
+    color: var(--text);
+  }
+
+  /* --------------------------------------------------------------- stats */
+  h3 { margin: 24px 0 10px; font-size: 15px; color: var(--muted); font-weight: 600;
+       text-transform: uppercase; letter-spacing: .06em; }
+  .lead { color: var(--muted); font-size: 14px; margin: 0 0 10px; }
+
+  .dist { display: flex; align-items: center; gap: 8px; font-size: 12.5px; margin-bottom: 5px; }
+  .dist > span:first-child { width: 14px; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+  .dist-n { width: 26px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .dist-track { flex: 1; height: 9px; background: #eceff3; border-radius: 999px; overflow: hidden; }
+  .dist-track > i { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+
+  .note { font-size: 11.5px; color: var(--muted); margin-top: 20px; line-height: 1.55; }
+
+  @media (max-width: 560px) {
+    h1 { font-size: 24px; }
+    .panel { padding: 16px 14px; }
+    .board { --cell: 46px; }
+    .pad.en { grid-template-columns: repeat(7, 1fr); }
+    .pad.zh { grid-template-columns: repeat(8, 1fr); max-height: 300px; }
+    .share { font-size: 17px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="lang-switch" data-lang-switch></div>
+
+<h1 data-i18n="title"></h1>
+<p class="tip" data-i18n="tip"></p>
+
+<div class="panel">
+  <div class="topbar">
+    <span id="hintRow" class="hint"></span>
+    <button id="btnNew" class="ghost" data-i18n="newGame"></button>
+  </div>
+
+  <p id="msg" class="msg"></p>
+
+  <div id="board" class="board"></div>
+
+  <div id="pad" class="pad en"></div>
+  <div class="pad-actions">
+    <button id="btnDel" data-i18n="delKey"></button>
+    <button id="btnEnter" class="primary" data-i18n="enterKey"></button>
+  </div>
+  <p class="keys-hint" data-i18n="keysHint"></p>
+
+  <section id="over" class="over" hidden>
+    <h2 id="overTitle"></h2>
+    <p id="overSub" class="sub"></p>
+    <h3 data-i18n="shareTitle"></h3>
+    <div id="shareGrid" class="share"></div>
+    <div class="actions">
+      <button id="btnCopy" data-i18n="copy"></button>
+      <button id="btnAgain" class="primary" data-i18n="playAgain"></button>
+    </div>
+    <p id="copyMsg" class="msg"></p>
+    <textarea id="shareBox" readonly hidden></textarea>
+  </section>
+
+  <div id="statBox"></div>
+
+  <p class="note" data-i18n="note"></p>
+</div>
+
+<script src="../assets/i18n.js"></script>
+<script>
+/* =========================================================================
+ * Word Guess — zero-dependency single-file word game.
+ *
+ * Six tries to find a hidden word. Every guess is scored per position:
+ *   hit     (green)  right character, right place
+ *   present (amber)  the character is in the answer, but not here
+ *   miss    (grey)   the answer does not contain it at all
+ *
+ * Two languages, two banks:
+ *   en — five letter words, typed on a 26-key pad (or a real keyboard)
+ *   zh — four character idioms, tapped on a character pad
+ *
+ * The pad is the *input alphabet*, so it has to cover every character any
+ * accepted guess can contain. English can hardcode A-Z; the Chinese pad is
+ * derived from the word list itself so the two can never drift apart.
+ *
+ * The answer is drawn from a curated `answers` list; guesses are validated
+ * against the wider `words` list. `answers` must be a subset of `words`, or a
+ * player could be dealt a word the game then refuses to accept.
+ * ========================================================================= */
+
+var DICT = {
+  title:    { en: 'Word Guess', zh: '猜词' },
+  tip:      { en: 'Six tries to find the hidden word. Green: right character, right place. Amber: the character is in the word, somewhere else. Grey: not in the word.',
+              zh: '六次机会猜出隐藏的词。绿色＝字对位置也对，黄色＝字在词里但位置不对，灰色＝词里没有这个字。' },
+  newGame:  { en: 'New game', zh: '新一局' },
+  enterKey: { en: 'Enter', zh: '提交' },
+  delKey:   { en: 'Delete', zh: '删除' },
+  hintLine: { en: '{n}-letter word · {left} tries left', zh: '{n} 字成语 · 还剩 {left} 次' },
+  keysHint: { en: 'A physical keyboard works too — type, then Enter.', zh: '也支持实体键盘：直接打字，回车提交。' },
+  msgShort: { en: '{n} more character(s) needed', zh: '还差 {n} 个字' },
+  msgUnknown: { en: 'Not in the word list — try another one.', zh: '不在词库里，换一个试试。' },
+  winTitle: { en: 'Got it', zh: '猜对了' },
+  winSub:   { en: 'Solved in {n} of {total} tries.', zh: '用了 {n} 次机会（共 {total} 次）。' },
+  loseTitle:{ en: 'Out of tries', zh: '没猜中' },
+  loseSub:  { en: 'The answer was {answer}', zh: '答案是「{answer}」' },
+  shareTitle: { en: 'Share (no spoilers)', zh: '分享（不剧透）' },
+  copy:     { en: 'Copy result', zh: '复制结果' },
+  copied:   { en: 'Copied to clipboard.', zh: '已复制到剪贴板。' },
+  copyFail: { en: 'Could not use the clipboard — select the text below and copy it by hand.',
+              zh: '无法自动复制 —— 请手动选中下面这段文字复制。' },
+  playAgain:{ en: 'Play again', zh: '再来一局' },
+  statTitle:{ en: 'Your record', zh: '战绩' },
+  statNone: { en: 'No finished games yet.', zh: '还没有完成的纪录。' },
+  statLine: { en: 'Played {played} · won {win}% · streak {streak} · best {max}',
+              zh: '已玩 {played} 局 · 胜率 {win}% · 当前连胜 {streak} · 最高连胜 {max}' },
+  distTitle:{ en: 'Guesses used', zh: '用了几次猜中' },
+  shareText:{ en: 'Word Guess {n}/{total}\n{grid}\n{url}',
+              zh: '猜词 {n}/{total}\n{grid}\n{url}' },
+  note:     { en: 'The answer is drawn from a curated list of common words, and only words on that list are accepted as guesses. Each language keeps its own board and its own record.',
+              zh: '答案取自一份精选常用词表，也只有词表里的词才会被接受。两种语言各有独立的棋盘和战绩。' },
+  msgRestarted: { en: 'New game — good luck.', zh: '已开始新一局。' }
+};
+
+var T = LiteI18N.create(DICT);
+
+/* ------------------------------------------------------------ the word banks
+ * Written as whitespace-separated text so a typo is easy to spot and the
+ * length/charset checks in tools/wordguess-test.js can be exact. */
+
+function splitList(text) {
+  var parts = String(text).trim().split(/\s+/);
+  var out = [];
+  for (var i = 0; i < parts.length; i++) {
+    if (parts[i]) out.push(parts[i].toUpperCase());
+  }
+  return out;
+}
+
+/* Every guess the game will accept (and the pool the pad has to cover). */
+var EN_WORDS = splitList(
+  'about above actor acute admit adopt adult after again agent agree ahead alarm album alert ' +
+  'alike alive allow alone along alter among anger angle angry apart apple apply arena argue ' +
+  'arise array aside asset audio audit avoid awake award aware ' +
+  'badge basic basin beach began begin being below bench birth black blade blame blank blast ' +
+  'blend blind block blood board boost booth bound brain brand brave bread break breed brick ' +
+  'bride brief bring broad broke brown brush build built bunch burst ' +
+  'cabin cable candy canoe cargo carry catch cause chain chair chaos charm chart chase cheap ' +
+  'check chess chest chief child cliff climb clock close cloth cloud coach coast count court ' +
+  'cover crack craft crane crash cream crime cross crowd crown curve cycle ' +
+  'daily dance dealt death debut decay delay delta dense depth dirty doubt dozen draft drama ' +
+  'drank dream dress drift drink drive ' +
+  'eager early earth eight elbow elect empty enemy enjoy enter entry equal error essay event ' +
+  'every exact exist extra ' +
+  'faith false fault fiber field fifth fifty fight final first flame flash fleet flesh float ' +
+  'flock flood floor flour fluid focus force forge forth forty forum found frame fraud fresh ' +
+  'front frost fruit fully funny ' +
+  'giant given glass globe glory grace grade grain grand grant grape graph grasp grass grave ' +
+  'great green greet grief grill gross group grown guard guess guest guide ' +
+  'happy harsh haste heart heavy hedge hobby honey honor horse hotel house human humor ' +
+  'ideal image index inner input irony issue ivory ' +
+  'jelly joint judge juice ' +
+  'kneel knife knock known ' +
+  'label labor large laser later laugh layer learn lease least leave legal lemon level light ' +
+  'limit linen liver liter local lodge logic loose lover lower loyal lucky lunar lunch ' +
+  'magic major maker maple march match maybe mayor medal media mercy merge merit metal meter ' +
+  'micro might minor mixed model moist money month moral motor mount mouse mouth movie music ' +
+  'naked nasty naval needy nerve never newly night noise north novel nurse ' +
+  'ocean offer often olive onion opera orbit order organ other ought outer owner oxide ' +
+  'paint panel paper party pasta patch pause peace pearl pedal penny phase phone photo piano ' +
+  'piece pilot pitch pixel place plain plane plant plate plaza point polar pound power press ' +
+  'price pride prime print prior prize proof proud prove pulse punch pupil puppy purse ' +
+  'queen query quick quiet quote ' +
+  'radar radio raise rally ranch range rapid ratio reach ready realm rebel refer relax relay ' +
+  'renew reply rider ridge rifle right rigid rival river roast robot rocky rough round route ' +
+  'royal rural ' +
+  'scale scene scope score scout screw sense serve seven shade shaft shake shall shape share ' +
+  'shark sharp sheet shelf shell shift shine shirt shock shore short shout sight silly since ' +
+  'skill slate sleep slice slide slope small smart smell smile smoke snake solar solid solve ' +
+  'sorry sound south space spare speak speed spend spent spice spike spine split spoke sport ' +
+  'spray squad staff stage stake stamp stand stark start state steam steel steep steer stern ' +
+  'stick stiff still stock stone stood store storm story stove strip stuck study stuff style ' +
+  'sugar suite sunny super surge sweet swift swing sword ' +
+  'table taken taste teach tempo tenth thank theft their theme there thick thing think third ' +
+  'those three threw throw thumb tight timer tired title toast today token topic torch total ' +
+  'touch tough towel tower toxic trace track trade trail train trait trash treat trend trial ' +
+  'tribe trick tried truck truly trunk trust truth twice twist ' +
+  'ultra uncle under undue union unite unity until upper upset urban usage usual ' +
+  'valid value vapor vault venue verse video vigor villa viral virus visit vital vivid vocal ' +
+  'voice voter ' +
+  'wagon waste watch water weigh weird wheat wheel where which while white whole whose woman ' +
+  'world worry worse worst worth would wound wrist write wrong wrote ' +
+  'yield young youth zebra'
+);
+
+/* The narrower pool an answer may be drawn from — all common words. Every
+ * entry here MUST also appear in EN_WORDS (asserted by the test). */
+var EN_ANSWERS = splitList(
+  'about above actor admit adopt adult after again agent agree ahead alarm album alert alike ' +
+  'alive allow alone along alter among anger angle angry apart apple apply arena argue arise ' +
+  'array aside asset audio audit avoid awake award aware ' +
+  'basic basin beach began begin being below bench birth black blade blame blank blind block ' +
+  'blood board boost brain brand brave bread break bring broad brown brush build built ' +
+  'cabin cable candy carry catch cause chain chair chart chase cheap check chess chest chief ' +
+  'child climb clock close cloth cloud coach coast count court cover crack craft crane crash ' +
+  'cream crime cross crowd crown curve cycle ' +
+  'daily dance death debut delay delta dense depth dirty doubt dozen draft drama dream dress ' +
+  'drift drink drive ' +
+  'eager early earth eight elbow elect empty enjoy enter entry equal error essay event every ' +
+  'exact exist extra ' +
+  'faith false fault field fifth fifty fight final first flame flash float flood floor focus ' +
+  'force forge forth forty found frame fresh front frost fruit funny ' +
+  'giant given glass globe glory grade grain grand grant grape graph grass grave great green ' +
+  'greet group grown guard guess guest guide ' +
+  'happy harsh heart heavy hobby honey honor horse hotel house human humor ' +
+  'ideal image index inner input issue jelly joint judge juice knife knock known ' +
+  'label labor large laser later laugh layer learn least leave legal lemon level light limit ' +
+  'linen liver local lodge logic loose lower loyal lucky lunar lunch ' +
+  'magic major maker maple march match maybe mayor medal media mercy merit metal meter might ' +
+  'minor model money month moral motor mount mouse mouth movie music ' +
+  'naked nasty nerve never night noise north novel nurse ' +
+  'ocean offer often olive onion opera orbit order organ other outer owner ' +
+  'paint panel paper party pasta patch pause peace pearl pedal penny phase phone photo piano ' +
+  'piece pilot pitch pixel place plain plane plant plate point polar pound power press price ' +
+  'pride prime print prior prize proof proud prove pulse punch pupil purse ' +
+  'queen query quick quiet quote radar radio raise rally range rapid ratio reach ready realm ' +
+  'rebel refer relax relay renew reply rider ridge rifle right rigid rival river roast robot ' +
+  'rocky rough round route royal rural ' +
+  'scale scene scope score scout screw sense serve seven shade shaft shake shape share shark ' +
+  'sharp sheet shelf shell shift shine shirt shock shore short shout sight silly since skill ' +
+  'sleep slice slide slope small smart smell smile smoke snake solar solid solve sorry sound ' +
+  'south space spare speak speed spend spent spice spike spine split spoke sport spray squad ' +
+  'staff stage stake stamp stand start state steam steel steep steer stick stiff still stock ' +
+  'stone stood store storm story stove strip study stuff style sugar suite sunny super sweet ' +
+  'swift swing sword ' +
+  'table taken taste teach tenth thank their theme there thick thing think third those three ' +
+  'throw thumb tight timer tired title toast today token topic torch total touch tough towel ' +
+  'tower trace track trade trail train treat trend trial tribe trick truck truly trunk trust ' +
+  'truth twice twist ' +
+  'uncle under union unite unity until upper upset urban usage usual ' +
+  'valid value vapor vault venue verse video virus visit vital vivid vocal voice ' +
+  'wagon waste watch water weigh weird wheat wheel where which while white whole whose woman ' +
+  'world worry worse worst worth would wound write wrong wrote young youth zebra'
+);
+
+/* One list for the Chinese bank: all common four-character idioms, so every
+ * one is both a legal guess and a legal answer.
+ *
+ * The selection is deliberately stacked towards character reuse. The pad has
+ * to hold one key per distinct character, so a broader list of idioms would
+ * push it past 200 keys and turn every guess into a scrolling exercise. These
+ * 52 average 1.57 idioms per character, which keeps the pad at 130 keys. */
+var ZH_WORDS = splitList(
+  '一心一意 三心二意 心花怒放 心口如一 心有灵犀 专心致志 心惊胆战 心旷神怡 一鸣惊人 一丝不苟 ' +
+  '一鼓作气 举一反三 一诺千金 一箭双雕 不约而同 川流不息 络绎不绝 情不自禁 不劳而获 学而不厌 ' +
+  '不言而喻 大器晚成 大惊小怪 大公无私 天长地久 天马行空 天衣无缝 冰天雪地 人山人海 引人入胜 ' +
+  '出人头地 无微不至 无边无际 万无一失 自相矛盾 自强不息 自由自在 自言自语 有目共睹 有条不紊 ' +
+  '风和日丽 风平浪静 风雨同舟 狂风暴雨 春暖花开 鸟语花香 花好月圆 山清水秀 愚公移山 水滴石穿 ' +
+  '水到渠成 不言不语'
+);
+
+/* Every character that can appear in a Chinese guess, most frequent first so
+ * the pad stays scannable. Derived, never hand-maintained. */
+function distinctChars(words) {
+  var freq = {}, i, j, ch;
+  for (i = 0; i < words.length; i++) {
+    for (j = 0; j < words[i].length; j++) {
+      ch = words[i].charAt(j);
+      freq[ch] = (freq[ch] || 0) + 1;
+    }
+  }
+  var out = Object.keys(freq);
+  out.sort(function (a, b) {
+    if (freq[b] !== freq[a]) return freq[b] - freq[a];
+    return a < b ? -1 : (a > b ? 1 : 0);
+  });
+  return out;
+}
+
+var MAX_TRIES = 6;
+var STORE_KEY = 'litegame_wordguess';
+var SITE_URL = 'https://litegame-hub.github.io/wordguess-game/';
+var EMOJI = { hit: '\uD83D\uDFE9', present: '\uD83D\uDFE8', miss: '\u2B1C' };
+var RANK = { miss: 0, present: 1, hit: 2 };
+
+var BANKS = {
+  en: { len: 5, words: EN_WORDS, answers: EN_ANSWERS,
+        pad: splitList('a b c d e f g h i j k l m n o p q r s t u v w x y z') },
+  zh: { len: 4, words: ZH_WORDS, answers: ZH_WORDS, pad: null }
+};
+BANKS.zh.pad = distinctChars(ZH_WORDS);
+
+/* ------------------------------------------------------------------ scoring
+ * Two passes. The first marks exact hits and records how many of each answer
+ * character are still "unclaimed"; the second spends those leftovers on
+ * misplaced guesses. Doing it in one pass is the classic bug: it lets a guess
+ * with two of a letter light both up when the answer only has one. */
+function evaluate(guess, answer) {
+  var n = answer.length;
+  var out = new Array(n);
+  var left = {};
+  var i, ch;
+  for (i = 0; i < n; i++) {
+    if (guess.charAt(i) === answer.charAt(i)) {
+      out[i] = 'hit';
+    } else {
+      out[i] = null;
+      ch = answer.charAt(i);
+      left[ch] = (left[ch] || 0) + 1;
+    }
+  }
+  for (i = 0; i < n; i++) {
+    if (out[i]) continue;
+    ch = guess.charAt(i);
+    if (left[ch] > 0) { out[i] = 'present'; left[ch]--; }
+    else out[i] = 'miss';
+  }
+  return out;
+}
+
+function pickWord(bank) {
+  var list = (bank.answers && bank.answers.length) ? bank.answers : bank.words;
+  if (!list.length) return '';
+  var i = Math.floor(Math.random() * list.length);
+  if (!(i >= 0 && i < list.length)) i = 0;
+  return list[i];
+}
+
+/* --------------------------------------------------------------- persistence
+ * Stats only — an in-progress board lives in memory, which keeps the stored
+ * shape small and means a corrupt value can never block the game. */
+function blankStats() { return { played: 0, wins: 0, streak: 0, max: 0, dist: [0, 0, 0, 0, 0, 0] }; }
+
+function num(v) { return (typeof v === 'number' && isFinite(v) && v >= 0) ? Math.floor(v) : 0; }
+
+function loadStore() {
+  var out = { en: blankStats(), zh: blankStats() };
+  try {
+    var raw = localStorage.getItem(STORE_KEY);
+    if (!raw) return out;
+    var obj = JSON.parse(raw);
+    if (!obj || typeof obj !== 'object') return out;
+    var langs = ['en', 'zh'];
+    for (var i = 0; i < langs.length; i++) {
+      var l = langs[i], s = obj[l];
+      if (!s || typeof s !== 'object') continue;
+      var d = out[l];
+      d.played = num(s.played);
+      d.wins = num(s.wins);
+      d.streak = num(s.streak);
+      d.max = num(s.max);
+      if (Array.isArray(s.dist) && s.dist.length === MAX_TRIES) {
+        d.dist = [];
+        for (var j = 0; j < MAX_TRIES; j++) d.dist.push(num(s.dist[j]));
+      }
+    }
+  } catch (e) {}
+  return out;
+}
+
+function saveStore() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(stats)); } catch (e) {}
+}
+
+function bumpStats(lang, won, turns) {
+  var s = stats[lang];
+  if (!s) return;
+  s.played++;
+  if (won) {
+    s.wins++;
+    s.streak++;
+    if (s.streak > s.max) s.max = s.streak;
+    var i = Math.min(MAX_TRIES, Math.max(1, turns)) - 1;
+    s.dist[i]++;
+  } else {
+    s.streak = 0;
+  }
+  saveStore();
+}
+
+/* ------------------------------------------------------------------- state */
+var stats = loadStore();
+var games = { en: null, zh: null };
+var cur = 'en';
+var padEls = [];
+var padChars = [];
+
+function newGame(lang) {
+  var bank = BANKS[lang];
+  games[lang] = {
+    answer: pickWord(bank),
+    rows: [],
+    marks: [],
+    typed: [],
+    keyState: {},
+    done: false,
+    won: false
+  };
+  return games[lang];
+}
+
+/* --------------------------------------------------------------------- DOM */
+var elBoard     = document.getElementById('board');
+var elPad       = document.getElementById('pad');
+var elMsg       = document.getElementById('msg');
+var elHintRow   = document.getElementById('hintRow');
+var elOver      = document.getElementById('over');
+var elOverTitle = document.getElementById('overTitle');
+var elOverSub   = document.getElementById('overSub');
+var elShareGrid = document.getElementById('shareGrid');
+var elCopyMsg   = document.getElementById('copyMsg');
+var elShareBox  = document.getElementById('shareBox');
+var elStatBox   = document.getElementById('statBox');
+var elNewBtn    = document.getElementById('btnNew');
+var elEnterBtn  = document.getElementById('btnEnter');
+var elDelBtn    = document.getElementById('btnDel');
+var elCopyBtn   = document.getElementById('btnCopy');
+var elAgainBtn  = document.getElementById('btnAgain');
+
+/* ---------------------------------------------------------------- rendering */
+
+// Wipe an element's children (the stub DOM has no replaceChildren).
+function clear(el) {
+  while (el.children.length) el.removeChild(el.children[0]);
+}
+
+function setMsg(text, warn) {
+  elMsg.textContent = text || '';
+  elMsg.className = warn ? 'msg warn' : 'msg';
+}
+
+function clearMsg() { setMsg('', false); }
+
+function renderBoard() {
+  var g = games[cur], bank = BANKS[cur];
+  clear(elBoard);
+  for (var r = 0; r < MAX_TRIES; r++) {
+    var row = document.createElement('div');
+    row.className = 'row';
+    var chars = null, marks = null;
+    if (r < g.rows.length) { chars = g.rows[r]; marks = g.marks[r]; }
+    else if (r === g.rows.length && !g.done) { chars = g.typed; marks = null; }
+    for (var c = 0; c < bank.len; c++) {
+      var ch = (chars && chars[c]) ? chars[c] : '';
+      var cell = document.createElement('div');
+      var cls = 'cell';
+      if (marks) cls += ' ' + marks[c];
+      else if (ch) cls += ' filled';
+      cell.className = cls;
+      cell.textContent = ch;
+      row.appendChild(cell);
+    }
+    elBoard.appendChild(row);
+  }
+}
+
+function renderPad() {
+  var bank = BANKS[cur], g = games[cur];
+  elPad.className = 'pad ' + cur;
+  clear(elPad);
+  padEls = [];
+  padChars = [];
+  for (var i = 0; i < bank.pad.length; i++) {
+    var ch = bank.pad[i];
+    var b = document.createElement('button');
+    b.type = 'button';
+    var st = g.keyState[ch];
+    b.className = 'key' + (st ? ' ' + st : '');
+    b.textContent = ch;
+    elPad.appendChild(b);
+    padEls.push(b);
+    padChars.push(ch);
+  }
+}
+
+function renderHint() {
+  var g = games[cur], bank = BANKS[cur];
+  var left = Math.max(0, MAX_TRIES - g.rows.length);
+  elHintRow.textContent = T.t('hintLine', { n: bank.len, left: left });
+}
+
+function gridText(g) {
+  var lines = [];
+  for (var r = 0; r < g.rows.length; r++) {
+    var line = '';
+    for (var c = 0; c < g.marks[r].length; c++) line += EMOJI[g.marks[r][c]] || EMOJI.miss;
+    lines.push(line);
+  }
+  return lines.join('\n');
+}
+
+function shareText(g) {
+  return T.t('shareText', {
+    n: g.rows.length, total: MAX_TRIES, grid: gridText(g), url: SITE_URL
+  });
+}
+
+function renderOver() {
+  var g = games[cur], bank = BANKS[cur];
+  if (!g.done) {
+    elOver.hidden = true;
+    return;
+  }
+  elOver.hidden = false;
+  elOverTitle.textContent = g.won ? T.t('winTitle') : T.t('loseTitle');
+  elOverSub.textContent = g.won
+    ? T.t('winSub', { n: g.rows.length, total: MAX_TRIES })
+    : T.t('loseSub', { answer: g.answer });
+  elShareGrid.textContent = gridText(g);
+  // On a loss the answer is revealed, so re-render the pad to pick up any
+  // character states that only became known once the game ended.
+  renderPad();
+}
+
+function renderStats() {
+  var s = stats[cur] || blankStats();
+  clear(elStatBox);
+
+  var head = document.createElement('h3');
+  head.textContent = T.t('statTitle');
+  elStatBox.appendChild(head);
+
+  if (!s.played) {
+    var none = document.createElement('p');
+    none.className = 'lead';
+    none.textContent = T.t('statNone');
+    elStatBox.appendChild(none);
+    return;
+  }
+
+  var line = document.createElement('p');
+  line.className = 'lead';
+  line.textContent = T.t('statLine', {
+    played: s.played,
+    win: Math.round(100 * s.wins / s.played),
+    streak: s.streak,
+    max: s.max
+  });
+  elStatBox.appendChild(line);
+
+  var sub = document.createElement('h3');
+  sub.textContent = T.t('distTitle');
+  elStatBox.appendChild(sub);
+
+  var top = 0;
+  for (var i = 0; i < MAX_TRIES; i++) if (s.dist[i] > top) top = s.dist[i];
+
+  for (var k = 0; k < MAX_TRIES; k++) {
+    var row = document.createElement('div');
+    row.className = 'dist';
+    var lbl = document.createElement('span');
+    lbl.textContent = String(k + 1);
+    var track = document.createElement('div');
+    track.className = 'dist-track';
+    var fill = document.createElement('i');
+    fill.style.width = (top ? Math.round(100 * s.dist[k] / top) : 0) + '%';
+    track.appendChild(fill);
+    var n = document.createElement('span');
+    n.className = 'dist-n';
+    n.textContent = String(s.dist[k]);
+    row.appendChild(lbl);
+    row.appendChild(track);
+    row.appendChild(n);
+    elStatBox.appendChild(row);
+  }
+}
+
+function renderAll() {
+  renderBoard();
+  renderPad();
+  renderHint();
+  renderOver();
+  renderStats();
+}
+
+/* -------------------------------------------------------------------- input */
+function typeChar(ch) {
+  var g = games[cur], bank = BANKS[cur];
+  if (g.done) return;
+  if (g.typed.length >= bank.len) return;
+  g.typed.push(ch);
+  clearMsg();
+  renderBoard();
+}
+
+function delChar() {
+  var g = games[cur];
+  if (g.done) return;
+  if (!g.typed.length) return;
+  g.typed.pop();
+  clearMsg();
+  renderBoard();
+}
+
+function upgrade(st, ch, state) {
+  var old = st[ch];
+  if (old == null || RANK[state] > RANK[old]) st[ch] = state;
+}
+
+function submit() {
+  var g = games[cur], bank = BANKS[cur];
+  if (g.done) return;
+  if (g.typed.length < bank.len) {
+    setMsg(T.t('msgShort', { n: bank.len - g.typed.length }), true);
+    return;
+  }
+  var guess = g.typed.join('');
+  if (bank.words.indexOf(guess) < 0) {
+    setMsg(T.t('msgUnknown'), true);
+    return;
+  }
+  var marks = evaluate(guess, g.answer);
+  g.rows.push(g.typed.slice());
+  g.marks.push(marks);
+  for (var i = 0; i < marks.length; i++) upgrade(g.keyState, g.typed[i], marks[i]);
+  g.typed = [];
+
+  if (guess === g.answer) { g.done = true; g.won = true; }
+  else if (g.rows.length >= MAX_TRIES) { g.done = true; g.won = false; }
+
+  if (g.done) bumpStats(cur, g.won, g.rows.length);
+  clearMsg();
+  renderAll();
+}
+
+function restart() {
+  newGame(cur);
+  clearMsg();
+  renderAll();
+  setMsg(T.t('msgRestarted'), false);
+}
+
+function copyResult() {
+  var g = games[cur];
+  if (!g || !g.done) return;
+  var text = shareText(g);
+
+  function fallback() {
+    elShareBox.hidden = false;
+    elShareBox.value = text;
+    elCopyMsg.textContent = T.t('copyFail');
+    elCopyMsg.className = 'msg warn';
+  }
+
+  try {
+    var nav = (typeof navigator !== 'undefined') ? navigator : null;
+    var clip = nav && nav.clipboard;
+    if (clip && typeof clip.writeText === 'function') {
+      var p = clip.writeText(text);
+      if (p && typeof p.then === 'function') {
+        p.then(function () {
+          elShareBox.hidden = true;
+          elCopyMsg.textContent = T.t('copied');
+          elCopyMsg.className = 'msg';
+        }, fallback);
+      } else {
+        elShareBox.hidden = true;
+        elCopyMsg.textContent = T.t('copied');
+        elCopyMsg.className = 'msg';
+      }
+    } else {
+      fallback();
+    }
+  } catch (e) {
+    fallback();
+  }
+}
+
+// Delegated on the container so one listener serves every key. A pad key is a
+// plain text button with no element children, so a real click on the glyph
+// targets the button itself — `padEls.indexOf(ev.target)` is the whole lookup.
+// (A click in the gap between keys targets the container and matches nothing.)
+function onPadClick(ev) {
+  var i = padEls.indexOf(ev && ev.target);
+  if (i >= 0) typeChar(padChars[i]);
+}
+
+elPad.addEventListener('click', onPadClick);
+elEnterBtn.addEventListener('click', function () { submit(); });
+elDelBtn.addEventListener('click', function () { delChar(); });
+elNewBtn.addEventListener('click', function () { restart(); });
+elAgainBtn.addEventListener('click', function () { restart(); });
+elCopyBtn.addEventListener('click', function () { copyResult(); });
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('keydown', function (ev) {
+    var k = ev && ev.key;
+    if (!k) return;
+    if (k === 'Enter') { submit(); if (ev.preventDefault) ev.preventDefault(); return; }
+    if (k === 'Backspace' || k === 'Delete') { delChar(); if (ev.preventDefault) ev.preventDefault(); return; }
+    if (k === 'Escape') { restart(); return; }
+    if (k.length === 1) {
+      var up = k.toUpperCase();
+      if (BANKS[cur].pad.indexOf(up) >= 0) {
+        typeChar(up);
+        if (ev.preventDefault) ev.preventDefault();
+      }
+    }
+  });
+}
+
+/* Read-only bridge for the tests (and for anyone poking at the page). The vm
+ * sandbox already exposes the top-level vars, but jsdom does not, and a named
+ * surface documents what is safe to depend on. */
+var WG = {
+  MAX_TRIES: MAX_TRIES,
+  SITE_URL: SITE_URL,
+  STORE_KEY: STORE_KEY,
+  BANKS: BANKS,
+  evaluate: evaluate,
+  gridText: gridText,
+  shareText: shareText,
+  distinctChars: distinctChars,
+  getState: function () {
+    var g = games[cur];
+    return {
+      lang: cur,
+      answer: g.answer,
+      len: BANKS[cur].len,
+      rows: g.rows.map(function (r) { return r.join(''); }),
+      marks: g.marks.map(function (m) { return m.slice(); }),
+      typed: g.typed.slice(),
+      keyState: JSON.parse(JSON.stringify(g.keyState)),
+      done: g.done,
+      won: g.won,
+      padChars: padChars.slice(),
+      // class string per pad key, so a test can assert the colouring
+      padKeys: padEls.map(function (el) { return el.className; }),
+      msg: elMsg.textContent,
+      overHidden: elOver.hidden,
+      shareBoxHidden: elShareBox.hidden,
+      shareBoxValue: elShareBox.value,
+      stats: JSON.parse(JSON.stringify(stats))
+    };
+  },
+  forceAnswer: function (w) { games[cur].answer = w; },
+  type: function (c) { typeChar(c); },
+  del: function () { delChar(); },
+  submit: function () { submit(); },
+  restart: function () { restart(); },
+  copy: function () { copyResult(); }
+};
+if (typeof window !== 'undefined') window.WG = WG;
+
+/* Re-render everything assembled in JS when the language changes. Static
+ * [data-i18n] nodes are handled by the shared module; the board, pad, hint,
+ * result panel and stats all have to be rebuilt here. Switching language
+ * switches to that language's own board — progress is never thrown away. */
+T.onChange(function (lang) {
+  cur = (lang === 'zh') ? 'zh' : 'en';
+  if (!games[cur]) newGame(cur);
+  renderAll();
+});
+
+// Initialise both boards first, then let T.start() apply the language (it
+// fires onChange, which re-renders against live state).
+newGame('en');
+newGame('zh');
+cur = (T.lang === 'zh') ? 'zh' : 'en';
+renderAll();
+T.start();
+</script>
+</body>
+</html>
