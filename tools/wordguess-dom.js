@@ -16,7 +16,7 @@
  *
  * jsdom lives in an isolated directory so this repo stays dependency-free:
  *
- *   NODE_PATH=/Users/dgt/.workbuddy/binaries/node/workspace/node_modules \
+ *   NODE_PATH=<isolated-node-modules> \
  *     node tools/wordguess-dom.js [path/to/index.html]
  *
  * The optional path argument exists so a deliberately broken copy can be fed to
