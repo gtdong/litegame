@@ -64,6 +64,14 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const st = () => window.M3.getState();
   const cells = () => [...doc.querySelectorAll('#board .cell')];
   const cellAt = (r, c) => cells()[r * 8 + c];
+  const boardDirect = () => [...$('#board').children];
+  const fxKids = () => { const f = $('#fxLayer'); return f ? [...f.children] : []; };
+  // Concatenated stylesheet text, so we can prove the decorative CSS really shipped.
+  const cssText = () => {
+    let out = '';
+    for (const sheet of doc.styleSheets) { try { for (const r of sheet.cssRules) out += r.cssText + '\n'; } catch (e) { /* ignore */ } }
+    return out;
+  };
 
   function click(node) {
     node.dispatchEvent(new window.MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
@@ -103,6 +111,31 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ok(cells().length === 64, `the real board has 64 cell nodes (got ${cells().length})`);
   ok(cells().every(el => /\bc\d\b/.test(el.className)), 'every real cell carries a colour class at boot');
 
+  group('1b. the decoration layer is a SIBLING of the board, never inside it');
+  {
+    const board = $('#board'), fx = $('#fxLayer');
+    ok(!!board && !!fx, 'both #board and #fxLayer exist');
+    ok(!!fx && fx.parentElement === board.parentElement, "the fx layer shares the board's parent (.board-wrap)");
+    ok(!!fx && !board.contains(fx), '#fxLayer is NOT a descendant of #board');
+    const direct = boardDirect();
+    ok(direct.length === 64, `#board has exactly 64 direct children (got ${direct.length})`);
+    ok(direct.every(ch => /\bcell\b/.test(ch.className || '')),
+      'every direct child of #board is a .cell tile — no decoration leaked into the board');
+    ok(fxKids().length === 0, `the fx layer is empty at boot (got ${fxKids().length})`);
+    ok(/#fxLayer\s*\{[^}]*pointer-events:\s*none/.test(cssText()), 'the fx layer CSS declares pointer-events:none');
+  }
+
+  group('1c. the decorative CSS shipped (keyframes + reduced-motion)');
+  {
+    const css = cssText();
+    const kf = ['swapSlide', 'clearBurst', 'clearFlash', 'clearRing', 'fallDrop', 'refillDrop',
+      'boardShake', 'fxRing', 'fxSpark', 'fxFloat', 'fxCombo'];
+    const missing = kf.filter(k => !new RegExp('@keyframes\\s+' + k + '\\b').test(css));
+    ok(missing.length === 0, `all decoration keyframes are present (missing: ${JSON.stringify(missing)})`);
+    ok(/#board\.shake\s*\{/.test(css), 'the #board.shake rule is present');
+    ok(/@media[^{]*prefers-reduced-motion[^{]*reduce/.test(css), 'the prefers-reduced-motion block is present');
+  }
+
   group('2. the Start button leaves the ready state');
   ok(!!$('#btnStart'), 'the Start button is present');
   click($('#btnStart'));
@@ -137,6 +170,34 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     ok(st().combo >= 1, `a combo multiplier was applied (combo=${st().combo})`);
   }
 
+  group('3b. a real clear spawns decorations on #fxLayer, then recycles them');
+  {
+    await settle();
+    const board = $('#board'), fx = $('#fxLayer');
+    const mv = findLegalSwap(st().grid);
+    ok(!!mv, `a legal swap is available for the fx check: ${JSON.stringify(mv)}`);
+    let peak = 0, sawDecoration = false;
+    click(cellAt(mv[0], mv[1]));
+    click(cellAt(mv[2], mv[3]));
+    // Poll the live DOM across the cascade: decorations must appear on the
+    // overlay (never on the tiles) and must be gone again once it settles.
+    for (let i = 0; i < 300; i++) {
+      const n = fx.children.length;
+      if (n > peak) peak = n;
+      if (fx.querySelector('.fx-ring, .fx-spark, .fx-float, .fx-combo')) sawDecoration = true;
+      if (i > 20 && window.phase === 'idle' && n === 0) break;
+      await sleep(20);
+    }
+    ok(sawDecoration, 'the real clear attached decoration nodes to #fxLayer (ring/spark/float/combo)');
+    ok(peak > 0, `#fxLayer held decorations during the cascade (peak ${peak})`);
+    ok(peak <= 90, `the decoration list never exceeded the 90-node cap (peak ${peak})`);
+    await sleep(1500);                 // the longest ttl is 1000ms
+    ok(fx.children.length === 0, `#fxLayer is empty again once the animations retire (got ${fx.children.length})`);
+    ok(boardDirect().length === 64, `#board still has exactly 64 tiles (got ${boardDirect().length})`);
+    ok(cells().length === 64, 'still exactly 64 .cell nodes after the cascade');
+    ok(boardDirect().every(ch => /\bcell\b/.test(ch.className || '')), 'no decoration ever landed on a board tile');
+  }
+
   group('4. language switch re-renders the REAL DOM text');
   {
     const scoreLabel = () => text('[data-i18n="score"]');
@@ -169,7 +230,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
   group('5. no dangling element ids (real getElementById)');
   {
-    const ids = ['board', 'score', 'moves', 'target', 'best', 'combo', 'levelLabel', 'notice',
+    const ids = ['board', 'fxLayer', 'score', 'moves', 'target', 'best', 'combo', 'levelLabel', 'notice',
       'difficulty', 'btnNew', 'btnStart', 'btnHint', 'btnShuffle', 'dlgTitle', 'dlgSub', 'dlgBtn',
       'startOverlay', 'overlay'];
     const missing = ids.filter(id => doc.getElementById(id) === null);

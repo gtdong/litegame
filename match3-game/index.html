@@ -104,13 +104,27 @@
   button.primary:hover:not(:disabled) { color: #fff; filter: brightness(1.06); }
 
   /* ---------- board ---------- */
+  /* The wrapper gives the decoration layer a positioned box that exactly
+   * overlays the board, so particles and floating scores can live OUTSIDE
+   * `#board` (its classed children are treated as tiles by the harness). */
+  .board-wrap {
+    position: relative;
+    width: 100%;
+    /* Cell stride helpers — a cell is `(100% + gap)` wide, which is what the
+     * slide / drop keyframes multiply by. Declared on the wrapper so BOTH the
+     * board (tile grid) and the decoration layer inherit them. */
+    --gap: 6px;
+    --pad: 8px;
+    --clear-ms: 320ms;
+  }
+
   #board {
     display: grid;
     grid-template-columns: repeat(8, 1fr);
-    gap: 6px;
+    gap: var(--gap);
     width: 100%;
     aspect-ratio: 1 / 1;
-    padding: 8px;
+    padding: var(--pad);
     border-radius: 16px;
     background: linear-gradient(180deg, #f3f6fe, #e9eefb);
     border: 1px solid var(--border);
@@ -120,7 +134,24 @@
     overflow: hidden;
   }
 
+  /* Decoration layer: a grid mirroring the board's geometry, sitting on top of
+   * it. Anchors are placed with grid-row / grid-column so a particle burst is
+   * pixel-aligned with its tile without reading any layout back. */
+  #fxLayer {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    grid-template-rows: repeat(8, 1fr);
+    gap: var(--gap, 6px);
+    padding: var(--pad, 8px);
+    pointer-events: none;
+    z-index: 8;
+    overflow: visible;
+  }
+
   .cell {
+    position: relative;              /* anchor for the ::before / ::after fx */
     border-radius: 10px;
     background: #e2e8f5;
     box-shadow: inset 0 1px 3px rgba(30,39,64,.12);
@@ -133,10 +164,15 @@
     box-shadow: inset 0 1px 4px rgba(30,39,64,.10);
     cursor: default;
   }
+  /* The selected look deliberately uses NO transform: a running slide / drop
+   * animation owns `transform`, and an animation always beats a static
+   * declaration, so `scale(.9)` here would make a selected gem "jump" the
+   * moment it starts moving. An inset ring + glow conveys selection instead. */
   .cell.sel {
     outline: 3px solid var(--accent);
     outline-offset: -3px;
-    transform: scale(.9);
+    box-shadow: inset 0 0 0 3px rgba(99,102,241,.55), 0 0 10px rgba(99,102,241,.40);
+    filter: brightness(1.08);
     z-index: 3;
   }
 
@@ -149,28 +185,175 @@
   .cell.c5 { background: radial-gradient(circle at 32% 28%, #67e8f9, #06b6d4 72%); }
   .cell.c6 { background: radial-gradient(circle at 32% 28%, #f9a8d4, #ec4899 72%); }
 
-  .cell.swap { animation: swapPulse .16s ease; }
+  /* Transient phase animations. Each class only names the animation; the
+   * distance travelled is passed per cell through --fx-* custom properties so
+   * one keyframe drives every swap / drop. */
+  .cell.swap { animation: swapSlide var(--fx-ms, 190ms) cubic-bezier(.22,.72,.24,1) both; z-index: 4; }
   .cell.bad  { animation: shake .18s ease; }
-  .cell.clear{ animation: clearOut .2s ease forwards; }
+  .cell.clear{ animation: clearBurst var(--clear-ms, 320ms) cubic-bezier(.3,.9,.3,1) both; z-index: 6; }
+  .cell.fall { animation: fallDrop  var(--fx-ms, 300ms) cubic-bezier(.3,.05,.35,1.25) both; z-index: 4; }
+  .cell.drop { animation: refillDrop var(--fx-ms, 220ms) cubic-bezier(.3,.05,.35,1.25) both; z-index: 4; }
   .cell.hint { animation: hintPulse .6s ease 2; }
 
-  @keyframes swapPulse {
-    0%   { transform: scale(1); }
-    50%  { transform: scale(1.14); }
-    100% { transform: scale(1); }
+  /* White flash + expanding ring for a cleared gem, drawn as pseudo-elements so
+   * the tile keeps its colour class and its own `transform`. */
+  .cell.clear::before,
+  .cell.clear::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+  }
+  .cell.clear::before {
+    background: radial-gradient(circle, rgba(255,255,255,.95) 0%, rgba(255,255,255,0) 68%);
+    animation: clearFlash var(--clear-ms, 320ms) ease-out both;
+  }
+  .cell.clear::after {
+    border: 2px solid rgba(255,255,255,.92);
+    animation: clearRing var(--clear-ms, 320ms) ease-out both;
+  }
+
+  /* Swap: the two tiles start on each other's square and slide home, so the
+   * gems visibly cross over instead of blinking to a new colour. */
+  @keyframes swapSlide {
+    0%   { transform: translate(calc(var(--fx-nx, 0) * (100% + var(--gap))),
+                                calc(var(--fx-ny, 0) * (100% + var(--gap)))); }
+    100% { transform: translate(0, 0); }
+  }
+  /* Clear: a bright pop, then a shrinking, rotating fade-out. */
+  @keyframes clearBurst {
+    0%   { transform: scale(1) rotate(0deg);      filter: brightness(1)   saturate(1);   opacity: 1; }
+    30%  { transform: scale(1.2) rotate(0deg);    filter: brightness(1.75) saturate(1.4); opacity: 1; }
+    62%  { transform: scale(1.06) rotate(8deg);   filter: brightness(1.85) saturate(1.5); opacity: .95; }
+    100% { transform: scale(.25) rotate(22deg);   filter: brightness(2)   saturate(1.5); opacity: 0; }
+  }
+  @keyframes clearFlash {
+    0%   { opacity: 0; }
+    22%  { opacity: .78; }
+    100% { opacity: 0; }
+  }
+  @keyframes clearRing {
+    0%   { transform: scale(1);   opacity: .95; }
+    100% { transform: scale(2.1); opacity: 0; }
+  }
+  /* Gravity: accelerate down, then squash on landing and settle back. */
+  @keyframes fallDrop {
+    0%   { transform: translateY(calc(var(--fx-ny, 0) * (100% + var(--gap)))); }
+    78%  { transform: translateY(0) scaleY(1); }
+    88%  { transform: translateY(0) scale(1.14, .86); }
+    96%  { transform: translateY(0) scale(.96, 1.05); }
+    100% { transform: translateY(0) scale(1); }
+  }
+  /* Refill: same fall, but the new gems also fade in as they enter. */
+  @keyframes refillDrop {
+    0%   { transform: translateY(calc(var(--fx-ny, 0) * (100% + var(--gap)))); opacity: 0; }
+    18%  { opacity: 1; }
+    78%  { transform: translateY(0) scaleY(1); opacity: 1; }
+    88%  { transform: translateY(0) scale(1.12, .88); }
+    100% { transform: translateY(0) scale(1); }
   }
   @keyframes shake {
     0%, 100% { transform: translateX(0); }
     25%      { transform: translateX(-3px); }
     75%      { transform: translateX(3px); }
   }
-  @keyframes clearOut {
-    0%   { transform: scale(1);   opacity: 1; }
-    100% { transform: scale(.2);  opacity: 0; }
-  }
   @keyframes hintPulse {
     0%, 100% { box-shadow: 0 0 0 0 rgba(99,102,241,0); }
     50%      { box-shadow: 0 0 0 4px rgba(99,102,241,.55); }
+  }
+
+  /* ---------- decoration layer ---------- */
+  .fx-anchor { position: relative; pointer-events: none; }
+  .fx-anchor.fx-full { grid-row: 1 / -1; grid-column: 1 / -1; }
+
+  .fx-ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 10px;
+    border: 2px solid rgba(255,255,255,.95);
+    animation: fxRing .42s ease-out both;
+    pointer-events: none;
+  }
+  @keyframes fxRing {
+    0%   { transform: scale(.65); opacity: .9; }
+    100% { transform: scale(2.4); opacity: 0; }
+  }
+
+  .fx-spark {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 7px;
+    height: 7px;
+    margin: -3.5px 0 0 -3.5px;
+    border-radius: 50%;
+    /* A bright core so a spark reads as light, tinted by the gem it came from. */
+    background: radial-gradient(circle, #ffffff 0%, #ffffff 45%, var(--spark, #ffffff) 100%);
+    box-shadow: 0 0 8px 1px var(--spark, #ffffff);
+    animation: fxSpark .46s cubic-bezier(.2,.7,.4,1) both;
+    pointer-events: none;
+  }
+  @keyframes fxSpark {
+    0%   { transform: translate(0, 0) scale(.45); opacity: 1; }
+    100% { transform: translate(calc(var(--sx, 0) * var(--spread, 30px)),
+                                calc(var(--sy, 0) * var(--spread, 30px))) scale(0);
+           opacity: 0; }
+  }
+
+  .fx-float {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    font: 700 13px/1 "SFMono-Regular", Menlo, Consolas, monospace;
+    color: #fff;
+    text-shadow: 0 1px 3px rgba(20,27,48,.65);
+    white-space: nowrap;
+    animation: fxFloat .8s ease-out both;
+    pointer-events: none;
+  }
+  @keyframes fxFloat {
+    0%   { transform: translate(-50%, -50%) scale(.7);   opacity: 0; }
+    25%  { transform: translate(-50%, -60%) scale(1.06); opacity: 1; }
+    100% { transform: translate(-50%, -125%) scale(1);   opacity: 0; }
+  }
+
+  .fx-combo {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    font: 800 40px/1 "SFMono-Regular", Menlo, Consolas, monospace;
+    color: #fff;
+    text-shadow: 0 3px 14px rgba(79,70,229,.75), 0 1px 2px rgba(20,27,48,.45);
+    animation: fxCombo .9s cubic-bezier(.2,1.4,.4,1) both;
+    pointer-events: none;
+  }
+  @keyframes fxCombo {
+    0%   { transform: translate(-50%, -50%) scale(.4);  opacity: 0; }
+    30%  { transform: translate(-50%, -50%) scale(1.25); opacity: 1; }
+    55%  { transform: translate(-50%, -50%) scale(1);    opacity: 1; }
+    100% { transform: translate(-50%, -58%) scale(1);    opacity: 0; }
+  }
+
+  #board.shake { animation: boardShake .24s ease-out; }
+  @keyframes boardShake {
+    0%, 100% { transform: translate(0, 0); }
+    25%      { transform: translate(-2px, 1px); }
+    50%      { transform: translate(2px, -1px); }
+    75%      { transform: translate(-1px, 1px); }
+  }
+
+  /* Respect the platform motion preference: keep the flow identical but make
+   * every decorative animation effectively instantaneous. Cleanup is driven by
+   * the JS clock, never by animation events, so nothing leaks. */
+  @media (prefers-reduced-motion: reduce) {
+    .cell.swap, .cell.fall, .cell.drop, .cell.clear,
+    .cell.clear::before, .cell.clear::after,
+    .fx-ring, .fx-spark, .fx-float, .fx-combo {
+      animation-duration: 1ms !important;
+      animation-iteration-count: 1 !important;
+    }
+    #board.shake { animation: none !important; }
   }
 
   .notice {
@@ -243,7 +426,7 @@
     h1 { font-size: 22px; }
     .panel { padding: 11px; }
     .bar { gap: 5px; }
-    #board { gap: 4px; padding: 6px; }
+    .board-wrap { --gap: 4px; --pad: 6px; }
     button { padding: 7px 11px; font-size: 12px; }
     .stat { padding: 4px 7px; font-size: 11px; }
   }
@@ -266,7 +449,10 @@
     <span class="stat"><small data-i18n="level"></small> <b id="levelLabel">Normal</b></span>
   </div>
 
-  <div id="board"></div>
+  <div class="board-wrap">
+    <div id="board"></div>
+    <div id="fxLayer"></div>
+  </div>
 
   <div class="bar">
     <button id="btnHint" data-i18n="hint"></button>
@@ -380,12 +566,14 @@ var DIFF = {
   hard:   { colors: 7, moves: 20, target: 2000 }
 };
 
-/* Phase durations (ms). The CSS animations are tuned to match. */
-var SWAP_MS     = 160;
-var REVERT_MS   = 180;
-var CLEAR_MS    = 200;
-var FALL_MS     = 240;
-var REFILL_MS   = 200;
+/* Phase durations (ms). The CSS animations are tuned to match, and the state
+ * machine still owns all timing: an animation that never plays (a test stub, a
+ * reduced-motion user, a background tab) changes nothing about the flow. */
+var SWAP_MS     = 190;              // tiles slide across, then the machine parks
+var REVERT_MS   = 190;              // illegal swap: shake, then restore
+var CLEAR_MS    = 320;              // pop -> white flash -> shrink + spin out
+var FALL_MS     = 300;              // gravity drop with a landing squash
+var REFILL_MS   = 220;              // new gems drop in from above the board
 var SHUFFLE_MS  = 320;
 
 /* --------------------------------------------------------------- state */
@@ -420,8 +608,24 @@ var rng = Math.random;              // swappable for a seeded generator
 var lastFrameTs = 0;                // previous rAF timestamp (browser only)
 var cellEls = [];                   // cellEls[r][c] -> the tile element
 
+/* ---------------------------------------------------------- fx state
+ * `fxAt[r][c]` is a transient per-tile animation descriptor ({cls, vars}) that
+ * `render()` folds into the tile's className. It exists because render() rebuilds
+ * the WHOLE className every pass: a class poked on after render() would be wiped
+ * by the next pass, and if the className string happened to repeat, the browser
+ * would not replay the animation either. Routing every effect through this table
+ * means the class is set once on phase entry (and cleared on phase exit), so the
+ * animation always starts cleanly and simply runs out with the phase. */
+var fxAt = [];                       // fxAt[r][c] = { cls: 'swap', vars: {...} } | null
+var fxNodes = [];                   // decorations living on #fxLayer: [{el, ttl}]
+var FX_MAX_NODES = 90;              // hard ceiling on live decoration nodes
+var FX_MAX_BURSTS = 14;             // at most this many particle bursts per clear
+var fxLayerEl = null;               // the overlay the decorations are attached to
+var boardShakeTtl = 0;              // ms left on the board shake class
+
 /* ------------------------------------------------------------ dom refs */
 var boardEl = document.getElementById('board');
+fxLayerEl = document.getElementById('fxLayer');   // decoration overlay (outside #board)
 var scoreEl = document.getElementById('score');
 var movesEl = document.getElementById('moves');
 var targetEl = document.getElementById('target');
@@ -749,6 +953,168 @@ function inList(list, r, c) {
   return false;
 }
 
+/* -------------------------------------------------------------- fx helpers */
+
+/* Safe CSS custom-property write: the smoke stub's setProperty is a no-op and
+ * older jsdom builds can throw on an unknown property, so never let it bubble. */
+function setVar(el, key, value) {
+  if (!el || !el.style || typeof el.style.setProperty !== 'function') return;
+  try { el.style.setProperty(key, String(value)); } catch (e) {}
+}
+
+/* Detach a decoration node, tolerating whichever parent link the DOM stub sets. */
+function detachNode(el) {
+  if (!el) return;
+  var p = el.parentNode || el.parent;
+  if (p && typeof p.removeChild === 'function') {
+    try { p.removeChild(el); } catch (e) {}
+  }
+}
+
+/* Record a transient animation for one tile. render() folds `cls` into the tile
+ * className and writes `vars` as CSS custom properties. Routing effects through
+ * this table (instead of poking classes on after render) is what keeps them from
+ * being wiped by the next full-className repaint. */
+function setFx(r, c, cls, vars) {
+  if (r < 0 || r >= rows || c < 0 || c >= cols) return;
+  if (!fxAt[r]) fxAt[r] = [];
+  fxAt[r][c] = { cls: cls, vars: vars || null };
+}
+
+/* Drop every per-tile effect — called on each phase transition, so an effect
+ * lives exactly as long as its phase. */
+function clearFx() {
+  fxAt = [];
+}
+
+/* Attach a decoration and start its life clock. Retirement is driven by the rAF
+ * `update(dt)` clock (never by animation events, which no harness delivers) and
+ * the list is hard-capped so a pathological cascade cannot grow the DOM. */
+function addFxNode(el, ttl) {
+  if (!fxLayerEl || !el) return;
+  fxLayerEl.appendChild(el);
+  fxNodes.push({ el: el, ttl: ttl });
+  while (fxNodes.length > FX_MAX_NODES) detachNode(fxNodes.shift().el);
+}
+
+/* Retire every live decoration (used when the board is rebuilt). */
+function clearFxNodes() {
+  for (var i = 0; i < fxNodes.length; i++) detachNode(fxNodes[i].el);
+  fxNodes = [];
+}
+
+/* Age the decorations; anything past its ttl is removed. */
+function ageFxNodes(dt) {
+  if (!fxNodes.length) return;
+  var keep = [];
+  for (var i = 0; i < fxNodes.length; i++) {
+    var n = fxNodes[i];
+    n.ttl -= dt;
+    if (n.ttl <= 0) detachNode(n.el);
+    else keep.push(n);
+  }
+  fxNodes = keep;
+}
+
+/* An empty anchor already positioned over tile (r, c) on the decoration grid,
+ * so a burst lines up with its tile without reading geometry back. */
+function fxAnchor(r, c) {
+  var a = document.createElement('div');
+  a.className = 'fx-anchor';
+  setVar(a, 'grid-row', String(r + 1));
+  setVar(a, 'grid-column', String(c + 1));
+  return a;
+}
+
+/* Impact decoration for one cleared gem: an expanding ring plus a fan of sparks
+ * tinted with the gem's own colour. */
+function spawnBurst(r, c, colorIndex) {
+  if (!fxLayerEl) return;
+  if (fxNodes.length > FX_MAX_NODES - 8) return;               // budget guard
+  var anchor = fxAnchor(r, c);
+
+  var ring = document.createElement('div');
+  ring.className = 'fx-ring';
+  anchor.appendChild(ring);
+
+  var col = PALETTE[colorIndex] || '#ffffff';
+  var n = 6;
+  for (var i = 0; i < n; i++) {
+    var ang = (Math.PI * 2 * i) / n + (r * 0.7 + c * 0.4);
+    var sp = document.createElement('div');
+    sp.className = 'fx-spark';
+    setVar(sp, '--sx', Math.cos(ang).toFixed(3));
+    setVar(sp, '--sy', Math.sin(ang).toFixed(3));
+    setVar(sp, '--spread', (26 + ((i * 7 + r * 5 + c * 3) % 16)) + 'px');
+    setVar(sp, '--spark', col);
+    anchor.appendChild(sp);
+  }
+  addFxNode(anchor, CLEAR_MS + 260);
+}
+
+/* "+30" drifting up from a cleared cluster. Pure digits — no new copy. */
+function spawnScoreFloat(r, c, text) {
+  if (!fxLayerEl) return;
+  var anchor = fxAnchor(r, c);
+  var f = document.createElement('div');
+  f.className = 'fx-float';
+  f.textContent = text;
+  anchor.appendChild(f);
+  addFxNode(anchor, 900);
+}
+
+/* The big "x2" / "x3" pop in the middle of the board. */
+function spawnComboFloat(mult) {
+  if (!fxLayerEl) return;
+  var a = document.createElement('div');
+  a.className = 'fx-anchor fx-full';
+  var t = document.createElement('div');
+  t.className = 'fx-combo';
+  t.textContent = '\u00d7' + mult;                             // -> x2
+  a.appendChild(t);
+  addFxNode(a, 1000);
+}
+
+/* A very short board wobble when a chain lands. */
+function shakeBoard() {
+  if (!boardEl || !boardEl.classList) return;
+  boardEl.classList.add('shake');
+  boardShakeTtl = 260;
+}
+
+/* Translate a cleared grid into per-tile fall offsets. `before` is the grid with
+ * the matched cells already set to null; because gravity preserves column order
+ * and stacks the surviving gems on the bottom, a gem's landing row is implied by
+ * its index in the column's compacted list. A gem that fell `d` rows therefore
+ * starts `d` rows higher and slides home. */
+function applyFallFx(before) {
+  for (var c = 0; c < cols; c++) {
+    var src = [];
+    for (var r = 0; r < rows; r++) {
+      if (cellVal(before, r, c) !== null) src.push(r);
+    }
+    var m = src.length;
+    for (var i = 0; i < m; i++) {
+      var dst = rows - m + i;
+      var fell = dst - src[i];
+      if (fell > 0) setFx(dst, c, 'fall', { '--fx-ny': -fell, '--fx-ms': FALL_MS + 'ms' });
+    }
+  }
+}
+
+/* New gems in a column are the consecutive rows at the top, so they all travel
+ * the same distance and enter as one block from above the board. */
+function applyRefillFx(before) {
+  for (var c = 0; c < cols; c++) {
+    var m = 0;
+    for (var r = 0; r < rows; r++) if (cellVal(before, r, c) === null) m++;
+    if (!m) continue;
+    for (var i = 0; i < m; i++) {
+      setFx(i, c, 'drop', { '--fx-ny': -m, '--fx-ms': REFILL_MS + 'ms' });
+    }
+  }
+}
+
 /* Repaint every tile from the current grid + transient phase state. */
 function render() {
   for (var r = 0; r < rows; r++) {
@@ -759,11 +1125,16 @@ function render() {
       var cls = 'cell';
       cls += (v === null) ? ' empty' : (' c' + v);
       if (selected && selected[0] === r && selected[1] === c) cls += ' sel';
-      if (phase === 'swapping' && inList(swapCells, r, c)) cls += ' swap';
       if (phase === 'reverting' && inList(revertCells, r, c)) cls += ' bad';
-      if (phase === 'clearing' && inList(pendingClear, r, c)) cls += ' clear';
       if (hintTimer > 0 && inList(hintCells, r, c)) cls += ' hint';
+      var fx = (fxAt[r] && fxAt[r][c]) ? fxAt[r][c] : null;
+      if (fx) cls += ' ' + fx.cls;
       el.className = cls;
+      if (fx && fx.vars) {
+        for (var k in fx.vars) {
+          if (fx.vars.hasOwnProperty(k)) setVar(el, k, fx.vars[k]);
+        }
+      }
     }
   }
 }
@@ -834,6 +1205,10 @@ function setupBoard(seed) {
   cascadeDepth = 0;
   dragFrom = null;
   suppressClick = false;
+  clearFx();
+  clearFxNodes();
+  boardShakeTtl = 0;
+  if (boardEl && boardEl.classList) boardEl.classList.remove('shake');
   loadBest();
   status = 'ready';
   noticeKey = 'readyHint';
@@ -885,6 +1260,9 @@ function endGame(win) {
   endWin = !!win;
   phase = 'idle';
   phaseElapsed = 0;
+  clearFx();
+  boardShakeTtl = 0;
+  if (boardEl && boardEl.classList) boardEl.classList.remove('shake');
   if (score > best) { best = score; saveBest(); }
   if (overlay) overlay.classList.add('show');
   updateHud();
@@ -963,6 +1341,12 @@ function attemptSwap(r1, c1, r2, c2) {
     swapCells = [[r1, c1], [r2, c2]];
     noticeKey = 'play';
     noticeVars = null;
+    /* The data layer has already swapped the two colours, so each tile must
+     * START on its partner's square and slide home — that reads as the two gems
+     * crossing over rather than blinking to a new colour. */
+    clearFx();
+    setFx(r1, c1, 'swap', { '--fx-nx': c2 - c1, '--fx-ny': r2 - r1, '--fx-ms': SWAP_MS + 'ms' });
+    setFx(r2, c2, 'swap', { '--fx-nx': c1 - c2, '--fx-ny': r1 - r2, '--fx-ms': SWAP_MS + 'ms' });
     phase = 'swapping';
     phaseElapsed = 0;
     phaseDuration = SWAP_MS;
@@ -997,8 +1381,26 @@ function beginClear() {
   if (cascadeDepth > 40) { finishMove(); return; }   // safety net
 
   combo++;
-  score += pendingClear.length * BASE * combo;
+  var gained = pendingClear.length * BASE * combo;
+  score += gained;
   if (score > best) { best = score; saveBest(); }
+
+  /* One effect class for every cleared tile, then the decorations: a burst on
+   * the first few tiles (bounded so a 60-gem clear cannot spawn hundreds of
+   * nodes), the "+N" award floating up from the cluster's centre, and — from the
+   * second cascade round on — a big multiplier pop plus a board wobble. */
+  clearFx();
+  var i, pr, pc, cx = 0, cy = 0, bursts = 0;
+  for (i = 0; i < pendingClear.length; i++) {
+    pr = pendingClear[i][0]; pc = pendingClear[i][1];
+    setFx(pr, pc, 'clear', null);
+    cx += pc; cy += pr;
+    if (bursts < FX_MAX_BURSTS) { spawnBurst(pr, pc, cellVal(grid, pr, pc)); bursts++; }
+  }
+  cx = Math.round(cx / pendingClear.length);
+  cy = Math.round(cy / pendingClear.length);
+  spawnScoreFloat(cy, cx, '+' + gained);
+  if (combo >= 2) { spawnComboFloat(combo); shakeBoard(); }
 
   phase = 'clearing';
   phaseElapsed = 0;
@@ -1009,22 +1411,34 @@ function beginClear() {
 
 function onSwapDone() {
   swapCells = null;
+  clearFx();
   beginClear();
 }
 
 function onRevertDone() {
   revertCells = null;
+  clearFx();
   phase = 'idle';
   updateHud();
   render();
 }
 
 function onClearDone() {
-  for (var i = 0; i < pendingClear.length; i++) {
+  var i;
+  for (i = 0; i < pendingClear.length; i++) {
     grid[pendingClear[i][0]][pendingClear[i][1]] = null;
   }
   pendingClear = null;
-  grid = applyGravity(grid);
+  /* Gravity is a pure transform of the grid, so the fall distance is already
+   * implied by the cleared grid: within a column the non-empty gems keep their
+   * order and stack on the bottom. applyFallFx() derives exactly that from
+   * `before`, so no second grid has to be handed around. Do not skip the call:
+   * the timing machine is unchanged either way, but the tiles need the offsets
+   * to animate. */
+  var settled = applyGravity(grid);
+  clearFx();
+  applyFallFx(grid);
+  grid = settled;
   phase = 'falling';
   phaseElapsed = 0;
   phaseDuration = FALL_MS;
@@ -1032,7 +1446,10 @@ function onClearDone() {
 }
 
 function onFallDone() {
+  var before = grid;                  // settled grid, empties along the top
   grid = refill(grid, config.colors);
+  clearFx();
+  applyRefillFx(before);
   phase = 'refilling';
   phaseElapsed = 0;
   phaseDuration = REFILL_MS;
@@ -1049,6 +1466,7 @@ function onRefillDone() {
 
 function onShuffleDone() {
   grid = shuffleBoard(config.colors);
+  clearFx();
   phase = 'idle';
   phaseElapsed = 0;
   noticeKey = 'reshuffled';
@@ -1062,6 +1480,10 @@ function onShuffleDone() {
 function finishMove() {
   phase = 'idle';
   phaseElapsed = 0;
+  /* This is the convergence point of every resolve path, so the last phase's
+   * per-tile effects are retired here — otherwise the refill `drop` descriptor
+   * would outlive its phase and sit on the tiles until the next legal swap. */
+  clearFx();
   if (score > best) { best = score; saveBest(); }
 
   if (score >= target) { endGame(true); return; }
@@ -1102,6 +1524,17 @@ function doShuffle() {
  * Frame loop — a single rAF chain driving the phase timers. No setTimeout.
  * ==================================================================== */
 function update(dt) {
+  /* Decoration lifetimes and the board wobble run on their own clocks, so they
+   * keep expiring even while the phase machine sits idle. */
+  ageFxNodes(dt);
+  if (boardShakeTtl > 0) {
+    boardShakeTtl -= dt;
+    if (boardShakeTtl <= 0) {
+      boardShakeTtl = 0;
+      if (boardEl && boardEl.classList) boardEl.classList.remove('shake');
+    }
+  }
+
   if (hintTimer > 0) {
     hintTimer -= dt;
     if (hintTimer <= 0) { hintTimer = 0; hintCells = null; render(); }

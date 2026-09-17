@@ -772,6 +772,391 @@ group('i18n — dynamic text really follows the language (T.onChange path)');
   C.T.set('en');
 }
 
+/* ==================================================================
+ * Animation / decoration layer — the 2026-09 enhancement.
+ *
+ * The fx design routes every transient tile animation through the `fxAt`
+ * table, which render() folds into the tile's className, and retires it when
+ * the phase ends. These groups assert the three things a player actually
+ * depends on:
+ *   1. a swap slides the right tile the right way over exactly one cell,
+ *   2. a falling gem starts EXACTLY `d` rows above its landing square, where
+ *      `d` is the true number of rows it fell (the core new logic),
+ *   3. decorations are bounded, recycled, and never leak — and the board still
+ *      plays with the decoration layer entirely absent.
+ * ================================================================== */
+
+/* A board with no run of three (the (r+c)%3 diagonal stripe) — a clean slate
+ * onto which a single intended match can be planted without side effects. */
+function plainBoard() {
+  var g = [];
+  for (var r = 0; r < 8; r++) { var row = []; for (var c = 0; c < 8; c++) row.push((r + c) % 3); g.push(row); }
+  return g;
+}
+
+/* ① a stacked vertical run in one column: the two gems above fall 3 rows, the
+ *    bottom three never move. */
+var GRID_A = plainBoard();
+GRID_A[2][0] = 4; GRID_A[3][0] = 4; GRID_A[4][0] = 4;
+/* ② two runs in rows 1 and 5: every affected column gets TWO separated middle
+ *    holes, so the gems between them fall different, non-obvious distances. */
+var GRID_B = plainBoard();
+[2, 3, 4].forEach(function (c) { GRID_B[1][c] = 5; GRID_B[5][c] = 4; });
+/* ③ a 5-deep run cleared from the TOP of column 0 (no in-board fall there) plus
+ *    a shallow run in column 3 — proves refill gems travel farther than any gem
+ *    that fell inside the board. */
+var GRID_C = plainBoard();
+for (var _cr = 0; _cr < 5; _cr++) GRID_C[_cr][0] = 6;
+[2, 3, 4].forEach(function (r) { GRID_C[r][3] = 5; });
+
+/* Reset the whole machine onto `g`. keepNodes lets a stress loop accumulate the
+ * decoration list instead of wiping it between rounds. */
+function injectBoard(g, opts) {
+  opts = opts || {};
+  C.grid = g.map(function (row) { return row.slice(); });
+  C.rows = 8; C.cols = 8;
+  C.status = 'playing'; C.phase = 'idle'; C.phaseElapsed = 0; C.phaseDuration = 0;
+  C.combo = (opts.combo === undefined) ? 0 : opts.combo;
+  C.score = (opts.score === undefined) ? 0 : opts.score;
+  C.moves = (opts.moves === undefined) ? 20 : opts.moves;
+  C.target = (opts.target === undefined) ? 100000 : opts.target;
+  C.pendingClear = null; C.swapCells = null; C.revertCells = null;
+  C.hintCells = null; C.hintTimer = 0; C.selected = null;
+  C.cascadeDepth = 0; C.dragFrom = null; C.suppressClick = false;
+  C.config = { colors: 6, moves: 25, target: 100000 };
+  C.rng = C.makeRng(opts.seed === undefined ? 12345 : opts.seed);
+  if (!opts.keepNodes) C.clearFxNodes();
+  C.clearFx();
+  C.boardShakeTtl = 0;
+  if (C.boardEl && C.boardEl.classList) C.boardEl.classList.remove('shake');
+  C.render();
+}
+
+function fxEntry(r, c) { var row = C.fxAt[r]; return (row && row[c]) ? row[c] : null; }
+function cellCls(r, c) { return C.cellEls[r][c] ? C.cellEls[r][c].className : ''; }
+function cellVar(r, c, k) { return C.cellEls[r][c].style.getPropertyValue(k); }
+function fxClassSet() {
+  var set = {};
+  for (var r = 0; r < 8; r++) { var row = C.fxAt[r]; if (!row) continue;
+    for (var c = 0; c < 8; c++) { var e = row[c]; if (e) set[e.cls] = (set[e.cls] || 0) + 1; } }
+  return set;
+}
+function countCellsWithClass(cls) {
+  var n = 0;
+  for (var r = 0; r < 8; r++) for (var c = 0; c < 8; c++) if (C.cellEls[r][c] && C.cellEls[r][c]._cls.has(cls)) n++;
+  return n;
+}
+function anyCellHasClass(cls) { return countCellsWithClass(cls) > 0; }
+function collectFxDesc(cls) {
+  var out = [];
+  function walk(n) { if (!n) return; if (n._cls && n._cls.has(cls)) out.push(n); (n.children || []).forEach(walk); }
+  for (var i = 0; i < C.fxNodes.length; i++) walk(C.fxNodes[i].el);
+  return out;
+}
+
+/* Independent reference for the fall distance. Given the grid AFTER the cleared
+ * cells were removed, a column's surviving gems keep their relative order and
+ * settle onto its bottom `m` rows, so the i-th survivor (top to bottom) lands on
+ * row (8 - m + i) and falls (8 - m + i) - srcRow rows. A gem already sitting on
+ * its landing row falls 0 and must not animate. */
+function refFalls(cleared) {
+  var out = {};
+  for (var c = 0; c < 8; c++) {
+    var src = [];
+    for (var r = 0; r < 8; r++) { var v = cleared[r][c]; if (v !== null && v !== undefined) src.push(r); }
+    var m = src.length;
+    for (var i = 0; i < m; i++) { var dst = 8 - m + i; var fell = dst - src[i]; if (fell > 0) out[dst + ':' + c] = fell; }
+  }
+  return out;
+}
+
+/* Drive the real pipeline (beginClear -> onClearDone) and read the resulting
+ * per-tile fall offsets out of BOTH the fxAt table and the rendered DOM vars. */
+function fallScenario(grid) {
+  injectBoard(grid, { combo: 0 });
+  C.beginClear();
+  var matched = C.pendingClear.map(function (p) { return [p[0], p[1]]; });
+  var cleared = C.grid.map(function (row) { return row.slice(); });
+  for (var i = 0; i < C.pendingClear.length; i++) cleared[C.pendingClear[i][0]][C.pendingClear[i][1]] = null;
+  C.onClearDone();
+  var expected = refFalls(cleared);
+  var observed = {}, varsMismatch = [];
+  for (var r = 0; r < 8; r++) for (var c = 0; c < 8; c++) {
+    var e = fxEntry(r, c);
+    if (e && e.cls === 'fall') {
+      var ny = Number(e.vars['--fx-ny']);
+      observed[r + ':' + c] = -ny;
+      if (cellVar(r, c, '--fx-ny') !== String(ny)) varsMismatch.push(r + ':' + c);
+    }
+  }
+  return { phase: C.phase, matched: matched, expected: expected, observed: observed,
+           varsMismatch: varsMismatch, cellsWithFallClass: countCellsWithClass('fall') };
+}
+
+function fallOk(sc) {
+  if (sc.phase !== 'falling') return { ok: false, why: 'phase=' + sc.phase };
+  var ek = Object.keys(sc.expected), ok2 = Object.keys(sc.observed);
+  if (ek.length !== ok2.length) return { ok: false, why: ok2.length + ' animated vs ' + ek.length + ' expected' };
+  for (var i = 0; i < ek.length; i++) {
+    var k = ek[i];
+    if (sc.observed[k] === undefined) return { ok: false, why: 'no fall on ' + k };
+    if (sc.observed[k] !== sc.expected[k]) return { ok: false, why: k + ' fell ' + sc.observed[k] + ' rows, expected ' + sc.expected[k] };
+  }
+  return { ok: true };
+}
+
+/* Observe the previous phase's deepest in-board fall and the refill offsets. */
+function refillScenario(grid) {
+  injectBoard(grid, { combo: 0 });
+  C.beginClear();
+  C.onClearDone();
+  var fallMax = 0;
+  for (var r = 0; r < 8; r++) for (var c = 0; c < 8; c++) { var e = fxEntry(r, c); if (e && e.cls === 'fall') fallMax = Math.max(fallMax, -Number(e.vars['--fx-ny'])); }
+  C.onFallDone();
+  var drops = [];
+  for (var r2 = 0; r2 < 8; r2++) for (var c2 = 0; c2 < 8; c2++) { var e2 = fxEntry(r2, c2); if (e2 && e2.cls === 'drop') drops.push({ r: r2, c: c2, ny: -Number(e2.vars['--fx-ny']) }); }
+  return { phase: C.phase, fallMax: fallMax, drops: drops };
+}
+
+/* Fire `n` clear rounds back to back WITHOUT ageing anything out and report the
+ * peak number of live decoration nodes. */
+function nodeStress(n) {
+  injectBoard(GRID_A, { combo: 0 });
+  C.clearFxNodes();
+  var maxSeen = 0;
+  for (var i = 0; i < n; i++) {
+    C.grid = GRID_A.map(function (row) { return row.slice(); });
+    C.status = 'playing'; C.phase = 'idle'; C.combo = 0; C.cascadeDepth = 0;
+    C.phaseElapsed = 0; C.phaseDuration = 0; C.pendingClear = null;
+    C.config = { colors: 6, moves: 25, target: 100000 };
+    C.rng = C.makeRng(i + 1);
+    C.beginClear();
+    if (C.fxNodes.length > maxSeen) maxSeen = C.fxNodes.length;
+  }
+  return maxSeen;
+}
+
+/* Let the frame clock run until every decoration has expired. */
+function drainNodes(limit) {
+  C.phase = 'idle';
+  var guard = 0;
+  while (C.fxNodes.length > 0 && guard < (limit || 800)) { env.step(); guard++; }
+  return { left: C.fxNodes.length, frames: guard, layerKids: C.fxLayerEl.children.length };
+}
+
+/* -------------------------------------------------- swap slide offsets */
+group('animation — the swap slides each tile home from the partner square');
+{
+  M3.newGame({ difficulty: 'normal', seed: 7 });
+  var mv = C.findHintMove(C.grid);
+  check('a legal swap exists on the seeded board', !!mv, json(mv));
+  var r1 = mv[0], c1 = mv[1], r2 = mv[2], c2 = mv[3];
+  clickCell(r1, c1); clickCell(r2, c2);
+  check('the swap enters the swapping phase', C.phase === 'swapping', C.phase);
+  var ea = fxEntry(r1, c1), eb = fxEntry(r2, c2);
+  check('both swapped tiles carry the swap class', !!ea && ea.cls === 'swap' && !!eb && eb.cls === 'swap', json(fxClassSet()));
+  check('the rendered cells carry the swap class too',
+    /\bswap\b/.test(cellCls(r1, c1)) && /\bswap\b/.test(cellCls(r2, c2)), cellCls(r1, c1) + ' | ' + cellCls(r2, c2));
+  var ax = Number(ea.vars['--fx-nx']), ay = Number(ea.vars['--fx-ny']);
+  var bx = Number(eb.vars['--fx-nx']), by = Number(eb.vars['--fx-ny']);
+  check('the two offsets are exact opposites', ax === -bx && ay === -by, json([ax, ay, bx, by]));
+  check('each offset spans exactly one cell', Math.abs(ax) + Math.abs(ay) === 1 && Math.abs(bx) + Math.abs(by) === 1, json([ax, ay]));
+  check('the tile now at A starts on B — the square the gem it shows came from (data layer already swapped)',
+    ax === (c2 - c1) && ay === (r2 - r1), json([ax, ay, c2 - c1, r2 - r1]));
+  check('the tile now at B starts on A', bx === (c1 - c2) && by === (r1 - r2), json([bx, by]));
+  check('the slide reads its duration from --fx-ms', cellVar(r1, c1, '--fx-ms') === '190ms', cellVar(r1, c1, '--fx-ms'));
+}
+
+/* ------------------------------------- fall distance === rows fallen */
+group('animation — fall offsets equal the true number of rows fallen');
+{
+  var sa = fallScenario(GRID_A), sb = fallScenario(GRID_B), sc = fallScenario(GRID_C);
+
+  check('① the matches are the intended stacked run', json(sa.matched) === json([[2, 0], [3, 0], [4, 0]]), json(sa.matched));
+  var oka = fallOk(sa);
+  check('① every fall offset equals the reference distance', oka.ok, oka.why || json({ e: sa.expected, o: sa.observed }));
+  check('① the two gems above the run fall exactly 3', sa.observed['3:0'] === 3 && sa.observed['4:0'] === 3, json(sa.observed));
+  check('① the bottom of the column does not move', !sa.observed['5:0'] && !sa.observed['6:0'] && !sa.observed['7:0']);
+  check('① untouched columns never animate', Object.keys(sa.observed).every(function (k) { return /:0$/.test(k); }), json(Object.keys(sa.observed)));
+  check('① only moved tiles render the fall class', sa.cellsWithFallClass === Object.keys(sa.observed).length, sa.cellsWithFallClass + ' vs ' + Object.keys(sa.observed).length);
+  check('① the render mirrors the table into --fx-ny', sa.varsMismatch.length === 0, json(sa.varsMismatch));
+
+  check('② the matches are two separated middle runs',
+    json(sb.matched) === json([[1, 2], [1, 3], [1, 4], [5, 2], [5, 3], [5, 4]]), json(sb.matched));
+  var okb = fallOk(sb);
+  check('② every fall offset equals the reference distance', okb.ok, okb.why || json({ e: sb.expected, o: sb.observed }));
+  check('② a gem above two holes falls 2', sb.observed['2:2'] === 2 && sb.observed['2:3'] === 2 && sb.observed['2:4'] === 2, json(sb.observed));
+  check('② gems between the two holes fall 1', sb.observed['3:3'] === 1 && sb.observed['4:3'] === 1 && sb.observed['5:3'] === 1, json(sb.observed));
+  check('② the gems below the lower hole stay put', !sb.observed['6:3'] && !sb.observed['7:3']);
+  check('② the render mirrors the table into --fx-ny', sb.varsMismatch.length === 0, json(sb.varsMismatch));
+
+  var okc = fallOk(sc);
+  check('③ every fall offset equals the reference distance', okc.ok, okc.why || json({ e: sc.expected, o: sc.observed }));
+  check('③ clearing the top 5 of a column leaves nothing to fall in it',
+    Object.keys(sc.observed).every(function (k) { return /:3$/.test(k); }), json(sc.observed));
+  check('③ the shallow run still drops by 3, twice', sc.observed['3:3'] === 3 && sc.observed['4:3'] === 3, json(sc.observed));
+}
+
+/* ------------------------------------------------ refill drop distance */
+group('animation — refill gems enter from above the board');
+{
+  var ra = refillScenario(GRID_A), rc = refillScenario(GRID_C);
+  check('the refill phase is reached', ra.phase === 'refilling' && rc.phase === 'refilling', ra.phase + ',' + rc.phase);
+  check('new gems exist after a clear', ra.drops.length > 0 && rc.drops.length > 0, ra.drops.length + ',' + rc.drops.length);
+  // `ny` is the travel distance (positive); the tile is parked `ny` rows ABOVE
+  // its landing row, i.e. it starts at row (landingRow - ny), which must be < 0
+  // (above the top of the board).
+  check('every refill gem starts ABOVE the board top (landing - offset < 0)',
+    ra.drops.concat(rc.drops).every(function (d) { return (d.r - d.ny) < 0; }),
+    json(ra.drops.concat(rc.drops).slice(0, 4)));
+  var maxDrop = Math.max.apply(null, rc.drops.map(function (d) { return d.ny; }));
+  check('the refill travel beats the deepest in-board fall (5 > 3)', maxDrop > rc.fallMax,
+    'refill ' + maxDrop + ' vs fall ' + rc.fallMax);
+  check('the refill reads its duration from --fx-ms',
+    rc.drops.every(function (d) { return cellVar(d.r, d.c, '--fx-ms') === '220ms'; }));
+}
+
+/* ------------------------------------------------- lifecycle / cleanup */
+group('animation — every effect is retired when its phase ends');
+{
+  function cls(k) { return fxClassSet()[k] || 0; }
+  M3.newGame({ difficulty: 'normal', seed: 7 });
+  var mv = C.findHintMove(C.grid);
+  clickCell(mv[0], mv[1]); clickCell(mv[2], mv[3]);
+  C.onSwapDone();
+  check('after onSwapDone no swap class survives', cls('swap') === 0 && !anyCellHasClass('swap'), json(fxClassSet()));
+  check('after onSwapDone the cleared tiles are in the clear state', cls('clear') >= 3, json(fxClassSet()));
+
+  C.onClearDone();
+  check('after onClearDone the clear class is gone from the table', cls('clear') === 0, json(fxClassSet()));
+  check('after onClearDone NO tile is still visually clear (which would hide the gem)', !anyCellHasClass('clear'));
+
+  C.onFallDone();
+  check('after onFallDone no fall class survives', cls('fall') === 0 && !anyCellHasClass('fall'), json(fxClassSet()));
+  check('after onFallDone the new gems are in the drop state', cls('drop') >= 1, json(fxClassSet()));
+
+  var endedFrom = C.phase;
+  C.onRefillDone();
+  if (C.phase === 'clearing') {
+    check('cascade: onRefillDone retires the drop class before the next round',
+      cls('drop') === 0 && !anyCellHasClass('drop'), json(fxClassSet()));
+  } else {
+    check('move end: onRefillDone leaves NO residual animation class (fxAt cleared)',
+      C.fxAt.length === 0 && !anyCellHasClass('drop') && !anyCellHasClass('fall') && !anyCellHasClass('clear'),
+      'phase=' + C.phase + ' (arrived from ' + endedFrom + ') fx=' + json(fxClassSet()));
+  }
+
+  // illegal-swap path retires cleanly too
+  M3.newGame({ difficulty: 'normal', seed: 11 });
+  var pair = null;
+  for (var r = 0; r < 8 && !pair; r++) for (var c = 0; c < 8 && !pair; c++) {
+    if (c + 1 < 8 && !C.swapMakesMatch(C.grid, r, c, r, c + 1)) pair = [r, c, r, c + 1];
+    else if (r + 1 < 8 && !C.swapMakesMatch(C.grid, r, c, r + 1, c)) pair = [r, c, r + 1, c];
+  }
+  clickCell(pair[0], pair[1]); clickCell(pair[2], pair[3]);
+  check('the illegal swap enters the reverting phase', C.phase === 'reverting', C.phase);
+  C.onRevertDone();
+  check('after onRevertDone the board is idle with an empty fx table',
+    C.phase === 'idle' && C.fxAt.length === 0 && !anyCellHasClass('bad'));
+}
+
+/* real pipeline: a clear class must never outlive its own round */
+group('animation — across a real cascade no gem is stranded in the clear state');
+{
+  var moves = 0, fallingFrames = 0, clearLeaks = 0;
+  for (var s = 1; s <= 400 && moves < 6; s++) {
+    M3.newGame({ difficulty: 'easy', seed: s });
+    var mv = C.findHintMove(C.grid);
+    if (!mv) continue;
+    clickCell(mv[0], mv[1]); clickCell(mv[2], mv[3]);
+    var guard = 0;
+    while (guard < 4000 && C.phase !== 'idle') {
+      env.step(); guard++;
+      if (C.phase === 'falling' || C.phase === 'refilling') {
+        fallingFrames++;
+        if (countCellsWithClass('clear') > 0) clearLeaks++;
+      }
+      if (C.status !== 'playing') break;
+    }
+    if (guard < 4000) moves++;
+  }
+  check('several moves really ran through falling/refilling', fallingFrames > 0 && moves >= 3, moves + ' moves, ' + fallingFrames + ' frames');
+  check('no tile ever keeps the clear class while falling/refilling', clearLeaks === 0, clearLeaks);
+}
+
+/* ----------------------------------------------- node cap + recycling */
+group('animation — decoration nodes are capped and fully recycled');
+{
+  var maxSeen = nodeStress(40);
+  check('fxNodes never exceeds FX_MAX_NODES under stress', maxSeen <= C.FX_MAX_NODES, maxSeen + ' vs ' + C.FX_MAX_NODES);
+  check('the cap actually trims the list', maxSeen === C.FX_MAX_NODES, maxSeen);
+  var d = drainNodes(800);
+  check('after enough frames every decoration is recycled (fxNodes -> 0)', d.left === 0, json(d));
+  check('the decoration layer has no orphan children', d.layerKids === 0, d.layerKids);
+}
+
+/* ---------------------------------------------- combo + floating texts */
+group('animation — combo threshold and the floating numbers');
+{
+  injectBoard(GRID_A, { combo: 0 });
+  C.beginClear();
+  var c1 = C.combo, cells1 = C.pendingClear.length;
+  check('combo 1 spawns no combo pop', c1 === 1 && collectFxDesc('fx-combo').length === 0, 'combo=' + c1);
+  var fl1 = collectFxDesc('fx-float');
+  check('combo 1 spawns exactly one score float', fl1.length === 1, fl1.length);
+  check('the score float is +cells*10*combo',
+    fl1.length === 1 && fl1[0].textContent === '+' + (cells1 * 10 * c1), fl1[0] && fl1[0].textContent);
+
+  injectBoard(GRID_A, { combo: 1 });
+  C.beginClear();
+  var c2 = C.combo, cells2 = C.pendingClear.length;
+  var pop = collectFxDesc('fx-combo');
+  check('combo 2 spawns exactly one combo pop', c2 === 2 && pop.length === 1, 'combo=' + c2 + ' pops=' + pop.length);
+  check('the combo pop text encodes the combo number', pop.length === 1 && pop[0].textContent === '\u00d7' + c2, pop[0] && pop[0].textContent);
+  var fl2 = collectFxDesc('fx-float');
+  check('combo 2 doubles the award displayed',
+    fl2.length === 1 && fl2[0].textContent === '+' + (cells2 * 10 * c2), fl2[0] && fl2[0].textContent);
+}
+
+/* -------------------------------------------------------- board shake */
+group('animation — the board only shakes on a chain, then settles');
+{
+  injectBoard(GRID_A, { combo: 0 });
+  C.beginClear();
+  check('no shake on the first clear round', C.boardShakeTtl === 0 && !C.boardEl._cls.has('shake'), C.boardShakeTtl);
+
+  injectBoard(GRID_A, { combo: 1 });
+  C.beginClear();
+  check('the board shakes from the second round on', C.boardEl._cls.has('shake') && C.boardShakeTtl > 0, C.boardShakeTtl);
+  check('the rendered #board carries the shake class', /(^|\s)shake(\s|$)/.test(C.boardEl.className), C.boardEl.className);
+  drainNodes(400);
+  check('the shake timer decays to 0', C.boardShakeTtl === 0, C.boardShakeTtl);
+  check('the shake class is removed when the timer expires', !C.boardEl._cls.has('shake'), C.boardEl.className);
+}
+
+/* ------------------------------------------ plays without an fx layer */
+group('animation — the game still plays with NO decoration layer');
+{
+  var saved = C.fxLayerEl;
+  var threw = null;
+  C.fxLayerEl = null;
+  try {
+    M3.newGame({ difficulty: 'normal', seed: 7 });
+    var mv = C.findHintMove(C.grid);
+    var sc0 = C.score, mv0 = C.moves;
+    clickCell(mv[0], mv[1]); clickCell(mv[2], mv[3]);
+    var guard = 0;
+    while (guard < 3000 && C.phase !== 'idle') { env.step(); guard++; }
+    check('a full move still resolves to idle without the fx layer', C.phase === 'idle', C.phase);
+    check('the move still scored', C.score > sc0, C.score);
+    check('exactly one move was spent', C.moves === mv0 - 1, C.moves);
+    check('nothing could be attached (fxNodes stays empty)', C.fxNodes.length === 0, C.fxNodes.length);
+  } catch (e) { threw = e; }
+  check('no exception is thrown when the fx layer is absent', threw === null, threw && threw.message);
+  C.fxLayerEl = saved;
+  M3.newGame({ difficulty: 'normal', seed: 1 });
+}
+
 /* ============================= reverse checks (prove assertions are live) */
 group('reverse checks (in-process) — the suite catches broken rules');
 {
@@ -829,6 +1214,58 @@ group('reverse checks (in-process) — the suite catches broken rules');
   C.findMatches = origFind2;
   const rcross = C.findMatches(cross);
   check('restored findMatches de-duplicates the cross', rcross.length === cellSet(rcross).size && rcross.length === 5, `${rcross.length}`);
+}
+
+/* ======= reverse checks (in-process) — the ANIMATION assertions are live ===
+ * Each one deliberately breaks a piece of the new animation contract and shows
+ * the matching assertion above would go red, then restores it. The external
+ * (file-level) break/restore proof lives in the QA report. */
+group('reverse checks — the animation assertions catch broken offsets / cleanup / caps');
+{
+  // 1) a hard-wired fall offset must be caught by the fall-distance assertion.
+  const origFall = C.applyFallFx;
+  C.applyFallFx = function (before) {
+    for (var r = 0; r < 8; r++) for (var c = 0; c < 8; c++) {
+      if (C.cellVal(before, r, c) !== null) C.setFx(r, c, 'fall', { '--fx-ny': -1, '--fx-ms': '300ms' });
+    }
+  };
+  const brokenFall = fallScenario(GRID_A);
+  check('reverse: a hard-wired -1 fall offset disagrees with the reference', !fallOk(brokenFall).ok, json(brokenFall.observed));
+  C.applyFallFx = origFall;
+  check('restored applyFallFx agrees with the reference again', fallOk(fallScenario(GRID_A)).ok);
+
+  // 2) dropping clearFx() from onClearDone must leave the invisible clear class.
+  const origClearDone = C.onClearDone;
+  C.onClearDone = function () {
+    var i;
+    for (i = 0; i < C.pendingClear.length; i++) C.grid[C.pendingClear[i][0]][C.pendingClear[i][1]] = null;
+    C.pendingClear = null;
+    C.grid = C.applyGravity(C.grid);            // BUG: clearFx() deliberately omitted
+    C.phase = 'falling'; C.phaseElapsed = 0; C.phaseDuration = 300; C.render();
+  };
+  injectBoard(GRID_A, { combo: 0 }); C.beginClear(); C.onClearDone();
+  check('reverse: a missing clearFx leaves the invisible clear class on the board', countCellsWithClass('clear') > 0, countCellsWithClass('clear'));
+  C.onClearDone = origClearDone;
+  injectBoard(GRID_A, { combo: 0 }); C.beginClear(); C.onClearDone();
+  check('restored onClearDone retires the clear class', countCellsWithClass('clear') === 0);
+
+  // 3) an unbounded budget must let the decoration list blow past the cap.
+  const origCap = C.FX_MAX_NODES;
+  C.FX_MAX_NODES = 100000;
+  const unbounded = nodeStress(40);
+  C.FX_MAX_NODES = origCap;
+  check('reverse: without a cap the node list grows well past 90', unbounded > 90, unbounded);
+  check('restored cap trims the list to <= 90 again', nodeStress(40) <= 90);
+
+  // 4) a neutered ageFxNodes must leak (nothing is ever recycled).
+  const origAge = C.ageFxNodes;
+  C.ageFxNodes = function () {};
+  injectBoard(GRID_A, { combo: 0 }); C.beginClear();
+  const leaked = drainNodes(200);
+  check('reverse: with aging disabled the nodes never get recycled', leaked.left > 0, json(leaked));
+  C.ageFxNodes = origAge;
+  injectBoard(GRID_A, { combo: 0 }); C.beginClear();
+  check('restored aging recycles every node', drainNodes(800).left === 0);
 }
 
 console.log(`\n${pass} passed, ${fail} failed\n`);
