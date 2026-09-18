@@ -1,0 +1,1744 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lianliankan</title>
+<style>
+  :root {
+    --bg: #eef2fb;
+    --card: #ffffff;
+    --border: #d7deee;
+    --text: #1e2740;
+    --muted: #6b7592;
+    --accent: #6366f1;
+    --good: #16a34a;
+    --danger: #e11d48;
+    --link: #f59e0b;
+    --gap: 6px;
+    --pad: 8px;
+    --clear-ms: 340ms;
+    --shuffle-ms: 320ms;
+    --deal-ms: 260ms;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    margin: 0;
+    padding: 20px 12px 48px;
+    background: radial-gradient(120% 120% at 50% 0%, #ffffff 0%, var(--bg) 62%);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+  }
+
+  h1 { margin: 0 0 4px; font-size: 27px; letter-spacing: -.02em; }
+  .tip { margin: 0 0 16px; font-size: 13px; color: var(--muted); text-align: center; max-width: 460px; }
+
+  .panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 14px;
+    box-shadow: 0 10px 30px rgba(30,39,64,.10);
+    width: min(440px, 100%);
+  }
+
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    margin-bottom: 10px;
+  }
+  .bar:last-child { margin-bottom: 0; margin-top: 10px; }
+
+  .stat {
+    background: #f5f7fd;
+    color: #3a4668;
+    font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 5px 9px;
+    border-radius: 9px;
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+  }
+  .stat small { font-weight: 400; opacity: .7; font-size: 11px; }
+  .stat b { color: var(--accent); }
+  #time.low { color: var(--danger); }
+
+  select {
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--text);
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    padding: 7px 9px;
+    cursor: pointer;
+  }
+  select:disabled { opacity: .5; cursor: not-allowed; }
+
+  button {
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--text);
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    padding: 8px 14px;
+    cursor: pointer;
+    transition: border-color .12s ease, color .12s ease, background .12s ease, filter .12s ease;
+  }
+  button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  button.primary {
+    background: linear-gradient(160deg, #818cf8, #4f46e5);
+    border-color: #4f46e5;
+    color: #fff;
+    font-weight: 700;
+  }
+  button.primary:hover:not(:disabled) { color: #fff; filter: brightness(1.06); }
+
+  /* ---------- board ---------- */
+  /* The wrapper gives the decoration layers a positioned box that exactly
+   * overlays the board. Both layers are SIBLINGS of #board (never children —
+   * the smoke harness treats classed children of #board as clickable tiles). */
+  .board-wrap {
+    position: relative;
+    width: 100%;
+  }
+
+  #board {
+    display: grid;
+    gap: var(--gap);
+    width: 100%;
+    padding: var(--pad);
+    border-radius: 16px;
+    background: linear-gradient(180deg, #f3f6fe, #e9eefb);
+    border: 1px solid var(--border);
+    box-shadow: inset 0 2px 10px rgba(30,39,64,.07);
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* Floating text layer: a grid mirroring the board geometry, on top of it. */
+  #fxLayer {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    gap: var(--gap);
+    padding: var(--pad);
+    pointer-events: none;
+    z-index: 10;
+    overflow: visible;
+  }
+
+  /* The link path is drawn on an SVG overlay in "board units" (viewBox 0 0
+   * cols rows, one unit = one tile). Outer-ring waypoints sit at -0.5 /
+   * rows+0.5, so overflow: visible lets the line run around the OUTSIDE edge
+   * of the board — the classic lianliankan "around the corner" connection. */
+  #linkLayer {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
+    z-index: 9;
+  }
+
+  .tile {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    background: linear-gradient(180deg, #ffffff, #f4f6fd);
+    border: 1px solid var(--border);
+    box-shadow: 0 2px 4px rgba(30,39,64,.10);
+    cursor: pointer;
+    min-width: 0;
+    min-height: 0;
+    line-height: 1;
+    transition: filter .12s ease, box-shadow .12s ease;
+    will-change: transform, opacity;
+  }
+  .tile:hover { filter: brightness(1.05); }
+  .tile.empty {
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+    cursor: default;
+  }
+
+  /* Selected look deliberately uses NO transform: the clear / shuffle
+   * animations own `transform`, and an animation always wins over a static
+   * declaration, so scaling here would make the tile jump. */
+  .tile.sel {
+    outline: 3px solid var(--accent);
+    outline-offset: -3px;
+    box-shadow: inset 0 0 0 3px rgba(99,102,241,.45), 0 0 12px rgba(99,102,241,.40);
+    filter: brightness(1.06);
+    z-index: 3;
+  }
+
+  .tile.hint {
+    outline: 3px solid var(--link);
+    outline-offset: -3px;
+    animation: hintPulse .55s ease 3;
+    z-index: 3;
+  }
+  @keyframes hintPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(245,158,11,0); }
+    50%      { box-shadow: 0 0 0 5px rgba(245,158,11,.55); }
+  }
+
+  .tile.bad { animation: shake .2s ease; }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25%      { transform: translateX(-3px); }
+    75%      { transform: translateX(3px); }
+  }
+
+  .tile.clear { animation: tileClear var(--clear-ms) cubic-bezier(.3,.9,.3,1) both; z-index: 5; }
+  @keyframes tileClear {
+    0%   { transform: scale(1) rotate(0deg);     filter: brightness(1);   opacity: 1; }
+    30%  { transform: scale(1.14) rotate(0deg);  filter: brightness(1.6); opacity: 1; }
+    100% { transform: scale(.18) rotate(14deg);  filter: brightness(1.9); opacity: 0; }
+  }
+
+  .tile.out { animation: tileOut var(--shuffle-ms) ease-in both; }
+  @keyframes tileOut {
+    0%   { transform: scale(1);   opacity: 1; }
+    100% { transform: scale(.35); opacity: 0; }
+  }
+  .tile.in { animation: tileIn var(--deal-ms) cubic-bezier(.2,1.3,.4,1) both; }
+  @keyframes tileIn {
+    0%   { transform: scale(.3); opacity: 0; }
+    100% { transform: scale(1);  opacity: 1; }
+  }
+
+  /* ---------- link path (SVG) ---------- */
+  .link-halo {
+    fill: none;
+    stroke: rgba(245,158,11,.35);
+    stroke-width: .34;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    animation: linkFlash var(--clear-ms) ease-out both;
+  }
+  .link-line {
+    fill: none;
+    stroke: var(--link);
+    stroke-width: .15;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    animation: linkFlash var(--clear-ms) ease-out both;
+  }
+  .link-dot {
+    fill: #ffffff;
+    stroke: var(--link);
+    stroke-width: .06;
+    animation: linkFlash var(--clear-ms) ease-out both;
+  }
+  @keyframes linkFlash {
+    0%   { opacity: 0; }
+    15%  { opacity: 1; }
+    65%  { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
+  /* ---------- floating text layer ---------- */
+  .fx-anchor { position: relative; pointer-events: none; }
+  .fx-anchor.fx-full { grid-row: 1 / -1; grid-column: 1 / -1; }
+
+  .fx-float {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    font: 700 13px/1 "SFMono-Regular", Menlo, Consolas, monospace;
+    color: #fff;
+    text-shadow: 0 1px 3px rgba(20,27,48,.65);
+    white-space: nowrap;
+    animation: fxFloat .8s ease-out both;
+    pointer-events: none;
+  }
+  @keyframes fxFloat {
+    0%   { transform: translate(-50%, -50%) scale(.7);   opacity: 0; }
+    25%  { transform: translate(-50%, -60%) scale(1.06); opacity: 1; }
+    100% { transform: translate(-50%, -125%) scale(1);   opacity: 0; }
+  }
+
+  .fx-combo {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    font: 800 40px/1 "SFMono-Regular", Menlo, Consolas, monospace;
+    color: #fff;
+    text-shadow: 0 3px 14px rgba(79,70,229,.75), 0 1px 2px rgba(20,27,48,.45);
+    animation: fxCombo .9s cubic-bezier(.2,1.4,.4,1) both;
+    pointer-events: none;
+  }
+  @keyframes fxCombo {
+    0%   { transform: translate(-50%, -50%) scale(.4);  opacity: 0; }
+    30%  { transform: translate(-50%, -50%) scale(1.25); opacity: 1; }
+    55%  { transform: translate(-50%, -50%) scale(1);    opacity: 1; }
+    100% { transform: translate(-50%, -58%) scale(1);    opacity: 0; }
+  }
+
+  /* Respect the platform motion preference: every decorative animation
+   * becomes effectively instantaneous. Timing is owned by the rAF state
+   * machine, never by CSS events, so the flow is unchanged either way. */
+  @media (prefers-reduced-motion: reduce) {
+    .tile.clear, .tile.out, .tile.in, .tile.bad, .tile.hint,
+    .link-line, .link-halo, .link-dot, .fx-float, .fx-combo {
+      animation-duration: 1ms !important;
+      animation-iteration-count: 1 !important;
+    }
+  }
+
+  .notice {
+    margin: 10px 2px 0;
+    min-height: 18px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  /* ---------- overlays ---------- */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 27, 48, .42);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 20;
+  }
+  .overlay.show { display: flex; }
+
+  .dialog {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 26px 28px 22px;
+    width: min(360px, 100%);
+    text-align: center;
+    box-shadow: 0 16px 50px rgba(20,27,48,.30);
+    animation: rise .2s ease-out;
+  }
+  @keyframes rise {
+    from { transform: translateY(12px); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+  }
+
+  .dialog h2 { margin: 0 0 10px; font-size: 22px; }
+  .dialog p  { color: var(--muted); font-size: 13px; line-height: 1.65; margin: 0 0 18px; }
+  #dlgSub {
+    font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 13px;
+  }
+  .dialog b { color: var(--accent); }
+
+  .field {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin: 0 0 18px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  @media (max-width: 480px) {
+    h1 { font-size: 22px; }
+    .panel { padding: 11px; }
+    .bar { gap: 5px; }
+    .board-wrap { --gap: 4px; --pad: 6px; }
+    button { padding: 7px 11px; font-size: 12px; }
+    .stat { padding: 4px 7px; font-size: 11px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="lang-switch" data-lang-switch></div>
+
+<h1 data-i18n="title"></h1>
+<p class="tip" data-i18n="tip"></p>
+
+<div class="panel">
+  <div class="bar">
+    <span class="stat"><small data-i18n="score"></small> <b id="score">0</b></span>
+    <span class="stat"><small data-i18n="time"></small> <b id="time">0:00</b></span>
+    <span class="stat"><small data-i18n="pairs"></small> <b id="pairs">0</b></span>
+    <span class="stat"><small data-i18n="combo"></small> <b id="combo">-</b></span>
+    <span class="stat"><small data-i18n="hints"></small> <b id="hints">3</b></span>
+    <span class="stat"><small data-i18n="best"></small> <b id="best">0</b></span>
+    <span class="stat"><small data-i18n="level"></small> <b id="levelLabel">Normal</b></span>
+  </div>
+
+  <div class="board-wrap">
+    <div id="board"></div>
+    <div id="fxLayer"></div>
+    <svg id="linkLayer" preserveAspectRatio="none" aria-hidden="true"></svg>
+  </div>
+
+  <div class="bar">
+    <button id="btnHint" data-i18n="hint"></button>
+    <button id="btnShuffle" data-i18n="shuffle"></button>
+    <button id="btnNew" data-i18n="newgame"></button>
+  </div>
+  <p class="notice" id="notice"></p>
+</div>
+
+<!-- Start overlay: the required entry point out of the ready state. -->
+<div id="startOverlay" class="overlay show">
+  <div class="dialog">
+    <h2 data-i18n="title"></h2>
+    <p data-i18n-html="aimhtml"></p>
+    <label class="field">
+      <span data-i18n="difficulty"></span>
+      <select id="difficulty">
+        <option value="easy" data-i18n="diff_easy"></option>
+        <option value="normal" selected data-i18n="diff_normal"></option>
+        <option value="hard" data-i18n="diff_hard"></option>
+      </select>
+    </label>
+    <button id="btnStart" class="primary" data-i18n="start"></button>
+  </div>
+</div>
+
+<!-- Result overlay: shown on clearing the board or running out of time. -->
+<div id="overlay" class="overlay">
+  <div class="dialog">
+    <h2 id="dlgTitle"></h2>
+    <p id="dlgSub"></p>
+    <button id="dlgBtn" class="primary" data-i18n="replay"></button>
+  </div>
+</div>
+
+<script src="../assets/i18n.js"></script>
+<script>
+/* ============================================================================
+ * Lianliankan (Link Match) — a single-file, zero-dependency, DOM-rendered
+ * tile-linking game.
+ *
+ * Path model: the playable space is the (rows+2) x (cols+2) EXTENDED grid.
+ * Tiles live at extended coords (1..rows, 1..cols); the outer ring (row/col 0
+ * and rows+1/cols+1) is always empty, which is how paths may legally run
+ * AROUND the outside of the board — the classic lianliankan rule.
+ *
+ * Path finding uses "three-segment enumeration": any legal path has at most
+ * two turns, i.e. at most three straight segments. The two-turn cases are
+ * enumerated exactly (one shared column, or one shared row, for the middle
+ * segment), so the search is complete and obviously correct without BFS.
+ *
+ * Timing: the whole flow is a requestAnimationFrame-driven state machine
+ * (`phase`). setTimeout is NEVER used (the smoke harness stubs it out); the
+ * countdown, combo window, hint / deny highlights and decoration lifetimes
+ * all accumulate frame deltas. Phases:
+ *     idle -> clearing -> idle (pair removed; then win / deadlock checks)
+ *     idle -> shuffling -> dealing -> idle   (deadlock auto-shuffle, or button)
+ *
+ * Everything is top-level ES5 so the bridge object `window.LL` and the pure
+ * helpers stay reachable from the test harness.
+ * ========================================================================== */
+
+var T = LiteI18N.create({
+  title:       { en: 'Lianliankan', zh: '连连看' },
+  tip:         { en: 'Link two matching tiles with a path of at most two turns — clear the board before time runs out.',
+                 zh: '用最多两次转折的路径连接两张相同图案的牌，在时间耗尽前清空棋盘。' },
+  score:       { en: 'Score', zh: '得分' },
+  time:        { en: 'Time', zh: '时间' },
+  pairs:       { en: 'Pairs', zh: '剩余对数' },
+  combo:       { en: 'Combo', zh: '连击' },
+  hints:       { en: 'Hints', zh: '提示' },
+  best:        { en: 'Best', zh: '最佳' },
+  level:       { en: 'Level', zh: '难度' },
+  difficulty:  { en: 'Difficulty', zh: '难度' },
+  diff_easy:   { en: 'Easy', zh: '简单' },
+  diff_normal: { en: 'Normal', zh: '普通' },
+  diff_hard:   { en: 'Hard', zh: '困难' },
+  hint:        { en: 'Hint', zh: '提示' },
+  shuffle:     { en: 'Shuffle', zh: '洗牌' },
+  newgame:     { en: 'New Game', zh: '新游戏' },
+  start:       { en: 'Start Game', zh: '开始游戏' },
+  replay:      { en: 'Play Again', zh: '再来一局' },
+  win:         { en: 'You Win!', zh: '你赢了！' },
+  lose:        { en: "Time's Up", zh: '时间到' },
+  readyHint:   { en: 'Choose a difficulty, then press Start.',
+                 zh: '选择难度，然后点击「开始游戏」。' },
+  play:        { en: 'Tap two matching tiles that can be linked with at most two turns.',
+                 zh: '点击两张相同图案、且能用不超过两次转折连通的牌。' },
+  noLink:      { en: 'No path between those two — try another tile.',
+                 zh: '这两张连不起来，换一张试试。' },
+  deadShuffle: { en: 'No pairs left — board reshuffled (-30).',
+                 zh: '没有可连的牌了，自动洗牌（-30 分）。' },
+  reshuffled:  { en: 'Board reshuffled! (-30)',
+                 zh: '已洗牌！（-30 分）' },
+  resultWin:   { en: 'Score {score} · Time bonus +{bonus} · Best {best}',
+                 zh: '得分 {score} · 时间奖励 +{bonus} · 最佳 {best}' },
+  resultLose:  { en: 'Score {score} · Pairs left {pairs} · Best {best}',
+                 zh: '得分 {score} · 剩余对数 {pairs} · 最佳 {best}' },
+  aimhtml: {
+    en: 'Tap one tile, then a second with the <b>same picture</b>: if they can be ' +
+        'joined by a path with <b>at most two turns</b> (paths may run around the ' +
+        'outer edge of the board), both tiles are removed. Clear everything ' +
+        'before the timer empties!',
+    zh: '先点一张牌，再点一张<b>同图案</b>的牌：若两者能用<b>最多两次转折</b>的路径连通' +
+        '（路径可以绕棋盘外圈），两张牌即被消除。在时间耗尽前清空全部牌！'
+  },
+  k0:  { en: 'Apple',      zh: '苹果' },
+  k1:  { en: 'Orange',     zh: '橙子' },
+  k2:  { en: 'Lemon',      zh: '柠檬' },
+  k3:  { en: 'Watermelon', zh: '西瓜' },
+  k4:  { en: 'Grapes',     zh: '葡萄' },
+  k5:  { en: 'Strawberry', zh: '草莓' },
+  k6:  { en: 'Cat',        zh: '猫' },
+  k7:  { en: 'Fox',        zh: '狐狸' },
+  k8:  { en: 'Panda',      zh: '熊猫' },
+  k9:  { en: 'Star',       zh: '星星' },
+  k10: { en: 'Moon',       zh: '月亮' },
+  k11: { en: 'Lightning',  zh: '闪电' }
+});
+
+/* -------------------------------------------------------------- constants */
+var KINDS = ['🍎', '🍊', '🍋', '🍉', '🍇', '🍓', '🐱', '🦊', '🐼', '⭐', '🌙', '⚡'];
+
+/* Difficulty table: board size, number of tile kinds, time limit (seconds). */
+var DIFF = {
+  easy:   { rows: 6,  cols: 6, kinds: 8,  time: 360 },
+  normal: { rows: 8,  cols: 8, kinds: 10, time: 420 },
+  hard:   { rows: 10, cols: 8, kinds: 12, time: 480 }
+};
+
+/* Phase durations (ms) — the state machine owns all timing. */
+var CLEAR_MS   = 340;    // matched tiles pop out while the link line flashes
+var SHUFFLE_MS = 320;    // tiles fly away
+var DEAL_MS    = 260;    // reshuffled tiles pop back in
+var DENY_MS    = 200;    // "not linkable" shake
+
+/* Scoring. */
+var BASE_POINTS        = 10;   // per matched pair
+var COMBO_STEP         = 5;    // extra points per combo level
+var COMBO_WINDOW       = 5000; // ms between matches to keep the chain alive
+var HINT_COST          = 20;   // per hint
+var HINTS_PER_GAME     = 3;
+var SHUFFLE_COST       = 30;   // manual OR deadlock auto-shuffle
+var TIME_BONUS_PER_SEC = 2;    // win bonus per remaining second
+
+var SHUFFLE_TRIES = 400;       // hard cap on random re-deal attempts
+var REPAIR_SWAPS  = 200;       // hard cap on the deterministic fallback
+
+/* --------------------------------------------------------------- state */
+var rows = 8;                 // live board dimensions (tiles)
+var cols = 8;
+var grid = [];                // grid[r][c] = kind index, or null when cleared
+var status = 'ready';         // 'ready' | 'playing' | 'over'
+var diffKey = 'normal';
+var config = DIFF.normal;     // active difficulty config
+var score = 0;
+var best = 0;
+var comboLevel = 0;           // chain depth of the current combo
+var comboUntil = 0;           // playClock ms after which the combo expires
+var playClock = 0;            // ms of accumulated play (drives combo window)
+var timeLeft = 0;             // ms remaining
+var totalPairs = 0;
+var pairsLeft = 0;
+var hintsLeft = HINTS_PER_GAME;
+var selected = null;          // [r, c] of the selected tile, or null
+var endWin = false;           // result of the finished game
+var endBonus = 0;             // win time bonus
+
+var phase = 'idle';           // 'idle' | 'clearing' | 'shuffling' | 'dealing'
+var phaseElapsed = 0;
+var phaseDuration = 0;
+var clearingPair = null;      // the two tiles playing the clear animation
+var denyCells = null;         // tile(s) shaking after an unlinkable pick
+var denyTimer = 0;
+var hintCells = null;         // the pair highlighted by the Hint button
+var hintTimer = 0;
+var noticeKey = null;         // i18n key for the status line
+var noticeVars = null;
+var rng = Math.random;        // swappable for a seeded generator
+var lastFrameTs = 0;          // previous rAF timestamp (browser only)
+var tileEls = [];             // tileEls[r][c] -> the tile element
+var timeStr = '';             // cached countdown text (avoid rewrites per frame)
+var currentLink = null;       // <g> of the live link path on #linkLayer
+
+/* fxAt[r][c] is a transient per-tile animation descriptor ({cls, vars}) that
+ * render() folds into the tile className — same pattern as the match-3 game,
+ * so a class set here survives the next full repaint. */
+var fxAt = [];
+var fxNodes = [];             // decorations on #fxLayer: [{el, ttl}]
+var FX_MAX_NODES = 60;
+
+/* ------------------------------------------------------------ dom refs */
+var boardEl = document.getElementById('board');
+var fxLayerEl = document.getElementById('fxLayer');
+var linkLayerEl = document.getElementById('linkLayer');
+var scoreEl = document.getElementById('score');
+var timeEl = document.getElementById('time');
+var pairsEl = document.getElementById('pairs');
+var comboEl = document.getElementById('combo');
+var hintsEl = document.getElementById('hints');
+var bestEl = document.getElementById('best');
+var levelLabelEl = document.getElementById('levelLabel');
+var noticeEl = document.getElementById('notice');
+var diffEl = document.getElementById('difficulty');
+var btnNew = document.getElementById('btnNew');
+var btnStart = document.getElementById('btnStart');
+var btnHint = document.getElementById('btnHint');
+var btnShuffle = document.getElementById('btnShuffle');
+var dlgTitle = document.getElementById('dlgTitle');
+var dlgSub = document.getElementById('dlgSub');
+var dlgBtn = document.getElementById('dlgBtn');
+var startOverlay = document.getElementById('startOverlay');
+var overlay = document.getElementById('overlay');
+
+/* ======================================================================
+ * Pure helpers — exposed on window.LL; none of them mutate their argument.
+ * ==================================================================== */
+
+/* Dimensions of an arbitrary board, tolerating ragged rows. */
+function boardDims(b) {
+  var h = (b && b.length) ? b.length : 0;
+  var w = 0;
+  for (var r = 0; r < h; r++) { if (b[r] && b[r].length > w) w = b[r].length; }
+  return [h, w];
+}
+
+/* Deep copy of a board. */
+function copyBoard(b) {
+  var out = [];
+  for (var r = 0; r < b.length; r++) out.push(b[r] ? b[r].slice() : []);
+  return out;
+}
+
+/* Build the (h+2) x (w+2) extended grid: an always-empty outer ring wrapped
+ * around a copy of the board. This is how "around the outside" paths are
+ * modelled — the ring is real, addressable space. */
+function toExt(b) {
+  var dims = boardDims(b);
+  var h = dims[0], w = dims[1];
+  var x = [];
+  var r, c;
+  for (r = 0; r < h + 2; r++) {
+    var row = [];
+    for (c = 0; c < w + 2; c++) {
+      var v = (r >= 1 && r <= h && c >= 1 && c <= w && b[r - 1] && b[r - 1][c - 1] != null)
+        ? b[r - 1][c - 1] : null;
+      row.push(v);
+    }
+    x.push(row);
+  }
+  return x;
+}
+
+/* True when every cell STRICTLY between two collinear extended cells is empty.
+ * (Endpoints are not checked — callers validate corners separately.) */
+function segClearX(x, r1, c1, r2, c2) {
+  var lo, hi, i;
+  if (r1 === r2) {
+    lo = Math.min(c1, c2) + 1;
+    hi = Math.max(c1, c2);
+    for (i = lo; i < hi; i++) { if (x[r1][i] !== null) return false; }
+    return true;
+  }
+  lo = Math.min(r1, r2) + 1;
+  hi = Math.max(r1, r2);
+  for (i = lo; i < hi; i++) { if (x[i][c1] !== null) return false; }
+  return true;
+}
+
+/* Find a path from (ar,ac) to (br,bc) on the extended grid `x` using at most
+ * two turns (three straight segments). Returns the corner list —
+ * [[ar,ac], ...turns..., [br,bc]] in EXTENDED coordinates — or null.
+ *
+ * Enumeration (complete for <= 2 turns):
+ *   0 turns  : straight line, same row or column.
+ *   1 turn   : corner (ar,bc) or (br,ac).
+ *   2 turns  : a shared column cc (a -> (ar,cc) -> (br,cc) -> b), or a shared
+ *              row rr (a -> (rr,ac) -> (rr,bc) -> b). cc/rr range over the
+ *              WHOLE extended grid including the outer ring.
+ */
+function findPathX(x, ar, ac, br, bc) {
+  var H = x.length, W = x[0] ? x[0].length : 0;
+  var rr, cc;
+
+  /* A corner cell must be empty, or coincide with an endpoint (degenerate). */
+  function free(r, c) {
+    return x[r][c] === null || (r === ar && c === ac) || (r === br && c === bc);
+  }
+
+  /* 0 turns. */
+  if ((ar === br || ac === bc) && segClearX(x, ar, ac, br, bc)) {
+    return simplifyPath([[ar, ac], [br, bc]]);
+  }
+
+  /* 1 turn: corner (ar, bc). */
+  if (free(ar, bc) && segClearX(x, ar, ac, ar, bc) && segClearX(x, ar, bc, br, bc)) {
+    return simplifyPath([[ar, ac], [ar, bc], [br, bc]]);
+  }
+  /* 1 turn: corner (br, ac). */
+  if (free(br, ac) && segClearX(x, ar, ac, br, ac) && segClearX(x, br, ac, br, bc)) {
+    return simplifyPath([[ar, ac], [br, ac], [br, bc]]);
+  }
+
+  /* 2 turns with a vertical middle segment (shared column cc). cc === ac or
+   * cc === bc degenerates to the 1-turn cases above, so skip them. */
+  for (cc = 0; cc < W; cc++) {
+    if (cc === ac || cc === bc) continue;
+    if (free(ar, cc) && free(br, cc) &&
+        segClearX(x, ar, ac, ar, cc) &&
+        segClearX(x, ar, cc, br, cc) &&
+        segClearX(x, br, cc, br, bc)) {
+      return simplifyPath([[ar, ac], [ar, cc], [br, cc], [br, bc]]);
+    }
+  }
+  /* 2 turns with a horizontal middle segment (shared row rr). */
+  for (rr = 0; rr < H; rr++) {
+    if (rr === ar || rr === br) continue;
+    if (free(rr, ac) && free(rr, bc) &&
+        segClearX(x, ar, ac, rr, ac) &&
+        segClearX(x, rr, ac, rr, bc) &&
+        segClearX(x, rr, bc, br, bc)) {
+      return simplifyPath([[ar, ac], [rr, ac], [rr, bc], [br, bc]]);
+    }
+  }
+  return null;
+}
+
+/* Drop duplicated / collinear waypoints so the returned corner list is minimal
+ * (purely cosmetic for the drawn line, and friendlier for QA assertions). */
+function simplifyPath(pts) {
+  var out = [pts[0]];
+  var i;
+  for (i = 1; i < pts.length - 1; i++) {
+    var a = out[out.length - 1];
+    var p = pts[i];
+    var b = pts[i + 1];
+    var collinear = (a[0] === p[0] && p[0] === b[0]) || (a[1] === p[1] && p[1] === b[1]);
+    if (!collinear) out.push(p);
+  }
+  var last = pts[pts.length - 1];
+  var tail = out[out.length - 1];
+  if (tail[0] !== last[0] || tail[1] !== last[1]) out.push(last);
+  return out;
+}
+
+/* Connect two tiles given in BOARD coordinates. Returns the corner list in
+ * EXTENDED coordinates (path[0] = [r1+1, c1+1], last = [r2+1, c2+1]; the outer
+ * ring is row/col 0 and rows+1/cols+1) or null. Pure. */
+function connectPair(b, r1, c1, r2, c2) {
+  var dims = boardDims(b);
+  var h = dims[0], w = dims[1];
+  if (r1 < 0 || r1 >= h || c1 < 0 || c1 >= w) return null;
+  if (r2 < 0 || r2 >= h || c2 < 0 || c2 >= w) return null;
+  if (r1 === r2 && c1 === c2) return null;
+  var v1 = b[r1][c1];
+  var v2 = b[r2][c2];
+  if (v1 == null || v2 == null || v1 !== v2) return null;
+  var x = toExt(b);
+  return findPathX(x, r1 + 1, c1 + 1, r2 + 1, c2 + 1);
+}
+
+/* First removable pair on a board, as [[r1,c1],[r2,c2]], or null. Pure —
+ * used for the initial-board guarantee, deadlock detection and hints. */
+function findPair(b) {
+  var dims = boardDims(b);
+  var h = dims[0], w = dims[1];
+  if (h < 1 || w < 1) return null;
+  var byVal = {};
+  var r, c, v;
+  for (r = 0; r < h; r++) {
+    for (c = 0; c < w; c++) {
+      v = b[r][c];
+      if (v != null) {
+        if (!byVal[v]) byVal[v] = [];
+        byVal[v].push([r, c]);
+      }
+    }
+  }
+  var x = toExt(b);
+  var key;
+  for (key in byVal) {
+    if (!byVal.hasOwnProperty(key)) continue;
+    var list = byVal[key];
+    var i, j;
+    for (i = 0; i < list.length; i++) {
+      for (j = i + 1; j < list.length; j++) {
+        var p1 = list[i], p2 = list[j];
+        if (findPathX(x, p1[0] + 1, p1[1] + 1, p2[0] + 1, p2[1] + 1)) {
+          return [[p1[0], p1[1]], [p2[0], p2[1]]];
+        }
+      }
+    }
+  }
+  return null;
+}
+
+/* ---------------------------------------------------------------- rng */
+/* Integer in [0, n) drawn from the active generator. */
+function randInt(n) {
+  return Math.floor(rng() * n);
+}
+
+/* Seeded mulberry32 generator; accepts a number or a string seed. */
+function makeRng(seed) {
+  var s = seed;
+  if (typeof s === 'string') {
+    var h = 2166136261;
+    for (var i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 16777619) >>> 0;
+    }
+    s = h;
+  }
+  s = Number(s);
+  if (isNaN(s) || s === Infinity || s === -Infinity) s = 1;
+  s = s >>> 0;
+  if (s === 0) s = 0x9e3779b9;
+  return function () {
+    s = (s + 0x6D2B79F5) >>> 0;
+    var t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/* Fisher–Yates shuffle of an array in place, using the active generator. */
+function shuffleArr(a) {
+  for (var i = a.length - 1; i > 0; i--) {
+    var j = Math.floor(rng() * (i + 1));
+    var t = a[i]; a[i] = a[j]; a[j] = t;
+  }
+}
+
+/* -------------------------------------------------- solvability repair */
+/* Deterministic repair that mutates the (private copy of a) board until it is
+ * guaranteed to contain an adjacent same-value pair — which is always
+ * linkable. Strategy: take any value v with 2+ tiles, v1 = its first
+ * occurrence; bring ANOTHER v tile next to v1 either by swapping with an
+ * occupied neighbour, or by moving one into an empty neighbour. */
+function repairBoard(g) {
+  var dims = boardDims(g);
+  var h = dims[0], w = dims[1];
+  var byVal = {};
+  var r, c, v;
+  for (r = 0; r < h; r++) {
+    for (c = 0; c < w; c++) {
+      v = g[r][c];
+      if (v != null) {
+        if (!byVal[v]) byVal[v] = [];
+        byVal[v].push([r, c]);
+      }
+    }
+  }
+  var key, chosen = null;
+  for (key in byVal) {
+    if (byVal.hasOwnProperty(key) && byVal[key].length >= 2) { chosen = byVal[key]; break; }
+  }
+  if (!chosen) return false;                       // < 2 tiles: nothing to fix
+
+  var v1 = chosen[0];
+  var v2 = chosen[1];
+  var dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+  var d, nr, nc, i;
+
+  /* Pass 1: swap an occupied neighbour (not holding v) with v2. */
+  for (i = 0; i < dirs.length; i++) {
+    d = dirs[i];
+    nr = v1[0] + d[0]; nc = v1[1] + d[1];
+    if (nr < 0 || nr >= h || nc < 0 || nc >= w) continue;
+    if (nr === v2[0] && nc === v2[1]) return true; // already adjacent pair
+    if (g[nr][nc] != null && g[nr][nc] !== g[v1[0]][v1[1]]) {
+      var t = g[nr][nc];
+      g[nr][nc] = g[v2[0]][v2[1]];
+      g[v2[0]][v2[1]] = t;
+      return true;
+    }
+  }
+  /* Pass 2: move v2 into an empty neighbour of v1. */
+  for (i = 0; i < dirs.length; i++) {
+    d = dirs[i];
+    nr = v1[0] + d[0]; nc = v1[1] + d[1];
+    if (nr < 0 || nr >= h || nc < 0 || nc >= w) continue;
+    if (g[nr][nc] === null) {
+      g[nr][nc] = g[v2[0]][v2[1]];
+      g[v2[0]][v2[1]] = null;
+      return true;
+    }
+  }
+  return false;
+}
+
+/* Last-resort: bounded brute-force swaps until the board is solvable. */
+function bruteSwapSolvable(g) {
+  var dims = boardDims(g);
+  var h = dims[0], w = dims[1];
+  var pos = [];
+  var r, c;
+  for (r = 0; r < h; r++) {
+    for (c = 0; c < w; c++) { if (g[r][c] != null) pos.push([r, c]); }
+  }
+  var i, j, tried = 0;
+  for (i = 0; i < pos.length && tried < REPAIR_SWAPS; i++) {
+    for (j = i + 1; j < pos.length && tried < REPAIR_SWAPS; j++) {
+      tried++;
+      var t = g[pos[i][0]][pos[i][1]];
+      g[pos[i][0]][pos[i][1]] = g[pos[j][0]][pos[j][1]];
+      g[pos[j][0]][pos[j][1]] = t;
+      if (findPair(g)) return true;
+      t = g[pos[i][0]][pos[i][1]];
+      g[pos[i][0]][pos[i][1]] = g[pos[j][0]][pos[j][1]];
+      g[pos[j][0]][pos[j][1]] = t;
+    }
+  }
+  return false;
+}
+
+/* Make sure a board has at least one removable pair (mutates g). */
+function ensureSolvable(g) {
+  if (findPair(g)) return g;
+  repairBoard(g);
+  if (findPair(g)) return g;
+  bruteSwapSolvable(g);
+  return g;
+}
+
+/* Re-deal a board: permute the surviving tiles over their occupied cells so
+ * that the multiset of faces is preserved and at least one pair is linkable.
+ * Pure — returns a NEW board, never touching the argument. */
+function shuffleTiles(b) {
+  var dims = boardDims(b);
+  var h = dims[0], w = dims[1];
+  var occ = [];
+  var vals = [];
+  var r, c;
+  for (r = 0; r < h; r++) {
+    for (c = 0; c < w; c++) {
+      if (b[r] && b[r][c] != null) { occ.push([r, c]); vals.push(b[r][c]); }
+    }
+  }
+  if (occ.length < 2) return copyBoard(b);
+
+  var i, g;
+  for (i = 0; i < SHUFFLE_TRIES; i++) {
+    shuffleArr(vals);
+    g = copyBoard(b);
+    for (var k = 0; k < occ.length; k++) {
+      g[occ[k][0]][occ[k][1]] = vals[k];
+    }
+    if (findPair(g)) return g;
+  }
+  /* Deterministic fallback: repair the last permutation, then brute force. */
+  ensureSolvable(g);
+  return g;
+}
+
+/* Build a fresh full board for the current difficulty, guaranteeing that at
+ * least one pair is linkable from the very first move. */
+function buildBoard(kinds) {
+  var total = rows * cols;
+  var g, attempt, i;
+  for (attempt = 0; attempt < SHUFFLE_TRIES; attempt++) {
+    /* Even counts per kind: base share plus remainder spread over the first
+     * few kinds, each appearing in whole pairs. */
+    var vals = [];
+    var share = Math.floor(total / kinds);
+    var rem = total - share * kinds;
+    var k;
+    for (k = 0; k < kinds; k++) {
+      var n = share + (k < rem ? 1 : 0);
+      for (i = 0; i < n; i++) { vals.push(k); vals.push(k); }
+    }
+    /* Numeric drift guard: vals.length is always even and === total here. */
+    while (vals.length > total) vals.pop();
+    shuffleArr(vals);
+    g = [];
+    var idx = 0;
+    for (var r = 0; r < rows; r++) {
+      var row = [];
+      for (var c = 0; c < cols; c++) { row.push(vals[idx]); idx++; }
+      g.push(row);
+    }
+    if (findPair(g)) return g;
+  }
+  return ensureSolvable(g);
+}
+
+/* ======================================================================
+ * Rendering
+ * ==================================================================== */
+
+/* Build the tile elements once per board size and cache them by coordinate.
+ * Tiles are direct classed children of #board (required by the harness click
+ * path); the decoration layers are siblings, never children. */
+function buildDom() {
+  boardEl.innerHTML = '';
+  tileEls = [];
+  var r, c, el, row;
+  for (r = 0; r < rows; r++) {
+    row = [];
+    for (c = 0; c < cols; c++) {
+      el = document.createElement('div');
+      el.className = 'tile empty';
+      boardEl.appendChild(el);
+      row.push(el);
+    }
+    tileEls.push(row);
+  }
+  /* Dynamic grid geometry (cols/rows change with difficulty). */
+  if (boardEl.style) {
+    boardEl.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
+    boardEl.style.gridTemplateRows = 'repeat(' + rows + ', 1fr)';
+    boardEl.style.aspectRatio = cols + ' / ' + rows;
+  }
+  if (fxLayerEl && fxLayerEl.style) {
+    fxLayerEl.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
+    fxLayerEl.style.gridTemplateRows = 'repeat(' + rows + ', 1fr)';
+  }
+  if (linkLayerEl && typeof linkLayerEl.setAttribute === 'function') {
+    linkLayerEl.setAttribute('viewBox', '0 0 ' + cols + ' ' + rows);
+  }
+  fitTiles();
+}
+
+/* Size the emoji to the tile by measuring the board once (and again on
+ * resize). The stub DOM reports a fixed width, which is harmless. */
+function fitTiles() {
+  if (!boardEl || !boardEl.style) return;
+  var w = (typeof boardEl.clientWidth === 'number' && boardEl.clientWidth > 0)
+    ? boardEl.clientWidth : 440;
+  var chrome = (cols - 1) * 6 + 16;   // approximated gaps + padding
+  var size = (w - chrome) / cols;
+  if (size < 12) size = 12;
+  boardEl.style.fontSize = Math.round(size * 0.52) + 'px';
+}
+
+function inList(list, r, c) {
+  if (!list) return false;
+  for (var i = 0; i < list.length; i++) {
+    if (list[i][0] === r && list[i][1] === c) return true;
+  }
+  return false;
+}
+
+/* -------------------------------------------------------------- fx helpers */
+
+/* Safe CSS custom-property write (stub setProperty is a no-op). */
+function setVar(el, key, value) {
+  if (!el || !el.style || typeof el.style.setProperty !== 'function') return;
+  try { el.style.setProperty(key, String(value)); } catch (e) {}
+}
+
+/* Detach a decoration node, tolerating whichever parent link the DOM stub sets. */
+function detachNode(el) {
+  if (!el) return;
+  var p = el.parentNode || el.parent;
+  if (p && typeof p.removeChild === 'function') {
+    try { p.removeChild(el); } catch (e) {}
+  }
+}
+
+/* Record a transient animation for one tile (see fxAt comment above). */
+function setFx(r, c, cls, vars) {
+  if (r < 0 || r >= rows || c < 0 || c >= cols) return;
+  if (!fxAt[r]) fxAt[r] = [];
+  fxAt[r][c] = { cls: cls, vars: vars || null };
+}
+
+function clearFx() { fxAt = []; }
+
+function addFxNode(el, ttl) {
+  if (!fxLayerEl || !el) return;
+  fxLayerEl.appendChild(el);
+  fxNodes.push({ el: el, ttl: ttl });
+  while (fxNodes.length > FX_MAX_NODES) detachNode(fxNodes.shift().el);
+}
+
+function clearFxNodes() {
+  for (var i = 0; i < fxNodes.length; i++) detachNode(fxNodes[i].el);
+  fxNodes = [];
+}
+
+function ageFxNodes(dt) {
+  if (!fxNodes.length) return;
+  var keep = [];
+  for (var i = 0; i < fxNodes.length; i++) {
+    var n = fxNodes[i];
+    n.ttl -= dt;
+    if (n.ttl <= 0) detachNode(n.el);
+    else keep.push(n);
+  }
+  fxNodes = keep;
+}
+
+/* An empty anchor positioned over tile (r, c) on the decoration grid. */
+function fxAnchor(r, c) {
+  var a = document.createElement('div');
+  a.className = 'fx-anchor';
+  setVar(a, 'grid-row', String(r + 1));
+  setVar(a, 'grid-column', String(c + 1));
+  return a;
+}
+
+/* "+15" drifting up from the second tile of a match. Pure digits. */
+function spawnScoreFloat(r, c, text) {
+  if (!fxLayerEl) return;
+  var anchor = fxAnchor(r, c);
+  var f = document.createElement('div');
+  f.className = 'fx-float';
+  f.textContent = text;
+  anchor.appendChild(f);
+  addFxNode(anchor, 900);
+}
+
+/* The big "x2" / "x3" pop in the middle of the board. */
+function spawnComboFloat(level) {
+  if (!fxLayerEl) return;
+  var a = document.createElement('div');
+  a.className = 'fx-anchor fx-full';
+  var t = document.createElement('div');
+  t.className = 'fx-combo';
+  t.textContent = '\u00d7' + level;
+  a.appendChild(t);
+  addFxNode(a, 1000);
+}
+
+/* ------------------------------------------------------------ link path */
+/* Create an SVG element; the smoke stub has no createElementNS, so fall back
+ * gracefully (the line simply does not render there — it is pure decoration). */
+function svgNew(tag) {
+  if (typeof document.createElementNS === 'function') {
+    return document.createElementNS('http://www.w3.org/2000/svg', tag);
+  }
+  return document.createElement(tag);
+}
+
+function svgClass(el, name) {
+  if (el && typeof el.setAttribute === 'function') {
+    try { el.setAttribute('class', name); } catch (e) {}
+  }
+}
+
+/* Draw the connecting path for a successful match. `path` is the corner list
+ * in EXTENDED coordinates; tile (r, c) sits at SVG point (c - 0.5, r - 0.5),
+ * so outer-ring corners land just outside the board edge (overflow: visible). */
+function drawLink(path) {
+  if (!linkLayerEl || !path || path.length < 2) return;
+  var g = svgNew('g');
+  svgClass(g, 'link-g');
+  var pts = [];
+  var i, p, x, y;
+  for (i = 0; i < path.length; i++) {
+    p = path[i];
+    x = p[1] - 0.5;
+    y = p[0] - 0.5;
+    pts.push(x.toFixed(3) + ',' + y.toFixed(3));
+  }
+  var s = pts.join(' ');
+
+  var halo = svgNew('polyline');
+  svgClass(halo, 'link-halo');
+  halo.setAttribute('points', s);
+  g.appendChild(halo);
+
+  var line = svgNew('polyline');
+  svgClass(line, 'link-line');
+  line.setAttribute('points', s);
+  g.appendChild(line);
+
+  for (i = 0; i < path.length; i += Math.max(1, path.length - 1)) {
+    p = path[i];
+    var dot = svgNew('circle');
+    svgClass(dot, 'link-dot');
+    dot.setAttribute('cx', (p[1] - 0.5).toFixed(3));
+    dot.setAttribute('cy', (p[0] - 0.5).toFixed(3));
+    dot.setAttribute('r', '0.14');
+    g.appendChild(dot);
+  }
+  linkLayerEl.appendChild(g);
+  currentLink = g;
+}
+
+function removeLink() {
+  if (currentLink) {
+    detachNode(currentLink);
+    currentLink = null;
+  }
+}
+
+/* Repaint every tile from the current grid + transient phase state. */
+function render() {
+  for (var r = 0; r < rows; r++) {
+    for (var c = 0; c < cols; c++) {
+      var el = tileEls[r] ? tileEls[r][c] : null;
+      if (!el) continue;
+      var v = (grid[r] && grid[r][c] != null) ? grid[r][c] : null;
+      var cls = 'tile';
+      cls += (v === null) ? ' empty' : '';
+      if (selected && selected[0] === r && selected[1] === c) cls += ' sel';
+      if (hintTimer > 0 && inList(hintCells, r, c)) cls += ' hint';
+      if (denyTimer > 0 && inList(denyCells, r, c)) cls += ' bad';
+      var fx = (fxAt[r] && fxAt[r][c]) ? fxAt[r][c] : null;
+      if (fx) cls += ' ' + fx.cls;
+      el.className = cls;
+      el.textContent = (v === null) ? '' : KINDS[v];
+      el.title = (v === null) ? '' : T.t('k' + v);
+      if (fx && fx.vars) {
+        for (var k in fx.vars) {
+          if (fx.vars.hasOwnProperty(k)) setVar(el, k, fx.vars[k]);
+        }
+      }
+    }
+  }
+}
+
+/* ======================================================================
+ * HUD — every dynamic string is (re)written here, so a single language-change
+ * subscriber re-localises the whole screen.
+ * ==================================================================== */
+function timeText() {
+  var s = Math.max(0, Math.ceil(timeLeft / 1000));
+  var m = Math.floor(s / 60);
+  var r = s % 60;
+  return m + ':' + (r < 10 ? '0' : '') + r;
+}
+
+function updateHud() {
+  timeStr = timeText();
+  if (scoreEl) scoreEl.textContent = String(score);
+  if (timeEl) {
+    timeEl.textContent = timeStr;
+    if (timeEl.classList) {
+      if (status === 'playing' && timeLeft < 30000) timeEl.classList.add('low');
+      else timeEl.classList.remove('low');
+    }
+  }
+  if (pairsEl) pairsEl.textContent = String(pairsLeft);
+  if (comboEl) {
+    comboEl.textContent = (comboLevel > 1 && playClock < comboUntil)
+      ? ('x' + comboLevel) : '-';
+  }
+  if (hintsEl) hintsEl.textContent = String(hintsLeft);
+  if (bestEl) bestEl.textContent = String(best);
+  if (levelLabelEl) levelLabelEl.textContent = T.t('diff_' + diffKey);
+  if (noticeEl) noticeEl.textContent = noticeKey ? T.t(noticeKey, noticeVars) : '';
+
+  if (status === 'over') {
+    if (dlgTitle) dlgTitle.textContent = T.t(endWin ? 'win' : 'lose');
+    if (dlgSub) {
+      if (endWin) {
+        dlgSub.textContent = T.t('resultWin',
+          { score: score, bonus: endBonus, best: best });
+      } else {
+        dlgSub.textContent = T.t('resultLose',
+          { score: score, pairs: pairsLeft, best: best });
+      }
+    }
+  }
+
+  if (btnNew) btnNew.disabled = (status === 'ready');
+  if (btnHint) btnHint.disabled = (status !== 'playing' || phase !== 'idle' || hintsLeft <= 0);
+  if (btnShuffle) btnShuffle.disabled = (status !== 'playing' || phase !== 'idle');
+  if (diffEl) diffEl.disabled = (status === 'playing');
+  if (btnStart) btnStart.disabled = (status === 'playing');
+}
+
+/* ======================================================================
+ * Persistence — localStorage only (no removeItem anywhere).
+ * ==================================================================== */
+function loadBest() {
+  try {
+    var v = parseInt(localStorage.getItem('link_best') || '0', 10);
+    best = isNaN(v) ? 0 : v;
+  } catch (e) { best = 0; }
+}
+function saveBest() {
+  try { localStorage.setItem('link_best', String(best)); } catch (e) {}
+}
+
+/* ======================================================================
+ * Game lifecycle
+ * ==================================================================== */
+
+/* Build a fresh board for the current difficulty; ends in the ready state. */
+function setupGame(seed) {
+  config = DIFF[diffKey] || DIFF.normal;
+  rows = config.rows;
+  cols = config.cols;
+  rng = (seed === null || seed === undefined) ? Math.random : makeRng(seed);
+
+  grid = buildBoard(config.kinds);
+  totalPairs = (rows * cols) / 2;
+  pairsLeft = totalPairs;
+  score = 0;
+  comboLevel = 0;
+  comboUntil = 0;
+  playClock = 0;
+  timeLeft = config.time * 1000;
+  hintsLeft = HINTS_PER_GAME;
+  selected = null;
+  endWin = false;
+  endBonus = 0;
+  phase = 'idle';
+  phaseElapsed = 0;
+  phaseDuration = 0;
+  clearingPair = null;
+  denyCells = null;
+  denyTimer = 0;
+  hintCells = null;
+  hintTimer = 0;
+  clearFx();
+  clearFxNodes();
+  removeLink();
+  loadBest();
+  status = 'ready';
+  noticeKey = 'readyHint';
+  noticeVars = null;
+
+  buildDom();
+  if (startOverlay) startOverlay.classList.add('show');
+  if (overlay) overlay.classList.remove('show');
+  updateHud();
+  render();
+}
+
+/* Leave the ready state and begin play. */
+function startGame() {
+  if (status === 'playing') return;
+  if (status === 'over') { newGame({ difficulty: diffKey }); return; }
+  status = 'playing';
+  noticeKey = 'play';
+  noticeVars = null;
+  if (startOverlay) startOverlay.classList.remove('show');
+  if (overlay) overlay.classList.remove('show');
+  updateHud();
+  render();
+}
+
+/* Deterministic entry point for tests: newGame({difficulty, seed}). The same
+ * seed fully reproduces the board (and every later shuffle). */
+function newGame(opts) {
+  opts = opts || {};
+  if (opts.difficulty && DIFF[opts.difficulty]) diffKey = opts.difficulty;
+  setupGame(opts.seed);
+  status = 'playing';
+  noticeKey = 'play';
+  noticeVars = null;
+  if (startOverlay) startOverlay.classList.remove('show');
+  if (overlay) overlay.classList.remove('show');
+  updateHud();
+  render();
+  return getSnapshot();
+}
+
+function restart() {
+  newGame({ difficulty: diffKey });
+}
+
+/* Finish the game. A win converts the remaining time into bonus points. */
+function endGame(win) {
+  status = 'over';
+  endWin = !!win;
+  endBonus = 0;
+  if (win) {
+    endBonus = Math.ceil(timeLeft / 1000) * TIME_BONUS_PER_SEC;
+    score += endBonus;
+  }
+  phase = 'idle';
+  phaseElapsed = 0;
+  clearFx();
+  removeLink();
+  if (score > best) { best = score; saveBest(); }
+  if (overlay) overlay.classList.add('show');
+  updateHud();
+  render();
+}
+
+/* ======================================================================
+ * Interaction
+ * ==================================================================== */
+
+/* Map a tile element back to its [r, c] by identity scan. */
+function posOfTile(el) {
+  for (var r = 0; r < tileEls.length; r++) {
+    for (var c = 0; c < tileEls[r].length; c++) {
+      if (tileEls[r][c] === el) return [r, c];
+    }
+  }
+  return null;
+}
+
+/* Click-select flow: first tap selects, second tap on a matching linkable
+ * tile removes the pair; anything else re-selects. */
+function tileClick(r, c) {
+  if (status !== 'playing' || phase !== 'idle') return;
+  var v = (grid[r] && grid[r][c] != null) ? grid[r][c] : null;
+  if (v === null) return;
+
+  if (!selected) {
+    selected = [r, c];
+    render();
+    return;
+  }
+  var sr = selected[0], sc = selected[1];
+  if (sr === r && sc === c) {
+    selected = null;
+    render();
+    return;
+  }
+
+  var path = connectPair(grid, sr, sc, r, c);
+  if (path) {
+    beginMatch(sr, sc, r, c, path);
+    return;
+  }
+
+  /* Not linkable: shake the first tile, move the selection to the new one. */
+  denyCells = [[sr, sc]];
+  denyTimer = DENY_MS;
+  if (grid[sr] && grid[sr][sc] === v) noticeKey = 'noLink';
+  selected = [r, c];
+  updateHud();
+  render();
+}
+
+/* Score the pair, draw the link, and run the clear animation. */
+function beginMatch(r1, c1, r2, c2, path) {
+  selected = null;
+  hintCells = null;
+  hintTimer = 0;
+  denyCells = null;
+  denyTimer = 0;
+
+  /* Combo chain: consecutive matches inside the window stack a level. */
+  if (comboLevel > 0 && playClock < comboUntil) comboLevel++;
+  else comboLevel = 1;
+  comboUntil = playClock + COMBO_WINDOW;
+  var gained = BASE_POINTS + COMBO_STEP * (comboLevel - 1);
+  score += gained;
+  if (score > best) { best = score; saveBest(); }
+
+  clearingPair = [[r1, c1], [r2, c2]];
+  clearFx();
+  setFx(r1, c1, 'clear', null);
+  setFx(r2, c2, 'clear', null);
+  drawLink(path);
+  spawnScoreFloat(r2, c2, '+' + gained);
+  if (comboLevel >= 2) spawnComboFloat(comboLevel);
+
+  phase = 'clearing';
+  phaseElapsed = 0;
+  phaseDuration = CLEAR_MS;
+  noticeKey = 'play';
+  noticeVars = null;
+  updateHud();
+  render();
+}
+
+/* ------------------------------------------------------------- phases */
+function onClearDone() {
+  removeLink();
+  if (clearingPair) {
+    var a = clearingPair[0], b = clearingPair[1];
+    if (grid[a[0]]) grid[a[0]][a[1]] = null;
+    if (grid[b[0]]) grid[b[0]][b[1]] = null;
+  }
+  clearingPair = null;
+  clearFx();
+  pairsLeft--;
+
+  if (pairsLeft <= 0) {
+    endGame(true);
+    return;
+  }
+  if (!findPair(grid)) {
+    autoShuffle();
+    return;
+  }
+  phase = 'idle';
+  phaseElapsed = 0;
+  updateHud();
+  render();
+}
+
+/* Deadlock: no linkable pair remains. Reshuffle (with the standard penalty)
+ * so the game always keeps moving. */
+function autoShuffle() {
+  score = Math.max(0, score - SHUFFLE_COST);
+  comboLevel = 0;
+  comboUntil = 0;
+  noticeKey = 'deadShuffle';
+  noticeVars = null;
+  startShufflePhase();
+}
+
+function startShufflePhase() {
+  if (phase === 'shuffling' || phase === 'dealing') return;
+  selected = null;
+  hintCells = null;
+  hintTimer = 0;
+  clearFx();
+  for (var r = 0; r < rows; r++) {
+    for (var c = 0; c < cols; c++) {
+      if (grid[r] && grid[r][c] != null) setFx(r, c, 'out', null);
+    }
+  }
+  phase = 'shuffling';
+  phaseElapsed = 0;
+  phaseDuration = SHUFFLE_MS;
+  updateHud();
+  render();
+}
+
+function onShuffleDone() {
+  grid = shuffleTiles(grid);
+  /* Safety net: a shuffled board is solvable by construction; if a hostile
+   * harness ever disagrees, force it (bounded — no recursion loop). */
+  var guard = 0;
+  while (!findPair(grid) && guard < 3) {
+    grid = shuffleTiles(grid);
+    guard++;
+  }
+  clearFx();
+  for (var r = 0; r < rows; r++) {
+    for (var c = 0; c < cols; c++) {
+      if (grid[r] && grid[r][c] != null) setFx(r, c, 'in', null);
+    }
+  }
+  phase = 'dealing';
+  phaseElapsed = 0;
+  phaseDuration = DEAL_MS;
+  render();
+}
+
+function onDealDone() {
+  clearFx();
+  phase = 'idle';
+  phaseElapsed = 0;
+  updateHud();
+  render();
+}
+
+/* -------------------------------------------------------------- buttons */
+function doHint() {
+  if (status !== 'playing' || phase !== 'idle') return;
+  var pair = findPair(grid);
+  if (!pair) { autoShuffle(); return; }
+  if (hintsLeft <= 0) return;
+  hintsLeft--;
+  score = Math.max(0, score - HINT_COST);
+  hintCells = [[pair[0][0], pair[0][1]], [pair[1][0], pair[1][1]]];
+  hintTimer = 1500;
+  updateHud();
+  render();
+}
+
+function doShuffle() {
+  if (status !== 'playing' || phase !== 'idle') return;
+  score = Math.max(0, score - SHUFFLE_COST);
+  comboLevel = 0;
+  comboUntil = 0;
+  noticeKey = 'reshuffled';
+  noticeVars = null;
+  startShufflePhase();
+}
+
+/* ======================================================================
+ * Frame loop — a single rAF chain driving every clock. No setTimeout.
+ * ==================================================================== */
+function update(dt) {
+  /* Decorations, hint / deny highlights age on their own clocks so they
+   * expire even while the phase machine is idle. */
+  ageFxNodes(dt);
+  if (denyTimer > 0) {
+    denyTimer -= dt;
+    if (denyTimer <= 0) { denyTimer = 0; denyCells = null; render(); }
+  }
+  if (hintTimer > 0) {
+    hintTimer -= dt;
+    if (hintTimer <= 0) { hintTimer = 0; hintCells = null; render(); }
+  }
+
+  if (status !== 'playing') return;
+  playClock += dt;
+
+  /* Phase machine first, so a clear finishing on this frame can still win
+   * before the timeout check below runs. */
+  if (phase !== 'idle') {
+    phaseElapsed += dt;
+    if (phaseElapsed >= phaseDuration) {
+      phaseElapsed = 0;
+      if (phase === 'clearing') onClearDone();
+      else if (phase === 'shuffling') onShuffleDone();
+      else if (phase === 'dealing') onDealDone();
+    }
+  }
+  if (status !== 'playing') return;
+
+  /* Countdown (rAF-accumulated; never an interval — the stub fast-forwards
+   * those 40x and the callback must stay idempotent anyway). */
+  timeLeft -= dt;
+  if (timeLeft <= 0) {
+    timeLeft = 0;
+    endGame(false);
+    return;
+  }
+
+  /* Combo expiry. */
+  if (comboLevel > 0 && playClock >= comboUntil) {
+    comboLevel = 0;
+    updateHud();
+  }
+
+  /* Refresh the clock only when the displayed second changes. */
+  var ts = timeText();
+  if (ts !== timeStr) {
+    timeStr = ts;
+    if (timeEl) {
+      timeEl.textContent = ts;
+      if (timeEl.classList) {
+        if (timeLeft < 30000) timeEl.classList.add('low');
+        else timeEl.classList.remove('low');
+      }
+    }
+  }
+}
+
+function loop(ts) {
+  var dt = 16;                        // nominal frame when no timestamp given
+  if (typeof ts === 'number') {
+    if (lastFrameTs) {
+      dt = ts - lastFrameTs;
+      if (dt <= 0 || dt > 200) dt = 16;
+    }
+    lastFrameTs = ts;
+  }
+  update(dt);
+  requestAnimationFrame(loop);
+}
+
+/* ======================================================================
+ * Bridge object for tests / QA. canConnect / findPath / findPair / shuffle
+ * are pure with respect to their inputs (the live grid is only READ).
+ * ==================================================================== */
+function getSnapshot() {
+  return {
+    status: status,
+    board: copyBoard(grid),
+    score: score,
+    timeLeft: Math.ceil(timeLeft / 1000),
+    pairsLeft: pairsLeft,
+    combo: comboLevel,
+    hintsLeft: hintsLeft,
+    selected: selected ? [selected[0], selected[1]] : null,
+    lang: T.lang,
+    rows: rows,
+    cols: cols,
+    phase: phase
+  };
+}
+
+/* canConnect(a, b) / findPath(a, b): a = [r, c], b = [r, c] in BOARD
+ * coordinates. Returns the corner list in EXTENDED coordinates —
+ * path[0] = [a[0]+1, a[1]+1], last = [b[0]+1, b[1]+1]; intermediate corners
+ * may sit on the outer ring (row/col 0 or rows+1/cols+1) — or null. */
+function liveConnect(a, b) {
+  if (!a || !b) return null;
+  return connectPair(grid, a[0], a[1], b[0], b[1]);
+}
+
+/* ======================================================================
+ * Event wiring
+ * ====================================================================== */
+function bindClick(id, fn) {
+  var el = document.getElementById(id);
+  if (el) el.addEventListener('click', fn);
+}
+
+bindClick('btnStart', function () { startGame(); });
+bindClick('btnNew', function () { restart(); });
+bindClick('dlgBtn', function () { restart(); });
+bindClick('btnHint', function () { doHint(); });
+bindClick('btnShuffle', function () { doShuffle(); });
+
+/* Board clicks are delegated on the container; tiles carry the emoji as their
+ * own text content, so the real click target is always the tile itself. */
+boardEl.addEventListener('click', function (ev) {
+  var t = ev && ev.target;
+  var el = (t && typeof t.closest === 'function') ? t.closest('.tile') : null;
+  if (!el) return;
+  var pos = posOfTile(el);
+  if (pos) tileClick(pos[0], pos[1]);
+});
+
+if (diffEl) {
+  diffEl.addEventListener('change', function () {
+    diffKey = diffEl.value || 'normal';
+    if (status !== 'playing') setupGame();   // re-roll only while not mid-game
+  });
+}
+
+/* Backdrop tap dismisses the result dialog (the start dialog stays). */
+if (overlay) {
+  overlay.addEventListener('click', function (ev) {
+    if (ev.target === overlay) overlay.classList.remove('show');
+  });
+}
+
+window.addEventListener('keydown', function (ev) {
+  var k = ev.key;
+  if (status === 'ready' || status === 'over') {
+    if (k === ' ' || k === 'Enter') {
+      if (ev.preventDefault) ev.preventDefault();
+      startGame();
+    }
+    return;
+  }
+  if (k === 'h' || k === 'H') { doHint(); }
+  else if (k === 's' || k === 'S') { doShuffle(); }
+});
+
+window.addEventListener('resize', function () { fitTiles(); });
+
+/* Re-localise the whole screen on a language change — one callback only. */
+T.onChange(function () { updateHud(); render(); });
+
+/* ======================================================================
+ * Boot: initialise and render the first screen, then start i18n LAST.
+ * ====================================================================== */
+setupGame();
+window.LL = {
+  getState: getSnapshot,
+  canConnect: liveConnect,
+  findPath: liveConnect,
+  findPair: function (b) { return findPair(b || grid); },
+  shuffle: function (b) { return shuffleTiles(b || grid); },
+  newGame: newGame
+};
+/* rows / cols change with difficulty, so expose them as live getters. */
+Object.defineProperty(window.LL, 'rows', { get: function () { return rows; } });
+Object.defineProperty(window.LL, 'cols', { get: function () { return cols; } });
+T.start();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

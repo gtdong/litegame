@@ -296,11 +296,18 @@ group('interaction: click cycle empty -> filled -> X -> empty');
   check('Start button begins the game', B.state().started === true);
   check('default size is 5x5', B.state().N === 5);
 
-  // pick a cell that should stay empty in the solution to avoid accidental win
+  // pick a cell that should stay empty in the solution to avoid accidental win.
+  // Scan the WHOLE board: the puzzle is randomised, so the solution's first
+  // row is filled entirely roughly one round in ten — a 6-cell search window
+  // made this assertion flaky on CI (observed 2 failures in 20 runs).
   const sol = B.solution();
-  let r = 0, c = 0;
-  for (let i = 0; i < 5 && sol[r][c] !== 0; i++) { c++; if (c === 5) { c = 0; r++; } }
-  check('found an empty target cell', sol[r][c] === 0);
+  let r = -1, c = -1;
+  search: for (let rr = 0; rr < 5; rr++) {
+    for (let cc = 0; cc < 5; cc++) {
+      if (sol[rr][cc] === 0) { r = rr; c = cc; break search; }
+    }
+  }
+  check('found an empty target cell', r !== -1 && sol[r][c] === 0);
 
   B.clickCell(r, c);
   check('1st click -> filled (1)', B.grid()[r][c] === 1, `state=${B.grid()[r][c]}`);
@@ -329,10 +336,16 @@ group('clue auto-strike when a line is satisfied');
   const struck = B.rows()[r].every(el => el._cls.has('done'));
   check('row fully decided & correct -> its clues strike through', struck);
 
-  // an unsatisfied (partial) row must not strike
-  for (let c = 0; c < N; c++) grid[1][c] = 0;   // wipe row 1
+  // an unsatisfied (partial) row must not strike. Pick a row whose solution
+  // actually HAS filled cells: a row with an empty clue list is legitimately
+  // struck even when untouched, which made this assertion flaky on randomised
+  // boards whenever row 1 happened to solve to all-empty.
+  let wipe = -1;
+  for (let i = 0; i < N && wipe === -1; i++) if (sol[i].some(v => v === 1)) wipe = i;
+  check('picked a non-empty row to wipe', wipe !== -1);
+  for (let c = 0; c < N; c++) grid[wipe][c] = 0;   // wipe it
   B.ctx.renderClues();
-  const struck2 = B.rows()[1].every(el => el._cls.has('done'));
+  const struck2 = B.rows()[wipe].every(el => el._cls.has('done'));
   check('undecided row -> clues not struck', struck2 === false);
 }
 
