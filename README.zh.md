@@ -2,7 +2,7 @@
 
 **[简体中文](README.zh.md)** · [English](README.md)
 
-[![games](https://img.shields.io/badge/games-25-blue?style=flat-square)](#游戏列表)
+[![games](https://img.shields.io/badge/games-26-blue?style=flat-square)](#游戏列表)
 [![AI-generated](https://img.shields.io/badge/AI--generated-100%25-8b5cf6?style=flat-square)](#这个项目是怎么做出来的)
 [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen?style=flat-square)](#为什么是-litegame)
 [![vanilla JS](https://img.shields.io/badge/vanilla-JS-f7df1e?style=flat-square&logo=javascript&logoColor=black)](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript)
@@ -54,6 +54,7 @@
 | [wordguess-game](wordguess-game) | 猜词游戏，六次机会，中英双语词库 | `文字` `解谜` `双语` |
 | [match3-game](match3-game) | 三消，交换相邻宝石连线消除，连锁累积连击倍数 | `益智` `三消` `连锁` |
 | [link-game](link-game) | 连连看，两拐内连通即消除，可绕外圈，死局自动重排 | `益智` `路径` `消除` |
+| [pacman-game](pacman-game) | 吃豆人，四只性格各异的幽灵、能量豆反击、200/400/800/1600 连击 | `街机` `迷宫` `追逐` |
 
 ## 为什么是 litegame
 
