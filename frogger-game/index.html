@@ -1,0 +1,1383 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Frogger</title>
+<style>
+  :root {
+    --bg: #eef2fb;
+    --card: #ffffff;
+    --border: #d7deee;
+    --text: #1e2740;
+    --muted: #6b7592;
+    --accent: #6366f1;
+    --screen: #05121f;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    margin: 0;
+    padding: 20px 12px 48px;
+    background: radial-gradient(120% 120% at 50% 0%, #ffffff 0%, var(--bg) 62%);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+  }
+
+  h1 { margin: 0 0 4px; font-size: 27px; letter-spacing: -.02em; }
+  .tip { margin: 0 0 16px; font-size: 13px; color: var(--muted); text-align: center; max-width: 460px; line-height: 1.6; }
+
+  .panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 14px;
+    box-shadow: 0 10px 30px rgba(30,39,64,.10);
+    width: min(460px, 100%);
+  }
+
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    margin-bottom: 10px;
+  }
+  .bar:last-child { margin-bottom: 0; margin-top: 10px; }
+
+  .stat {
+    background: #f5f7fd;
+    color: #3a4668;
+    font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 5px 9px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .stat small { font-family: inherit; font-weight: 600; font-size: 11px; color: var(--muted); }
+  .stat.low { background: #ffe4e6; color: #b8073a; }
+  .stat.low small { color: #b8073a; }
+
+  button {
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    background: #ffffff;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 14px;
+    cursor: pointer;
+    transition: transform .08s ease, background .15s ease, opacity .15s ease;
+  }
+  button:hover { background: #f3f5fc; }
+  button:active { transform: translateY(1px); }
+  button:disabled { opacity: .45; cursor: default; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary:hover { background: #5457e6; }
+
+  .stage {
+    position: relative;
+    width: 100%;
+    background: var(--screen);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.06);
+  }
+  canvas { display: block; width: 100%; height: auto; background: var(--screen); }
+
+  /* Immersive start / result overlays. */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 27, 48, .48);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 20;
+  }
+  .overlay.show { display: flex; }
+
+  .dialog {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 26px 28px 22px;
+    width: min(360px, 100%);
+    text-align: center;
+    box-shadow: 0 16px 50px rgba(20,27,48,.30);
+    animation: rise .2s ease-out;
+  }
+  @keyframes rise {
+    from { transform: translateY(12px); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+  }
+  .dialog h2 { margin: 0 0 10px; font-size: 22px; }
+  .dialog p  { color: var(--muted); font-size: 13px; line-height: 1.65; margin: 0 0 18px; }
+
+  @media (max-width: 480px) {
+    h1 { font-size: 22px; }
+    .panel { padding: 11px; }
+    .bar { gap: 5px; }
+    button { padding: 7px 11px; font-size: 12px; }
+    .stat { padding: 4px 7px; font-size: 11px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="lang-switch" data-lang-switch></div>
+
+<h1 data-i18n="title"></h1>
+<p class="tip" data-i18n-html="tip"></p>
+
+<div class="panel">
+  <div class="bar">
+    <span class="stat"><small data-i18n="score"></small> <b id="score">0</b></span>
+    <span class="stat"><small data-i18n="lives"></small> <b id="lives">3</b></span>
+    <span class="stat"><small data-i18n="level"></small> <b id="level">1</b></span>
+    <span class="stat"><small data-i18n="homesLbl"></small> <b id="homes">0/5</b></span>
+    <span class="stat" id="timeStat"><small data-i18n="time"></small> <b id="time">20</b></span>
+  </div>
+
+  <div class="stage">
+    <canvas id="cv" width="416" height="416"></canvas>
+  </div>
+
+  <div class="bar">
+    <button id="btnPause" data-i18n="pause" disabled></button>
+    <button id="btnNew" data-i18n="newgame"></button>
+  </div>
+</div>
+
+<!-- Start overlay: the required entry point out of the ready state. -->
+<div id="startOverlay" class="overlay show">
+  <div class="dialog">
+    <h2 data-i18n="title"></h2>
+    <p data-i18n-html="readySub"></p>
+    <button id="btnStart" class="primary" data-i18n="start"></button>
+  </div>
+</div>
+
+<!-- Result overlay: shown on clearing a level or losing the last life. -->
+<div id="overlay" class="overlay">
+  <div class="dialog">
+    <h2 id="ovTitle"></h2>
+    <p id="ovSub"></p>
+    <button id="ovBtn" class="primary"></button>
+  </div>
+</div>
+
+<script src="../assets/i18n.js"></script>
+<script>
+/* ============================================================================
+ * Frogger - a single-file, zero-dependency, canvas-rendered arcade clone.
+ *
+ * Board model: 13 x 13 cells of CELL px each (geometry is owned entirely by the
+ * COLS/ROWS/CELL constants - never derived from the canvas or text metrics).
+ * Rows (top -> bottom):
+ *   0        five home bays separated by walls
+ *   1..5     five river lanes (logs + turtles)
+ *   6        median (safe)
+ *   7..11    five road lanes (cars + trucks)
+ *   12       start bank (safe)
+ *
+ * Determinism: every moving car / truck / log / turtle is a pure function of
+ * (lane, t, level) - position = (phase + dir * speed * t) mapped onto a fixed
+ * grid of slots - so a test can recompute any object's position for any time.
+ * No Math.random runs during simulation; `laneConfig(level)` returns the same
+ * table for the same level forever.
+ *
+ * The whole game runs on a single requestAnimationFrame clock that ACCUMULATES
+ * delta time (clamped to 50 ms); setTimeout / setInterval are never used.
+ * ========================================================================== */
+(function () {
+  'use strict';
+
+  /* ======================================================================
+   * 1. Constants (geometry is owned here - never read back from the canvas)
+   * ==================================================================== */
+
+  var CELL = 32;
+  var COLS = 13;
+  var ROWS = 13;
+  var W = COLS * CELL;          // 416 logical px
+  var H = ROWS * CELL;          // 416 logical px
+
+  var ROW_HOME = 0;             // top row: five bays + walls
+  var ROW_MEDIAN = 6;           // safe strip between road and river
+  var ROW_START = 12;           // bottom bank
+  var RIVER_ROWS = [1, 2, 3, 4, 5];
+  var ROAD_ROWS = [7, 8, 9, 10, 11];
+
+  var HOME_COLS = [1, 3, 6, 9, 11];   // five bays, symmetric around col 6
+  var FROG_HOME_COL = 6;
+  var FROG_HOME_ROW = ROW_START;
+
+  var HOP_TIME = 8 / 60;        // seconds for one 1-cell hop (8 frames @60fps)
+  var TIME_LIMIT_BASE = 25;     // countdown per life at level 1
+
+  var DIVE_PERIOD = 5.0;        // turtle dive cycle (seconds)
+  var DIVE_DOWN = 0.72;         // cycle fraction from which turtles submerge
+  var DIVE_WARN = 0.58;         // fraction from which turtles blink a warning
+
+  var DIRV = {
+    up:    { dr: -1, dc: 0 },
+    down:  { dr: 1,  dc: 0 },
+    left:  { dr: 0,  dc: -1 },
+    right: { dr: 0,  dc: 1 }
+  };
+
+  /* ======================================================================
+   * 2. i18n
+   * ==================================================================== */
+
+  var T = LiteI18N.create({
+    title:      { en: 'Frogger', zh: '青蛙过河' },
+    tip: {
+      en: 'Arrow keys / WASD to hop one cell at a time<br>Ride the logs and turtles, dodge the traffic, and fill all five home bays before the timer runs out',
+      zh: '方向键 / WASD 一次跳一格<br>踩着木头和乌龟，躲开车辆，在倒计时结束前填满 5 个家'
+    },
+    score:      { en: 'Score', zh: '得分' },
+    lives:      { en: 'Lives', zh: '生命' },
+    level:      { en: 'Level', zh: '关卡' },
+    homesLbl:   { en: 'Homes', zh: '家' },
+    time:       { en: 'Time', zh: '时间' },
+    pause:      { en: 'Pause', zh: '暂停' },
+    resume:     { en: 'Resume', zh: '继续' },
+    newgame:    { en: 'New game', zh: '新游戏' },
+    start:      { en: 'Start game', zh: '开始游戏' },
+    readySub: {
+      en: 'Fill all five home bays to clear the level.<br>Every moving piece is fully deterministic.',
+      zh: '填满全部 5 个家即可过关。<br>所有移动物体都是完全确定性的。'
+    },
+    clearTitle: { en: 'Level clear!', zh: '过关！' },
+    clearSub:   { en: 'Level {n} cleared - get ready for level {m}', zh: '第 {n} 关完成，准备进入第 {m} 关' },
+    nextLevel:  { en: 'Next level', zh: '下一关' },
+    overTitle:  { en: 'Game over', zh: '游戏结束' },
+    overSub:    { en: 'Final score {n}', zh: '最终得分 {n}' },
+    again:      { en: 'Play again', zh: '再来一局' }
+  });
+
+  /* ======================================================================
+   * 3. DOM handles (every id below must exist in the markup)
+   * ==================================================================== */
+
+  var cv = document.getElementById('cv');
+  var ctx = cv.getContext('2d');
+  var scoreEl = document.getElementById('score');
+  var livesEl = document.getElementById('lives');
+  var levelEl = document.getElementById('level');
+  var homesEl = document.getElementById('homes');
+  var timeEl = document.getElementById('time');
+  var timeStatEl = document.getElementById('timeStat');
+  var startEl = document.getElementById('startOverlay');
+  var btnStart = document.getElementById('btnStart');
+  var resEl = document.getElementById('overlay');
+  var ovTitleEl = document.getElementById('ovTitle');
+  var ovSubEl = document.getElementById('ovSub');
+  var ovBtnEl = document.getElementById('ovBtn');
+  var btnNew = document.getElementById('btnNew');
+  var btnPause = document.getElementById('btnPause');
+
+  /* ======================================================================
+   * 4. Deterministic lane model
+   *
+   * Every object carries a stable integer "slot" identity k, so an item keeps
+   * its identity (and therefore its turtle dive phase) for the whole game.
+   * Its left edge is the pure linear function   L(k, t) = k*step + phase + dir*v*t
+   * and the visible objects are simply those whose cell span overlaps [0, COLS].
+   * Nothing is stored per-frame, so any (lane, t, level) can be recomputed.
+   * ==================================================================== */
+
+  var LANE_BASE = [
+    { kind: 'home' },                                                       // 0
+    { kind: 'river', dir: -1, speed: 1.1, len: 3, gap: 2.0, type: 'log' },  // 1
+    { kind: 'river', dir: +1, speed: 1.4, len: 2, gap: 2.0, type: 'turtle', dive: true }, // 2
+    { kind: 'river', dir: -1, speed: 1.7, len: 4, gap: 1.5, type: 'log' },  // 3
+    { kind: 'river', dir: +1, speed: 1.2, len: 3, gap: 2.0, type: 'turtle', dive: true }, // 4
+    { kind: 'river', dir: -1, speed: 2.0, len: 2, gap: 2.5, type: 'log' },  // 5
+    { kind: 'safe' },                                                       // 6
+    { kind: 'road', dir: +1, speed: 2.2, len: 1, gap: 3.0, type: 'car' },   // 7
+    { kind: 'road', dir: -1, speed: 1.3, len: 2, gap: 4.0, type: 'truck' }, // 8
+    { kind: 'road', dir: +1, speed: 3.2, len: 1, gap: 2.5, type: 'car' },   // 9
+    { kind: 'road', dir: -1, speed: 2.6, len: 1, gap: 3.0, type: 'car' },   // 10
+    { kind: 'road', dir: +1, speed: 1.6, len: 1, gap: 3.5, type: 'car' },   // 11
+    { kind: 'safe' }                                                        // 12
+  ];
+
+  function frac(x) { return x - Math.floor(x); }
+
+  /* Per level, moving lanes speed up; the pattern never changes shape. */
+  function levelSpeedMul(level) {
+    return Math.min(2.2, 1 + (Math.max(1, level) - 1) * 0.15);
+  }
+
+  /* Pure: the lane table for a level. Also the layout description for tests. */
+  function laneConfig(level) {
+    var m = levelSpeedMul(level);
+    var out = [];
+    for (var i = 0; i < LANE_BASE.length; i++) {
+      var b = LANE_BASE[i];
+      var moving = (b.kind === 'road' || b.kind === 'river');
+      out.push({
+        row: i,
+        kind: b.kind,
+        dir: b.dir || 0,
+        speed: moving ? b.speed * m : 0,
+        baseSpeed: b.speed || 0,
+        len: moving ? b.len : 0,
+        gap: moving ? b.gap : 0,
+        step: moving ? (b.len + b.gap) : 0,   // cells between consecutive slot edges
+        type: b.type || null,
+        dive: !!b.dive,
+        phase: i * 0.7                          // fixed per-lane offset (no randomness)
+      });
+    }
+    return out;
+  }
+
+  /* All slot objects overlapping the board on one lane at time t. Pure. */
+  function laneObjects(cfg, t) {
+    if (cfg.kind !== 'road' && cfg.kind !== 'river') return [];
+    var step = cfg.step;
+    if (step <= 0) return [];
+    var off = cfg.phase + cfg.dir * cfg.speed * t;
+    var out = [];
+    var kLo = Math.floor((-cfg.len - off) / step) - 1;
+    var kHi = Math.ceil((COLS - off) / step) + 1;
+    for (var k = kLo; k <= kHi; k++) {
+      var from = k * step + off;
+      var to = from + cfg.len;
+      if (to <= 0 || from >= COLS) continue;   // keep partial overlaps, drop the rest
+      out.push({ from: from, to: to, slot: k });
+    }
+    return out;
+  }
+
+  /* Pure: road lane contents as cell-space segments. */
+  function vehiclesAt(laneIndex, t, level) {
+    var cfg = laneConfig(level)[laneIndex];
+    if (!cfg || cfg.kind !== 'road') return [];
+    var objs = laneObjects(cfg, t);
+    var out = [];
+    for (var i = 0; i < objs.length; i++) {
+      out.push({ from: objs[i].from, to: objs[i].to, kind: cfg.type, slot: objs[i].slot });
+    }
+    return out;
+  }
+
+  /* Pure: river lane contents as cell-space segments (turtles carry dive state). */
+  function platformsAt(laneIndex, t, level) {
+    var cfg = laneConfig(level)[laneIndex];
+    if (!cfg || cfg.kind !== 'river') return [];
+    var objs = laneObjects(cfg, t);
+    var out = [];
+    for (var i = 0; i < objs.length; i++) {
+      var sub = cfg.dive ? turtleSubmerged(objs[i].slot, t) : false;
+      out.push({
+        from: objs[i].from, to: objs[i].to, kind: cfg.type, slot: objs[i].slot,
+        submerged: sub,
+        warning: cfg.dive ? turtleWarning(objs[i].slot, t) : false
+      });
+    }
+    return out;
+  }
+
+  /* Deterministic turtle dive phase - a stable function of (slot, t). */
+  function turtlePhase(slot, t) { return frac(t / DIVE_PERIOD + slot * 0.37); }
+  function turtleSubmerged(slot, t) { return turtlePhase(slot, t) >= DIVE_DOWN; }
+  function turtleWarning(slot, t) {
+    var p = turtlePhase(slot, t);
+    return p >= DIVE_WARN && p < DIVE_DOWN;
+  }
+
+  /* Pure: is column `c` on row `r` safe to stand on at time t?
+   * Land rows are always safe; water rows need a live (non-submerged) platform. */
+  function supportAt(r, c, t, level) { return supportsAt(r, c + 0.5, t, level); }
+  function supportsAt(r, x, t, level) {
+    var cfg = laneConfig(level)[r];
+    if (!cfg || cfg.kind !== 'river') return true;
+    var ps = platformsAt(r, t, level);
+    for (var i = 0; i < ps.length; i++) {
+      if (ps[i].submerged) continue;
+      if (x >= ps[i].from && x <= ps[i].to) return true;
+    }
+    return false;
+  }
+
+  /* The live platform under a continuous column x on river row r (or null). */
+  function platformUnder(x, r, t, level) {
+    var cfg = laneConfig(level)[r];
+    if (!cfg || cfg.kind !== 'river') return null;
+    var ps = platformsAt(r, t, level);
+    for (var i = 0; i < ps.length; i++) {
+      if (ps[i].submerged) continue;
+      if (x >= ps[i].from && x <= ps[i].to) {
+        return { from: ps[i].from, to: ps[i].to, dir: cfg.dir, speed: cfg.speed, kind: cfg.type };
+      }
+    }
+    return null;
+  }
+
+  /* Pure: neighbour cell one hop away, clamped to the board. */
+  function hopTarget(r, c, dir) {
+    var d = DIRV[dir];
+    if (!d) return { r: r, c: c };
+    return {
+      r: Math.max(0, Math.min(ROWS - 1, r + d.dr)),
+      c: Math.max(0, Math.min(COLS - 1, c + d.dc))
+    };
+  }
+
+  /* Pure: column -> home bay index, or -1 when the column is a wall. */
+  function homeSlot(c) {
+    for (var i = 0; i < HOME_COLS.length; i++) if (HOME_COLS[i] === c) return i;
+    return -1;
+  }
+
+  /* Pure: points awarded for a scoring event. */
+  function scoreFor(event, state) {
+    state = state || {};
+    var tl = state.timeLeft || 0;
+    switch (event) {
+      case 'forward':       return 10;
+      case 'home':          return 50;
+      case 'homeTimeBonus': return Math.floor(tl) * 5;
+      case 'levelClear':    return 300 + (state.level || 1) * 100;
+      default:              return 0;
+    }
+  }
+
+  /* Pure: does the frog in `state` overlap any vehicle right now? */
+  function collidesAt(state) {
+    if (!state || !state.frog) return false;
+    var lv = state.level || 1;
+    var t = state.time || 0;
+    var x = state.frog.x;
+    var rows = state.frog.rows || [state.frog.r];
+    for (var i = 0; i < rows.length; i++) {
+      var cfg = laneConfig(lv)[rows[i]];
+      if (!cfg || cfg.kind !== 'road') continue;
+      var vs = vehiclesAt(rows[i], t, lv);
+      for (var j = 0; j < vs.length; j++) {
+        if (x > vs[j].from && x < vs[j].to) return true;
+      }
+    }
+    return false;
+  }
+
+  /* ======================================================================
+   * 5. Game state
+   * ==================================================================== */
+
+  var frog = null;          // { r, x, dir, hop:null|{fr,fx,tr,tx,t,dur} }
+  var homes = [false, false, false, false, false];
+  var homeFlash = [0, 0, 0, 0, 0];   // per-bay pulse timer for the fill animation
+  var score = 0;
+  var lives = 3;
+  var level = 1;
+  var seed = 1;
+  var phase = 'playing';    // ready | playing | paused | dying | levelclear | gameover
+  var gameT = 0;            // simulation clock (seconds) - only advances while playing
+  var timeLeft = 0;
+  var reachRow = ROW_START; // furthest row reached this attempt (min row index)
+  var queuedDir = null;     // one-slot input queue, consumed at the next cell centre
+  var deathTimer = 0;
+  var deathKind = null;
+  var overlayKind = null;   // 'clear' | 'over'
+
+  var particles = [];
+  var floaters = [];
+
+  var DEATH_TIME = 0.9;
+  var clock = 0;            // render-only animation clock (ripples, blinking)
+  var running = true;
+  var lastT = 0;
+
+  function cellOf(x) {
+    return Math.max(0, Math.min(COLS - 1, Math.round(x - 0.5)));
+  }
+  function timeLimit() {
+    return Math.max(10, TIME_LIMIT_BASE - (level - 1) * 2);
+  }
+  function homesFilled() {
+    var n = 0;
+    for (var i = 0; i < homes.length; i++) if (homes[i]) n++;
+    return n;
+  }
+
+  /* ======================================================================
+   * 6. Setup / reset
+   * ==================================================================== */
+
+  function respawnFrog() {
+    frog = { r: ROW_START, x: FROG_HOME_COL + 0.5, dir: 'up', hop: null };
+    reachRow = ROW_START;
+    timeLeft = timeLimit();
+    queuedDir = null;
+  }
+
+  function newGame(opts) {
+    opts = opts || {};
+    level = Math.max(1, opts.level || 1);
+    lives = Math.max(1, opts.lives || 3);
+    seed = opts.seed || 1;
+    score = 0;
+    homes = [false, false, false, false, false];
+    homeFlash = [0, 0, 0, 0, 0];
+    gameT = 0;
+    particles = [];
+    floaters = [];
+    deathTimer = 0;
+    deathKind = null;
+    overlayKind = null;
+    phase = 'playing';
+    respawnFrog();
+    updateHud();
+    return getState();
+  }
+
+  /* ======================================================================
+   * 7. Frog hops
+   * ==================================================================== */
+
+  function startHop(dir) {
+    if (frog.hop) { queuedDir = dir; return; }
+    var tc = hopTarget(frog.r, cellOf(frog.x), dir);
+    var tr, tx;
+    if (dir === 'up' || dir === 'down') { tr = tc.r; tx = frog.x; }
+    else { tr = frog.r; tx = tc.c + 0.5; }
+    frog.dir = dir;
+    if (tr === frog.r && Math.abs(tx - frog.x) < 1e-9) return;   // blocked by a wall
+    frog.hop = { fr: frog.r, fx: frog.x, tr: tr, tx: tx, t: 0, dur: HOP_TIME };
+  }
+
+  function hop(dir) {
+    if (phase !== 'playing') return getState();
+    startHop(dir);
+    return getState();
+  }
+
+  function smoothstep(t) { return t * t * (3 - 2 * t); }
+
+  /* Called once a hop reaches its target cell. */
+  function landing() {
+    frog.hop = null;
+    landSquash = 1;   // little squash-and-stretch pulse on touch-down
+    var r = frog.r;
+    if (r === ROW_HOME) { resolveHome(); return; }
+    var cfg = laneConfig(level)[r];
+    if (cfg.kind === 'river' && !supportsAt(r, frog.x, gameT, level)) { die('drown'); return; }
+    if (r < reachRow) { reachRow = r; award(scoreFor('forward', { level: level }), r, frog.x, 'forward'); }
+    if (queuedDir) { var d = queuedDir; queuedDir = null; startHop(d); }
+  }
+
+  function resolveHome() {
+    var slot = homeSlot(cellOf(frog.x));
+    if (slot < 0 || homes[slot]) { die('wall'); return; }
+    homes[slot] = true;
+    homeFlash[slot] = 1;
+    award(scoreFor('home', { level: level }), ROW_HOME, HOME_COLS[slot] + 0.5, 'home');
+    award(scoreFor('homeTimeBonus', { timeLeft: timeLeft }), ROW_HOME, HOME_COLS[slot] + 0.5, 'bonus');
+    spawnBurst(HOME_COLS[slot] + 0.5, ROW_HOME + 0.5, '#ffd45e', 14);
+    if (homesFilled() >= homes.length) { levelClear(); return; }
+    respawnFrog();
+  }
+
+  /* ======================================================================
+   * 8. Simulation step (deterministic: driven only by the accumulated dt)
+   * ==================================================================== */
+
+  function stepPlaying(dt) {
+    timeLeft -= dt;
+    if (timeLeft <= 0) { timeLeft = 0; die('timeout'); return; }
+
+    if (frog.hop) {
+      var h = frog.hop;
+      h.t += dt / h.dur;
+      if (h.t >= 1) {
+        frog.r = h.tr; frog.x = h.tx; frog.hop = null;
+        landing();
+        if (phase !== 'playing') return;
+      } else {
+        var e = smoothstep(h.t);
+        frog.r = h.fr + (h.tr - h.fr) * e;
+        frog.x = h.fx + (h.tx - h.fx) * e;
+      }
+    } else {
+      var cfg = laneConfig(level)[frog.r];
+      if (cfg.kind === 'river') {
+        frog.x += cfg.dir * cfg.speed * dt;                 // carried by the lane
+        if (frog.x < 0 || frog.x > COLS) { die('carried'); return; }
+        if (!supportsAt(frog.r, frog.x, gameT, level)) { die('drown'); return; }
+      }
+    }
+
+    if (collidesAt(getState())) { die('crash'); return; }
+  }
+
+  function die(kind) {
+    if (phase !== 'playing') return;
+    phase = 'dying';
+    deathKind = kind;
+    deathTimer = DEATH_TIME;
+    var col = kind === 'crash' ? '#ff6b6b' : kind === 'drown' ? '#7fd7ff'
+            : kind === 'timeout' ? '#ffffff' : kind === 'wall' ? '#ffd45e' : '#9fe8a0';
+    spawnBurst(frog.x, frog.r + 0.5, col, 12);
+    updateHud();
+  }
+
+  function finishDeath() {
+    lives--;
+    updateHud();
+    if (lives <= 0) { gameOver(); return; }
+    respawnFrog();
+    phase = 'playing';
+  }
+
+  function levelClear() {
+    award(scoreFor('levelClear', { level: level }), ROW_HOME, W / (2 * CELL), 'clear');
+    phase = 'levelclear';
+    showResult('clear');
+    updateHud();
+  }
+
+  function nextLevel() {
+    level++;
+    homes = [false, false, false, false, false];
+    homeFlash = [0, 0, 0, 0, 0];
+    particles = [];
+    floaters = [];
+    hideResult();
+    respawnFrog();
+    phase = 'playing';
+    updateHud();
+  }
+
+  function gameOver() {
+    phase = 'gameover';
+    showResult('over');
+  }
+
+  /* ======================================================================
+   * 9. Effects
+   * ==================================================================== */
+
+  function award(points, r, x, kind) {
+    if (points <= 0) return;
+    score += points;
+    addFloater(x, r, '+' + points, kind);
+  }
+
+  function addFloater(x, r, text, kind) {
+    floaters.push({ x: x, r: r, text: text, life: 1.0, kind: kind || 'forward' });
+  }
+
+  function spawnBurst(x, r, color, n) {
+    for (var i = 0; i < n; i++) {
+      var a = (i / n) * Math.PI * 2;
+      var sp = 1.4 + (i % 3) * 0.7;
+      particles.push({
+        x: x, r: r,
+        vx: Math.cos(a) * sp, vr: Math.sin(a) * sp - 0.6,
+        life: 0.6, color: color
+      });
+    }
+  }
+
+  function updateEffects(dt) {
+    var i;
+    for (i = particles.length - 1; i >= 0; i--) {
+      var p = particles[i];
+      p.life -= dt;
+      p.x += p.vx * dt; p.r += p.vr * dt; p.vr += 2.2 * dt;
+      if (p.life <= 0) particles.splice(i, 1);
+    }
+    for (i = floaters.length - 1; i >= 0; i--) {
+      var f = floaters[i];
+      f.life -= dt; f.r -= dt * 0.8;
+      if (f.life <= 0) floaters.splice(i, 1);
+    }
+    for (i = 0; i < homeFlash.length; i++) if (homeFlash[i] > 0) homeFlash[i] = Math.max(0, homeFlash[i] - dt);
+  }
+
+  /* ======================================================================
+   * 10. Frame update (single entry point for both rAF and the test tick)
+   * ==================================================================== */
+
+  function update(dt) {
+    if (phase === 'playing') {
+      gameT += dt;
+      stepPlaying(dt);
+    } else if (phase === 'dying') {
+      deathTimer -= dt;
+      if (deathTimer <= 0) finishDeath();
+    }
+    updateEffects(dt);
+  }
+
+  /* Deterministic advance used by the test bridge: no rAF, no wall clock. */
+  function tick(seconds, step) {
+    var s = step || 1 / 60;
+    var n = Math.max(1, Math.round((seconds || 0) / s));
+    var d = (seconds || 0) / n;
+    for (var i = 0; i < n; i++) {
+      clock += d;
+      update(d);
+    }
+    updateHud();   // sync the DOM HUD after advancing the model (value-cached, cheap)
+    return getState();
+  }
+
+  /* ======================================================================
+   * 11. State snapshot + carried-by query
+   * ==================================================================== */
+
+  // While the frog is resting on a river platform (log / turtle), report the
+  // lane it rides on and `p` = the frog's own current continuous column, in
+  // CELLS (e.g. 6.42) — NOT a 0..1 ratio. Returns null when airborne or not
+  // supported by any platform.
+  function carriedBy() {
+    if (!frog || frog.hop) return null;
+    var cfg = laneConfig(level)[frog.r];
+    if (!cfg || cfg.kind !== 'river') return null;
+    if (!supportsAt(frog.r, frog.x, gameT, level)) return null;
+    return { lane: frog.r, p: frog.x };
+  }
+
+  function getState() {
+    var rows = frog.hop ? [Math.round(frog.hop.fr), Math.round(frog.hop.tr)] : [Math.round(frog.r)];
+    return {
+      score: score,
+      lives: lives,
+      level: level,
+      phase: phase,
+      timeLeft: timeLeft,
+      frog: {
+        r: Math.round(frog.r),
+        c: cellOf(frog.x),
+        x: frog.x,
+        dir: frog.dir,
+        rows: rows,
+        hopping: !!frog.hop
+      },
+      homes: homes.slice(),
+      carriedBy: carriedBy(),
+      /* --- extras that make differential / timing tests easier --- */
+      time: gameT,
+      reachRow: reachRow,
+      homesFilled: homesFilled(),
+      seed: seed,
+      deathKind: deathKind
+    };
+  }
+
+  /* ======================================================================
+   * 12. Helpers + canvas setup
+   * ==================================================================== */
+
+  var landSquash = 0;   // 0..1 landing squash pulse (render only)
+
+  function cellCx(c) { return c * CELL + CELL / 2; }
+  function cellCy(r) { return r * CELL + CELL / 2; }
+  function px(x) { return x * CELL; }
+
+  function rr(x, y, w, h, rad) {
+    var r = Math.min(rad, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function setupCanvas() {
+    var dpr = window.devicePixelRatio || 1;
+    cv.width = W * dpr;
+    cv.height = H * dpr;
+    cv.style.aspectRatio = W + ' / ' + H;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  /* ======================================================================
+   * 13. Board rendering
+   * ==================================================================== */
+
+  function rowKind(r) {
+    if (r === ROW_HOME) return 'home';
+    if (r >= 1 && r <= 5) return 'river';
+    if (r >= 7 && r <= 11) return 'road';
+    return 'safe';
+  }
+
+  function drawBoard() {
+    for (var r = 0; r < ROWS; r++) {
+      var y = r * CELL;
+      var k = rowKind(r);
+      if (k === 'river') {
+        var g = ctx.createLinearGradient(0, y, 0, y + CELL);
+        g.addColorStop(0, '#0d3f6e');
+        g.addColorStop(1, '#0a2f56');
+        ctx.fillStyle = g;
+      } else if (k === 'road') {
+        ctx.fillStyle = (r % 2 === 0) ? '#262b34' : '#22262e';
+      } else if (k === 'home') {
+        ctx.fillStyle = '#0b3b23';
+      } else {
+        ctx.fillStyle = (r === ROW_START) ? '#1c5c33' : '#177a45';
+      }
+      ctx.fillRect(0, y, W, CELL);
+    }
+    /* Road markings: dashed centre lines. */
+    ctx.strokeStyle = 'rgba(255,255,255,.16)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([7, 9]);
+    for (var rr2 = 7; rr2 <= 11; rr2++) {
+      var yy = rr2 * CELL + 0.5;
+      ctx.beginPath();
+      ctx.moveTo(0, yy);
+      ctx.lineTo(W, yy);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+  }
+
+  function drawRipples() {
+    ctx.strokeStyle = 'rgba(180,225,255,.16)';
+    ctx.lineWidth = 1;
+    for (var r = 1; r <= 5; r++) {
+      var y0 = r * CELL;
+      for (var w = 0; w < 2; w++) {
+        ctx.beginPath();
+        var yy = y0 + CELL * (0.32 + w * 0.42);
+        for (var x = 0; x <= W; x += 8) {
+          var y = yy + Math.sin(x * 0.08 + clock * 1.9 + r * 1.3 + w * 2) * 1.8;
+          if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+    }
+  }
+
+  /* --- logs, turtles, cars, trucks ---------------------------------------- */
+
+  function drawLog(from, to, r) {
+    var x = px(from), w = px(to - from), y = r * CELL + 4, h = CELL - 8;
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,.4)';
+    ctx.shadowBlur = 5;
+    ctx.shadowOffsetY = 2;
+    var g = ctx.createLinearGradient(0, y, 0, y + h);
+    g.addColorStop(0, '#b07b45');
+    g.addColorStop(1, '#7d5228');
+    ctx.fillStyle = g;
+    rr(x + 1, y, w - 2, h, h / 2);
+    ctx.fill();
+    ctx.restore();
+    /* Wood rings near each end. */
+    ctx.strokeStyle = 'rgba(80,50,20,.55)';
+    ctx.lineWidth = 1;
+    var ends = [x + h * 0.55, x + w - h * 0.55];
+    for (var i = 0; i < ends.length; i++) {
+      ctx.beginPath();
+      ctx.ellipse(ends[i], r * CELL + CELL / 2, h * 0.26, h * 0.42, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.ellipse(ends[i], r * CELL + CELL / 2, h * 0.12, h * 0.2, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+
+  function drawTurtle(from, to, r, submerged, warning) {
+    var cx0 = px(from), cx1 = px(to);
+    var y = r * CELL + CELL / 2;
+    var count = Math.max(1, Math.round((cx1 - cx0) / CELL));
+    var alpha = submerged ? 0.28 : 1;
+    if (warning && !submerged && Math.floor(clock * 8) % 2 === 0) alpha = 0.45;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    for (var i = 0; i < count; i++) {
+      var cx = cx0 + CELL * (i + 0.5) * ((cx1 - cx0) / (count * CELL));
+      cx = cx0 + (cx1 - cx0) * ((i + 0.5) / count);
+      ctx.fillStyle = '#2e8b57';
+      ctx.beginPath();
+      ctx.arc(cx, submerged ? y + 3 : y, CELL * 0.36, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#226b41';
+      ctx.beginPath();
+      ctx.arc(cx, submerged ? y + 3 : y, CELL * 0.20, 0, Math.PI * 2);
+      ctx.fill();
+      /* Shell plate lines. */
+      ctx.strokeStyle = 'rgba(10,60,30,.6)';
+      ctx.lineWidth = 1;
+      for (var s = 0; s < 6; s++) {
+        var a = (s / 6) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.moveTo(cx + Math.cos(a) * CELL * 0.2, (submerged ? y + 3 : y) + Math.sin(a) * CELL * 0.2);
+        ctx.lineTo(cx + Math.cos(a) * CELL * 0.36, (submerged ? y + 3 : y) + Math.sin(a) * CELL * 0.36);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+    if (submerged) {
+      ctx.strokeStyle = 'rgba(180,225,255,.5)';
+      for (var rr3 = 0; rr3 < 3; rr3++) {
+        ctx.beginPath();
+        ctx.ellipse(cx0 + (cx1 - cx0) / 2, y, CELL * (0.3 + rr3 * 0.18), CELL * (0.14 + rr3 * 0.08), 0, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+  }
+
+  var CAR_COLORS = ['#e05a5a', '#e0b34a', '#7f6ce0', '#4aa8e0', '#e07a4a'];
+  var TRUCK_COLORS = ['#5a8f5a', '#8a6a3a', '#6a6a8a'];
+
+  function drawCar(from, to, r, dir, idx) {
+    var x = px(from), w = px(to - from), h = CELL * 0.62, y = r * CELL + (CELL - h) / 2;
+    var col = CAR_COLORS[idx % CAR_COLORS.length];
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,.45)';
+    ctx.shadowBlur = 5; ctx.shadowOffsetY = 2;
+    ctx.fillStyle = col;
+    rr(x + 2, y, w - 4, h, 6);
+    ctx.fill();
+    ctx.restore();
+    /* Windshield toward the travel direction. */
+    ctx.fillStyle = 'rgba(200,230,255,.75)';
+    var wsW = w * 0.3;
+    if (dir > 0) rr(x + w - wsW - 5, y + 4, wsW, h - 8, 3);
+    else rr(x + 5, y + 4, wsW, h - 8, 3);
+    ctx.fill();
+    /* Wheels. */
+    ctx.fillStyle = '#141414';
+    ctx.beginPath(); ctx.arc(x + w * 0.26, y + h, 3.4, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x + w * 0.74, y + h, 3.4, 0, Math.PI * 2); ctx.fill();
+    /* Headlights. */
+    ctx.fillStyle = '#fff2b0';
+    if (dir > 0) { ctx.fillRect(x + w - 3, y + 3, 3, 3); ctx.fillRect(x + w - 3, y + h - 6, 3, 3); }
+    else { ctx.fillRect(x, y + 3, 3, 3); ctx.fillRect(x, y + h - 6, 3, 3); }
+  }
+
+  function drawTruck(from, to, r, dir, idx) {
+    var x = px(from), w = px(to - from), h = CELL * 0.7, y = r * CELL + (CELL - h) / 2;
+    var col = TRUCK_COLORS[idx % TRUCK_COLORS.length];
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,.45)';
+    ctx.shadowBlur = 5; ctx.shadowOffsetY = 2;
+    /* Trailer. */
+    ctx.fillStyle = '#d8d8de';
+    rr(x + 2, y, w - w * 0.32 - 3, h, 4);
+    ctx.fill();
+    /* Cab. */
+    ctx.fillStyle = col;
+    if (dir > 0) rr(x + w - w * 0.32, y, w * 0.32 - 2, h, 4);
+    else rr(x + 2, y, w * 0.32 - 2, h, 4);
+    ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = 'rgba(200,230,255,.7)';
+    if (dir > 0) rr(x + w - w * 0.3, y + 4, w * 0.22, h - 8, 3);
+    else rr(x + w * 0.08, y + 4, w * 0.22, h - 8, 3);
+    ctx.fill();
+    ctx.fillStyle = '#141414';
+    ctx.beginPath(); ctx.arc(x + w * 0.2, y + h, 3.6, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x + w * 0.8, y + h, 3.6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fff2b0';
+    if (dir > 0) { ctx.fillRect(x + w - 3, y + 3, 3, 3); ctx.fillRect(x + w - 3, y + h - 6, 3, 3); }
+    else { ctx.fillRect(x, y + 3, 3, 3); ctx.fillRect(x, y + h - 6, 3, 3); }
+  }
+
+  function drawLanes() {
+    var cfg = laneConfig(level);
+    for (var i = 0; i < cfg.length; i++) {
+      var c = cfg[i];
+      if (c.kind === 'road') {
+        var vs = vehiclesAt(i, gameT, level);
+        for (var j = 0; j < vs.length; j++) {
+          var v = vs[j];
+          if (v.kind === 'truck') drawTruck(v.from, v.to, i, c.dir, Math.abs(v.slot));
+          else drawCar(v.from, v.to, i, c.dir, Math.abs(v.slot) + i);
+        }
+      } else if (c.kind === 'river') {
+        var ps = platformsAt(i, gameT, level);
+        for (var k = 0; k < ps.length; k++) {
+          var p = ps[k];
+          if (p.kind === 'log') drawLog(p.from, p.to, i);
+          else drawTurtle(p.from, p.to, i, p.submerged, p.warning);
+        }
+      }
+    }
+  }
+
+  /* --- homes ---------------------------------------------------------------- */
+
+  function drawHomes() {
+    ctx.fillStyle = '#0b3b23';
+    ctx.fillRect(0, 0, W, CELL);
+    for (var c = 0; c < COLS; c++) {
+      var slot = homeSlot(c);
+      if (slot < 0) {
+        /* Wall between bays - a stone block. */
+        ctx.fillStyle = '#254a34';
+        rr(c * CELL + 2, 3, CELL - 4, CELL - 6, 5);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,.06)';
+        ctx.fillRect(c * CELL + 5, 6, CELL - 10, 3);
+        continue;
+      }
+      var filled = homes[slot];
+      var pulse = filled ? 0.5 + 0.5 * Math.sin(clock * 4 + slot) : 0;
+      var flash = homeFlash[slot];
+      var x = c * CELL + 2, y = 3, w = CELL - 4, h = CELL - 6;
+      if (filled) {
+        ctx.save();
+        ctx.shadowColor = 'rgba(120,235,120,.85)';
+        ctx.shadowBlur = 8 + pulse * 8;
+        ctx.fillStyle = '#3bbd5a';
+        ctx.fillRect(x, y, w, h);
+        ctx.restore();
+        /* Little settled frog icon, popping in when just filled. */
+        var pop = 1 + flash * 0.4;
+        var fx = x + w / 2, fy = y + h / 2;
+        ctx.fillStyle = '#eafff0';
+        ctx.beginPath();
+        ctx.ellipse(fx, fy, w * 0.28 * pop, h * 0.22 * pop, 0, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.fillStyle = '#10301d';
+        rr(x, y, w, h, 6);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,.08)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+    }
+  }
+
+  /* --- frog ----------------------------------------------------------------- */
+
+  function drawFrog() {
+    var cx = frog.x * CELL;
+    var cy = frog.r * CELL + CELL / 2;
+    var sx = 1, sy = 1;
+    var dead = (phase === 'dying');
+
+    if (frog.hop) {
+      var t = frog.hop.t;
+      var arc = Math.sin(Math.PI * t);
+      sy = 1 + 0.22 * arc;
+      sx = 1 - 0.14 * arc;
+      cy -= arc * 4;
+    }
+    if (landSquash > 0) {
+      sy *= 1 - 0.28 * landSquash;
+      sx *= 1 + 0.22 * landSquash;
+    }
+
+    if (dead) {
+      var prog = 1 - Math.max(0, deathTimer) / DEATH_TIME;
+      if (deathKind === 'crash') { sy *= 1 - 0.75 * prog; sx *= 1 + 0.4 * prog; }
+      else if (deathKind === 'drown') { cy += prog * CELL * 0.5; sx *= 1 - prog * 0.4; sy *= 1 - prog * 0.4; }
+      else if (deathKind === 'timeout') { ctx.globalAlpha = (Math.floor(clock * 12) % 2 === 0) ? 1 : 0.25; }
+      else if (deathKind === 'wall') { sy *= 1 - 0.5 * prog; sx *= 1 + 0.35 * prog; }
+    }
+
+    var bw = CELL * 0.34 * sx;
+    var bh = CELL * 0.30 * sy;
+
+    /* Legs. */
+    ctx.fillStyle = '#4fae2f';
+    var legLift = frog.hop ? Math.sin(Math.PI * frog.hop.t) * 3 : 0;
+    ctx.beginPath(); ctx.ellipse(cx - bw * 0.9, cy + bh * 0.5, bw * 0.34, bh * 0.5, -0.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx + bw * 0.9, cy + bh * 0.5, bw * 0.34, bh * 0.5, 0.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx - bw * 0.75, cy - bh * 0.6, bw * 0.26, bh * 0.4, -0.6, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx + bw * 0.75, cy - bh * 0.6, bw * 0.26, bh * 0.4, 0.6, 0, Math.PI * 2); ctx.fill();
+
+    /* Body. */
+    ctx.save();
+    ctx.shadowColor = 'rgba(120,235,120,.55)';
+    ctx.shadowBlur = 7;
+    ctx.fillStyle = '#7ce24b';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy - legLift * 0.3, bw, bh, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = '#5cc233';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + bh * 0.35, bw * 0.7, bh * 0.4, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    /* Eyes - look toward the facing direction. */
+    var ev = DIRV[frog.dir] || { dr: -1, dc: 0 };
+    var ex = bw * 0.42, ey = -bh * 0.45;
+    for (var s = -1; s <= 1; s += 2) {
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.arc(cx + s * ex, cy + ey, bw * 0.28, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#0d2a12';
+      ctx.beginPath();
+      ctx.arc(cx + s * ex + ev.dc * bw * 0.12, cy + ey + ev.dr * bh * 0.16, bw * 0.13, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    /* Dead eyes become X marks. */
+    if (dead && (deathKind === 'crash' || deathKind === 'wall')) {
+      ctx.strokeStyle = '#20301c';
+      ctx.lineWidth = 1.6;
+      for (var s2 = -1; s2 <= 1; s2 += 2) {
+        var exx = cx + s2 * ex, eyy = cy + ey, rr4 = bw * 0.24;
+        ctx.beginPath(); ctx.moveTo(exx - rr4, eyy - rr4); ctx.lineTo(exx + rr4, eyy + rr4); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(exx + rr4, eyy - rr4); ctx.lineTo(exx - rr4, eyy + rr4); ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /* --- effects + overlay chrome -------------------------------------------- */
+
+  function drawEffects() {
+    for (var i = 0; i < particles.length; i++) {
+      var p = particles[i];
+      ctx.globalAlpha = Math.max(0, Math.min(1, p.life / 0.6));
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x * CELL, p.r * CELL, 2.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    ctx.textAlign = 'center';
+    ctx.font = '700 12px "SFMono-Regular", Menlo, Consolas, monospace';
+    var KIND_COLOR = { forward: '#bfe9ff', home: '#ffe08a', bonus: '#ffd45e', clear: '#8ef0a0' };
+    for (var j = 0; j < floaters.length; j++) {
+      var f = floaters[j];
+      ctx.globalAlpha = Math.max(0, Math.min(1, f.life));
+      ctx.fillStyle = KIND_COLOR[f.kind] || '#ffffff';
+      ctx.fillText(f.text, f.x * CELL, f.r * CELL + 6);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawTimerBar() {
+    var lim = timeLimit();
+    var ratio = Math.max(0, Math.min(1, timeLeft / lim));
+    var barH = 5;
+    ctx.fillStyle = 'rgba(0,0,0,.35)';
+    ctx.fillRect(0, 0, W, barH);
+    var low = ratio < 0.28;
+    var blink = low && Math.floor(clock * 6) % 2 === 0;
+    ctx.fillStyle = low ? (blink ? '#ff4d6d' : '#ff8fa3') : (ratio < 0.55 ? '#ffd45e' : '#5ce08a');
+    ctx.fillRect(0, 0, W * ratio, barH);
+  }
+
+  function drawPauseVeil() {
+    if (phase !== 'paused') return;
+    ctx.fillStyle = 'rgba(5,18,31,.55)';
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#e8ecff';
+    ctx.font = '700 24px "SFMono-Regular", Menlo, Consolas, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(T.t('pause'), W / 2, H / 2);
+  }
+
+  function draw() {
+    drawBoard();
+    drawRipples();
+    drawHomes();
+    drawLanes();
+    drawFrog();
+    drawEffects();
+    drawTimerBar();
+    drawPauseVeil();
+  }
+
+  /* ======================================================================
+   * 14. HUD / overlays
+   * ==================================================================== */
+
+  /* Value cache backing updateHud(); `null` = "never written". */
+  var hudCache = {
+    score: null, lives: null, level: null, homes: null, time: null,
+    low: null, pauseDisabled: null, pauseText: null
+  };
+
+  function updateHud() {
+    // Value cache: updateHud() runs every frame from loop(), so remember the
+    // last value written for each field and only touch the DOM when it actually
+    // changes. At steady state this performs ZERO writes per frame, and the
+    // event-time (start / die / levelClear / pause / boot) calls stay
+    // idempotent. `null` marks "never written" so the first call always writes.
+    var c = hudCache;
+    if (c.score !== score) { scoreEl.textContent = score; c.score = score; }
+    if (c.lives !== lives) { livesEl.textContent = lives; c.lives = lives; }
+    if (c.level !== level) { levelEl.textContent = level; c.level = level; }
+    var homesTxt = homesFilled() + '/' + homes.length;
+    if (c.homes !== homesTxt) { homesEl.textContent = homesTxt; c.homes = homesTxt; }
+    var timeTxt = Math.ceil(Math.max(0, timeLeft));
+    if (c.time !== timeTxt) { timeEl.textContent = timeTxt; c.time = timeTxt; }
+    var low = (timeLeft <= 5);
+    if (c.low !== low) {
+      if (low) timeStatEl.classList.add('low'); else timeStatEl.classList.remove('low');
+      c.low = low;
+    }
+    var pauseDisabled = !(phase === 'playing' || phase === 'paused');
+    if (c.pauseDisabled !== pauseDisabled) { btnPause.disabled = pauseDisabled; c.pauseDisabled = pauseDisabled; }
+    var pauseTxt = (phase === 'paused') ? T.t('resume') : T.t('pause');
+    if (c.pauseText !== pauseTxt) { btnPause.textContent = pauseTxt; c.pauseText = pauseTxt; }
+  }
+
+  function showResult(kind) {
+    overlayKind = kind;
+    if (kind === 'clear') {
+      ovTitleEl.textContent = T.t('clearTitle');
+      ovSubEl.textContent = T.t('clearSub', { n: level, m: level + 1 });
+      ovBtnEl.textContent = T.t('nextLevel');
+    } else {
+      ovTitleEl.textContent = T.t('overTitle');
+      ovSubEl.textContent = T.t('overSub', { n: score });
+      ovBtnEl.textContent = T.t('again');
+    }
+    resEl.classList.add('show');
+  }
+
+  function hideResult() { overlayKind = null; resEl.classList.remove('show'); }
+  function hideStart() { startEl.classList.remove('show'); }
+
+  function startPlay() {
+    hideStart();
+    hideResult();
+    phase = 'playing';
+    updateHud();
+  }
+
+  function togglePause() {
+    if (phase === 'playing') { phase = 'paused'; lastT = 0; updateHud(); }
+    else if (phase === 'paused') { phase = 'playing'; lastT = 0; updateHud(); }
+  }
+
+  /* ======================================================================
+   * 15. Input
+   * ==================================================================== */
+
+  var KEY_DIR = {
+    ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
+    w: 'up', s: 'down', a: 'left', d: 'right',
+    W: 'up', S: 'down', A: 'left', D: 'right'
+  };
+
+  function onKeyDown(ev) {
+    var k = ev.key;
+    var d = KEY_DIR[k];
+    if (d) {
+      if (ev.preventDefault) ev.preventDefault();
+      if (phase === 'playing') hop(d);
+      return;
+    }
+    if (k === ' ' || k === 'Enter') {
+      if (ev.preventDefault) ev.preventDefault();
+      if (phase === 'ready') { startPlay(); }
+      else if (phase === 'gameover') { newGame({ level: 1 }); startPlay(); }
+      else if (phase === 'paused') { togglePause(); }
+      return;
+    }
+    if (k === 'p' || k === 'P') togglePause();
+  }
+
+  document.addEventListener('keydown', onKeyDown);
+
+  btnStart.addEventListener('click', function () { startPlay(); });
+
+  btnNew.addEventListener('click', function () {
+    newGame({ level: 1 });
+    startPlay();
+  });
+
+  btnPause.addEventListener('click', function () { togglePause(); });
+
+  ovBtnEl.addEventListener('click', function () {
+    if (overlayKind === 'clear') nextLevel();
+    else if (overlayKind === 'over') { newGame({ level: 1 }); startPlay(); }
+  });
+
+  /* ======================================================================
+   * 16. rAF loop (delta-accumulating clock - never setTimeout/setInterval)
+   * ==================================================================== */
+
+  function nowMs() {
+    if (typeof performance !== 'undefined' && performance && performance.now) return performance.now();
+    return Date.now();
+  }
+
+  function loop() {
+    if (!running) return;
+    var t = nowMs();
+    var dt = lastT ? (t - lastT) / 1000 : 1 / 60;
+    lastT = t;
+    if (!isFinite(dt) || dt <= 0) dt = 1 / 60;
+    if (dt > 0.05) dt = 0.05;                    // clamp big hitches / tab restores
+    clock += dt;
+    if (landSquash > 0) landSquash = Math.max(0, landSquash - dt * 5);
+    update(dt);
+    updateHud();                                 // refresh DOM HUD every frame (cheap: value-cached)
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  /* ======================================================================
+   * 17. Test bridge + boot
+   * ==================================================================== */
+
+  window.FR = {
+    COLS: COLS,
+    ROWS: ROWS,
+    CELL: CELL,
+    ROW_HOME: ROW_HOME,
+    ROW_MEDIAN: ROW_MEDIAN,
+    ROW_START: ROW_START,
+    HOME_COLS: HOME_COLS.slice(),
+    laneConfig: function (level) { return laneConfig(level || 1); },
+    vehiclesAt: function (laneIndex, t, level) { return vehiclesAt(laneIndex, t || 0, level || 1); },
+    platformsAt: function (laneIndex, t, level) { return platformsAt(laneIndex, t || 0, level || 1); },
+    hopTarget: function (r, c, dir) { return hopTarget(r, c, dir); },
+    collidesAt: function (state) { return collidesAt(state); },
+    supportAt: function (r, c, t, level) { return supportAt(r, c, t || 0, level || 1); },
+    homeSlot: function (c) { return homeSlot(c); },
+    scoreFor: function (event, state) { return scoreFor(event, state); },
+    newGame: function (opts) { return newGame(opts); },
+    hop: function (dir) { return hop(dir); },
+    tick: function (seconds, step) { return tick(seconds, step); },
+    getState: function () { return getState(); },
+    /* Extra deterministic conveniences (used by the logic suite). */
+    start: function () { startPlay(); return getState(); },
+    platformUnder: function (x, r, t, level) { return platformUnder(x, r, t || 0, level || 1); }
+  };
+
+  /* Re-localise the dynamic text (HUD, pause button, result dialog) when the
+   * language changes. Exactly one onChange callback is registered. */
+  T.onChange(function () {
+    updateHud();
+    if (overlayKind) showResult(overlayKind);
+  });
+
+  setupCanvas();
+  newGame({ level: 1 });
+  phase = 'ready';
+  startEl.classList.add('show');
+  updateHud();
+  T.start();
+  requestAnimationFrame(loop);
+
+})();
+</script>
+</body>
+</html>

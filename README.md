@@ -2,7 +2,7 @@
 
 [简体中文](README.zh.md) · **[English](README.md)**
 
-[![games](https://img.shields.io/badge/games-26-blue?style=flat-square)](#games)
+[![games](https://img.shields.io/badge/games-27-blue?style=flat-square)](#games)
 [![AI-generated](https://img.shields.io/badge/AI--generated-100%25-8b5cf6?style=flat-square)](#how-this-was-made)
 [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen?style=flat-square)](#why-litegame)
 [![vanilla JS](https://img.shields.io/badge/vanilla-JS-f7df1e?style=flat-square&logo=javascript&logoColor=black)](https://developer.mozilla.org/docs/Web/JavaScript)
@@ -55,6 +55,7 @@ Each game lives in its own folder and is a single self-contained `index.html`. T
 | [match3-game](match3-game) | Swap adjacent gems to line up three or more, cascades build a combo multiplier | `puzzle` `match-3` `cascade` |
 | [link-game](link-game) | Connect matching tiles with a path of at most two turns, rim included | `puzzle` `tiles` `pathfinding` |
 | [pacman-game](pacman-game) | The arcade chase: four distinct ghost personalities, power pellets, 200/400/800/1600 combos | `arcade` `maze` `chase` |
+| [frogger-game](frogger-game) | Cross five lanes of traffic and a river of logs to fill five homes before the timer runs out | `arcade` `timing` `reflex` |
 
 ## Why litegame
 
