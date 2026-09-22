@@ -1,0 +1,1570 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Space Invaders</title>
+<style>
+  :root {
+    --bg: #eef2fb;
+    --card: #ffffff;
+    --border: #d7deee;
+    --text: #1e2740;
+    --muted: #6b7592;
+    --accent: #6366f1;
+    --screen: #050b1a;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    margin: 0;
+    padding: 20px 12px 48px;
+    background: radial-gradient(120% 120% at 50% 0%, #ffffff 0%, var(--bg) 62%);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+  }
+
+  h1 { margin: 0 0 4px; font-size: 27px; letter-spacing: -.02em; }
+  .tip { margin: 0 0 16px; font-size: 13px; color: var(--muted); text-align: center; max-width: 460px; line-height: 1.6; }
+
+  .panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 14px;
+    box-shadow: 0 10px 30px rgba(30,39,64,.10);
+    width: min(480px, 100%);
+  }
+
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    margin-bottom: 10px;
+  }
+  .bar:last-child { margin-bottom: 0; margin-top: 10px; }
+
+  .stat {
+    background: #f5f7fd;
+    color: #3a4668;
+    font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 5px 9px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .stat small { font-family: inherit; font-weight: 600; font-size: 11px; color: var(--muted); }
+
+  button {
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    background: #ffffff;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 14px;
+    cursor: pointer;
+    transition: transform .08s ease, background .15s ease, opacity .15s ease;
+  }
+  button:hover { background: #f3f5fc; }
+  button:active { transform: translateY(1px); }
+  button:disabled { opacity: .45; cursor: default; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary:hover { background: #5457e6; }
+  button.pad { min-width: 54px; font-size: 16px; padding: 8px 10px; }
+
+  .stage {
+    position: relative;
+    width: 100%;
+    background: var(--screen);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.06);
+  }
+  canvas { display: block; width: 100%; height: auto; background: var(--screen); }
+
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(5, 11, 26, .62);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 20;
+  }
+  .overlay.show { display: flex; }
+
+  .dialog {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 26px 28px 22px;
+    width: min(360px, 100%);
+    text-align: center;
+    box-shadow: 0 16px 50px rgba(20,27,48,.30);
+    animation: rise .2s ease-out;
+  }
+  @keyframes rise {
+    from { transform: translateY(12px); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+  }
+  .dialog h2 { margin: 0 0 10px; font-size: 22px; }
+  .dialog p  { color: var(--muted); font-size: 13px; line-height: 1.65; margin: 0 0 18px; }
+
+  @media (max-width: 480px) {
+    h1 { font-size: 22px; }
+    .panel { padding: 11px; }
+    .bar { gap: 5px; }
+    button { padding: 7px 11px; font-size: 12px; }
+    .stat { padding: 4px 7px; font-size: 11px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="lang-switch" data-lang-switch></div>
+
+<h1 data-i18n="title"></h1>
+<p class="tip" data-i18n-html="tip"></p>
+
+<div class="panel">
+  <div class="bar">
+    <span class="stat"><small data-i18n="score"></small> <b id="score">0</b></span>
+    <span class="stat"><small data-i18n="lives"></small> <b id="lives">3</b></span>
+    <span class="stat"><small data-i18n="wave"></small> <b id="wave">1</b></span>
+    <span class="stat"><small data-i18n="remaining"></small> <b id="remaining">55</b></span>
+  </div>
+
+  <div class="stage">
+    <canvas id="cv" width="480" height="560"></canvas>
+  </div>
+
+  <div class="bar">
+    <button id="btnPause" data-i18n="pause" disabled></button>
+    <button id="btnNew" data-i18n="newgame"></button>
+    <button id="btnLeft" class="pad" aria-label="left">&#9664;</button>
+    <button id="btnFire" class="primary pad" data-i18n="fire"></button>
+    <button id="btnRight" class="pad" aria-label="right">&#9654;</button>
+  </div>
+</div>
+
+<!-- Start overlay: the required entry point out of the ready state. -->
+<div id="startOverlay" class="overlay show">
+  <div class="dialog">
+    <h2 data-i18n="title"></h2>
+    <p data-i18n-html="readySub"></p>
+    <button id="btnStart" class="primary" data-i18n="start"></button>
+  </div>
+</div>
+
+<!-- Result overlay: shown on clearing a wave or losing the last life. -->
+<div id="overlay" class="overlay">
+  <div class="dialog">
+    <h2 id="ovTitle"></h2>
+    <p id="ovSub"></p>
+    <button id="ovBtn" class="primary"></button>
+  </div>
+</div>
+
+<script src="../assets/i18n.js"></script>
+<script>
+/* ============================================================================
+ * Space Invaders - a single-file, zero-dependency, canvas-rendered arcade clone.
+ *
+ * The whole game runs on ONE requestAnimationFrame clock that ACCUMULATES delta
+ * time (clamped to 50 ms). setTimeout / setInterval are never used.
+ *
+ * Determinism (the core discipline of this file):
+ *   - The alien fleet marches in DISCRETE steps. Its pose is a PURE function of
+ *     the step count: formationState(steps, aliveCount, wave) -> { offsetX,
+ *     originY, dir }; nothing accumulates per frame, so any step index can be
+ *     recomputed exactly.
+ *   - The time between steps is a PURE function of the alien count and wave:
+ *     stepInterval(aliveCount, wave). Fewer aliens -> shorter interval -> the
+ *     classic "last invader zooms" behaviour.
+ *   - Every random choice (bomb drop column, UFO reward) comes from a SEEDED
+ *     pseudo-random function of (seed, counter). No Math.random() anywhere, so
+ *     newGame({ seed }) is fully reproducible and different seeds diverge.
+ *   - Nothing outside draw() mutates game state, so a headless step-driven run
+ *     (tick) reproduces the on-screen game exactly.
+ *
+ * Geometry is owned by the CELL / COLS / ROWS / FIELD_* constants and is never
+ * read back from the canvas. Everything lives inside this IIFE; only window.SI
+ * is exported.
+ * ========================================================================== */
+(function () {
+  'use strict';
+
+  /* ======================================================================
+   * 1. Constants (geometry is owned here - never read back from the canvas)
+   * ==================================================================== */
+
+  var CELL = 28;                 // one alien cell (both axes), px
+  var COLS = 11;                 // alien columns
+  var ROWS = 5;                  // alien rows
+  var TOTAL_INVADERS = COLS * ROWS;   // 55
+
+  var FIELD_W = 480;             // logical playfield width, px
+  var FIELD_H = 560;             // logical playfield height, px
+  var EDGE = 16;                 // side margin the fleet bounces inside
+
+  var SHIP_W = 40, SHIP_H = 22;  // player ship box, px
+  var SHIP_Y = 500;              // ship centre y, px
+  var SHIP_SPEED = 170;          // player horizontal speed, px/s
+
+  var BULLET_W = 3, BULLET_H = 14;
+  var BULLET_SPEED = 800;        // player bullet speed, px/s (upward).
+                                 // Fast, like the arcade: with the classic
+                                 // one-bullet rule this is what sets the
+                                 // maximum kill rate, so it is the main dial
+                                 // that keeps every wave winnable.
+
+  var BOMB_W = 6, BOMB_H = 14;
+  var BOMB_SPEED = 130;          // alien bomb speed, px/s (downward)
+  var MAX_BOMBS = 6;             // hard cap so a wave can never be a wall
+
+  var INVADER_FLOOR = 470;       // fleet bottom reaching this y == invasion wins
+
+  var UFO_Y = 24, UFO_SPEED = 100, UFO_PERIOD_STEPS = 40, UFO_MIN_ALIVE = 8;
+  var BOMB_CHANCE = 0.14;        // per-step probability a bomb is released
+                                 // (the fleet fires far faster late in a wave,
+                                 //  because it steps more often - classic)
+
+  var BUNKER_COUNT = 4, BUNKER_W = 22, BUNKER_H = 16, BUNKER_PX = 2, BUNKER_TOP = 400;
+  var DEATH_TIME = 0.8;          // seconds of the player-death animation
+
+  var UFO_SCORES = [50, 100, 150, 300];
+
+  /* Two-frame walk sprites, one per alien type (11 x 8 characters). Row 0 uses
+   * 'A' (30 pts), rows 1-2 use 'B' (20 pts), rows 3-4 use 'C' (10 pts).        */
+  var SPRITES = {
+    A: [
+      ['..#.....#..',
+       '...#...#...',
+       '..#######..',
+       '.##.###.##.',
+       '###########',
+       '#.#######.#',
+       '#.#.....#.#',
+       '...#...#...'],
+      ['..#.....#..',
+       '#..#...#..#',
+       '#.#######.#',
+       '###.###.###',
+       '###########',
+       '.#########.',
+       '..#.....#..',
+       '.#.......#.']
+    ],
+    B: [
+      ['...#...#...',
+       '....#.#....',
+       '...#####...',
+       '..##.###.##',
+       '###########',
+       '#.#######.#',
+       '#.#.....#.#',
+       '...##.##...'],
+      ['...#...#...',
+       '#...#.#...#',
+       '#..#####..#',
+       '##.#.###.##',
+       '###########',
+       '.#.#####.#.',
+       '#.#.....#.#',
+       '##.......##']
+    ],
+    C: [
+      ['...#####...',
+       '..#######..',
+       '.#########.',
+       '##.#####.##',
+       '###########',
+       '###.###.###',
+       '##.#.#.#.##',
+       '#.#.....#.#'],
+      ['...#####...',
+       '..#######..',
+       '.#########.',
+       '##.#####.##',
+       '###########',
+       '#.##.#.##.#',
+       '##.#...#.##',
+       '.#.#...#.#.']
+    ]
+  };
+  var TYPE_BY_ROW = ['A', 'B', 'B', 'C', 'C'];
+  var TYPE_COLOR = { A: '#8ef0a0', B: '#7fd7ff', C: '#ffd58a' };
+
+  /* ======================================================================
+   * 2. i18n
+   * ==================================================================== */
+
+  var T = LiteI18N.create({
+    title:      { en: 'Space Invaders', zh: '太空侵略者' },
+    tip: {
+      en: 'Arrow keys / A D to move, Space to fire<br>Wipe out the alien fleet, dodge their bombs and keep your shields alive',
+      zh: '方向键 / A D 左右移动，空格开火<br>清空敌阵、躲开炸弹，守住你的护盾'
+    },
+    score:      { en: 'Score', zh: '得分' },
+    lives:      { en: 'Lives', zh: '生命' },
+    wave:       { en: 'Wave', zh: '波次' },
+    remaining:  { en: 'Left', zh: '剩余' },
+    pause:      { en: 'Pause', zh: '暂停' },
+    resume:     { en: 'Resume', zh: '继续' },
+    newgame:    { en: 'New game', zh: '新游戏' },
+    fire:       { en: 'Fire', zh: '开火' },
+    start:      { en: 'Start game', zh: '开始游戏' },
+    readySub: {
+      en: 'Clear all 55 invaders to advance a wave.<br>Every alien marches, fires and scores deterministically.',
+      zh: '清空全部 55 只侵略者即可进入下一波。<br>所有侵略者的行进、投弹与计分都是完全确定性的。'
+    },
+    clearTitle: { en: 'Wave clear!', zh: '本波清空！' },
+    clearSub:   { en: 'Wave {n} cleared - get ready for wave {m}', zh: '第 {n} 波完成，准备进入第 {m} 波' },
+    nextWave:   { en: 'Next wave', zh: '下一波' },
+    overTitle:  { en: 'Game over', zh: '游戏结束' },
+    overSub:    { en: 'Final score {n}', zh: '最终得分 {n}' },
+    again:      { en: 'Play again', zh: '再来一局' }
+  });
+
+  /* ======================================================================
+   * 3. DOM handles (every id below must exist in the markup)
+   * ==================================================================== */
+
+  var cv = document.getElementById('cv');
+  var ctx = cv.getContext('2d');
+  var scoreEl = document.getElementById('score');
+  var livesEl = document.getElementById('lives');
+  var waveEl = document.getElementById('wave');
+  var remEl = document.getElementById('remaining');
+  var btnPause = document.getElementById('btnPause');
+  var btnNew = document.getElementById('btnNew');
+  var btnLeft = document.getElementById('btnLeft');
+  var btnRight = document.getElementById('btnRight');
+  var btnFire = document.getElementById('btnFire');
+  var startEl = document.getElementById('startOverlay');
+  var btnStart = document.getElementById('btnStart');
+  var resEl = document.getElementById('overlay');
+  var ovTitleEl = document.getElementById('ovTitle');
+  var ovSubEl = document.getElementById('ovSub');
+  var ovBtnEl = document.getElementById('ovBtn');
+
+  /* ======================================================================
+   * 4. Pure helpers: seeded PRNG, scoring, fleet geometry
+   * ==================================================================== */
+
+  /* Deterministic 32-bit integer hash -> float in [0, 1). Pure, O(1). */
+  function rngHash(seed, index) {
+    var h = (seed >>> 0) ^ Math.imul(((index | 0) + 0x9E3779B9) | 0, 0x85EBCA6B);
+    h = Math.imul(h ^ (h >>> 13), 0xC2B2AE35);
+    h ^= h >>> 16;
+    return (h >>> 0) / 4294967296;
+  }
+
+  /* A classic xorshift32 one-step PRNG. Pure: { s } -> { value, state }.
+   * Exposed so tests can drive an explicit reproducible stream; the live game
+   * derives its rolls from rngHash(seed, counter) - the same idea in closed
+   * form, and the counter that indexes it lives in the game state. */
+  function nextRandom(state) {
+    var x = ((state && state.s) >>> 0) || 1;
+    x ^= (x << 13); x >>>= 0;
+    x ^= (x >>> 17);
+    x ^= (x << 5);  x >>>= 0;
+    return { value: x / 4294967296, state: { s: x } };
+  }
+
+  /* Pure: the reward the UFO carries on its `ufoIndex`-th appearance. */
+  function ufoScoreAt(seed, ufoIndex) {
+    var v = rngHash((seed ^ 0x1F2E3D4C) >>> 0, (ufoIndex | 0) * 7 + 3);
+    var i = Math.floor(v * UFO_SCORES.length);
+    if (i < 0) i = 0;
+    if (i >= UFO_SCORES.length) i = UFO_SCORES.length - 1;
+    return UFO_SCORES[i];
+  }
+
+  /* Pure: points for a kill. 'invader' keys off the row; 'ufo' indexes the
+   * reward table (see ufoScoreAt). */
+  function scoreFor(kind, row) {
+    if (kind === 'invader') {
+      if (row === 0) return 30;
+      if (row <= 2) return 20;
+      return 10;
+    }
+    if (kind === 'ufo') {
+      var i = ((row | 0) % UFO_SCORES.length + UFO_SCORES.length) % UFO_SCORES.length;
+      return UFO_SCORES[i];
+    }
+    return 0;
+  }
+
+  /* Pure: per-wave configuration. Each new wave starts LOWER and marches
+   * FASTER, and UFOs come a touch more often.
+   *
+   * The three difficulty dials are deliberately gentle, because a wave must
+   * stay COMPLETABLE: the number of fleet steps a player survives before the
+   * fleet reaches the line (the "budget") has to stay comfortably above the
+   * steps an ideal player needs to kill all 55 aliens. Raising startY eats the
+   * budget while a smaller stepBase grows the cost, so both are capped here and
+   * the bullet is fast enough to keep the ratio above ~1.9x for 12 waves. */
+  function waveConfig(wave) {
+    var w = Math.max(1, wave | 0);
+    return {
+      cols: COLS,
+      rows: ROWS,
+      total: TOTAL_INVADERS,
+      startY: Math.min(48 + (w - 1) * 6, 88),           // lower start every wave (capped)
+      stepX: 2,                                          // px advanced per step
+      stepBase: Math.max(0.36, 0.5 - (w - 1) * 0.02),    // slowest step interval (floored)
+      minIntervalFraction: 0.3,                          // fastest == stepBase * this
+      ufoPeriod: Math.max(20, UFO_PERIOD_STEPS - (w - 1) * 3)
+    };
+  }
+
+  /* Pure: seconds between fleet steps. Fewer aliens -> faster (classic). */
+  function stepInterval(aliveCount, wave) {
+    var cfg = waveConfig(wave);
+    var base = cfg.stepBase;
+    var fastest = base * cfg.minIntervalFraction;
+    var frac = Math.max(0, Math.min(1, (aliveCount || 0) / cfg.total));
+    return fastest + (base - fastest) * frac;
+  }
+
+  /* Pure: the fleet pose after `steps` discrete steps.
+   *   offsetX  - left edge of the fleet, px
+   *   originY  - top edge of row 0, px (drops one CELL each edge bounce)
+   *   dir      - +1 marching right, -1 marching left
+   * The fleet sweeps a fixed range [EDGE .. FIELD_W - formW - EDGE]; its outer
+   * bounds never change (a documented choice that keeps the oracle exact). */
+  function formationState(steps, aliveCount, wave) {
+    var cfg = waveConfig(wave);
+    var minX = EDGE;
+    var maxX = FIELD_W - cfg.cols * CELL - EDGE;
+    var range = maxX - minX;
+    var half = Math.max(1, Math.round(range / cfg.stepX));  // steps per sweep
+    var cycle = half * 2;
+    var s = Math.max(0, steps | 0);
+    var p = ((s % cycle) + cycle) % cycle;
+    var offsetX, dir;
+    if (p <= half) { offsetX = minX + p * cfg.stepX; dir = (p < half) ? 1 : -1; }
+    else { offsetX = minX + (cycle - p) * cfg.stepX; dir = -1; }
+    var drops = Math.floor(s / half);
+    var originY = cfg.startY + drops * CELL;
+    return { offsetX: offsetX, originY: originY, dir: dir, half: half, drops: drops };
+  }
+
+  /* Pure: which column (if any) a bomb is dropped from on step `stepIndex`.
+   * Returns a column present in `aliveColumns`, or -1 for "no bomb this step".
+   * Deterministic in (stepIndex, seed, aliveColumns) - the whole bomb schedule
+   * is reproducible from the seed alone. */
+  function bombColumnFor(stepIndex, seed, aliveColumns) {
+    if (!aliveColumns || !aliveColumns.length) return -1;
+    var roll = rngHash(seed >>> 0, (stepIndex | 0) * 2 + 1);
+    if (roll >= BOMB_CHANCE) return -1;
+    var pick = rngHash(seed >>> 0, (stepIndex | 0) * 2 + 2);
+    var idx = Math.floor(pick * aliveColumns.length);
+    if (idx < 0) idx = 0;
+    if (idx >= aliveColumns.length) idx = aliveColumns.length - 1;
+    return aliveColumns[idx];
+  }
+
+  /* Pure: build a fresh shield bitmap (a rounded-top block with a widening arch
+   * cut out of its base). Rows are strings of '#' (solid) / '.' (gap). */
+  function makeBunker() {
+    var mid = (BUNKER_W - 1) / 2;
+    var rad = 4, notchH = 6;
+    var grid = [];
+    for (var r = 0; r < BUNKER_H; r++) {
+      var row = '';
+      for (var c = 0; c < BUNKER_W; c++) {
+        var solid = true;
+        if (r < rad) {
+          if (c < rad) {
+            var dxl = c - (rad - 1), dyl = r - (rad - 1);
+            if (dxl * dxl + dyl * dyl > rad * rad) solid = false;
+          }
+          if (c >= BUNKER_W - rad) {
+            var dxr = c - (BUNKER_W - rad), dyr = r - (rad - 1);
+            if (dxr * dxr + dyr * dyr > rad * rad) solid = false;
+          }
+        }
+        if (r >= BUNKER_H - notchH) {
+          var depth = r - (BUNKER_H - notchH);   // 0 at top of notch, grows down
+          if (Math.abs(c - mid) <= 1 + depth) solid = false;
+        }
+        row += solid ? '#' : '.';
+      }
+      grid.push(row);
+    }
+    return grid;
+  }
+
+  function countSolid(grid) {
+    var n = 0;
+    for (var r = 0; r < grid.length; r++) {
+      for (var c = 0; c < grid[r].length; c++) if (grid[r].charAt(c) === '#') n++;
+    }
+    return n;
+  }
+
+  /* Pure (non-mutating): carve a circular hole of `radius` cells centred on
+   * local cell (x, y) out of bunker `bunkerIndex`, returning a NEW bitmap. The
+   * stored bunker is left untouched - callers assign the result. */
+  function damageBunker(bunkerIndex, x, y, radius) {
+    var src = bunkers[bunkerIndex];
+    if (!src) return [];
+    var out = src.slice();
+    var r = Math.max(0, radius || 0);
+    var r2 = r * r;
+    for (var row = 0; row < out.length; row++) {
+      var chars = out[row].split('');
+      var changed = false;
+      for (var col = 0; col < chars.length; col++) {
+        if (chars[col] !== '#') continue;
+        var dx = col - x, dy = row - y;
+        if (dx * dx + dy * dy <= r2) { chars[col] = '.'; changed = true; }
+      }
+      if (changed) out[row] = chars.join('');
+    }
+    return out;
+  }
+
+  /* Pure: is local cell (x, y) of bunker `bunkerIndex` still solid? */
+  function hitTestBunker(bunkerIndex, x, y) {
+    var g = bunkers[bunkerIndex];
+    if (!g) return false;
+    var c = Math.floor(x), r = Math.floor(y);
+    if (r < 0 || r >= g.length) return false;
+    if (c < 0 || c >= g[r].length) return false;
+    return g[r].charAt(c) === '#';
+  }
+
+  /* ======================================================================
+   * 5. Game state
+   * ==================================================================== */
+
+  var invaders = [];          // [{ col, row, type, alive }] indexed row*COLS+col
+  var bunkers = [];           // [bitmap, ...]  BUNKER_COUNT of them
+  var ship = { x: FIELD_W / 2, dir: 0 };
+  var playerBullet = null;    // { x, y } | null  (the classic ONE-bullet rule)
+  var bombs = [];             // [{ x, y }]
+  var ufo = null;             // { x, y, dir, score } | null
+
+  var score = 0;
+  var lives = 3;
+  var wave = 1;
+  var seed = 1;
+  var phase = 'playing';      // ready | playing | paused | dying | waveclear | gameover
+  var steps = 0;              // fleet step counter (drives formationState)
+  var stepTimer = 0;          // seconds until the next fleet step
+  var ufoSpawns = 0;          // how many UFOs have appeared (PRNG counter)
+  var deathTimer = 0;
+  var overlayKind = null;     // 'clear' | 'over'
+
+  var particles = [];
+  var floaters = [];
+  var stars = [];
+
+  var heldDir = 0;            // -1 / 0 / +1, driven by HELD keys & touch pads
+  var shake = 0;              // screen-shake magnitude (render only)
+  var flash = 0;              // white-flash amount 0..1 (render only)
+  var clock = 0;              // render-only animation clock (seconds)
+  var running = true;
+  var lastT = 0;
+
+  /* ======================================================================
+   * 6. Fleet queries
+   * ==================================================================== */
+
+  function aliveCount() {
+    var n = 0;
+    for (var i = 0; i < invaders.length; i++) if (invaders[i].alive) n++;
+    return n;
+  }
+
+  function aliveColumns() {
+    var seen = {}, out = [];
+    for (var i = 0; i < invaders.length; i++) {
+      var iv = invaders[i];
+      if (iv.alive && !seen[iv.col]) { seen[iv.col] = true; out.push(iv.col); }
+    }
+    out.sort(function (a, b) { return a - b; });
+    return out;
+  }
+
+  function bottomInvaderInColumn(col) {
+    for (var r = ROWS - 1; r >= 0; r--) {
+      var iv = invaders[r * COLS + col];
+      if (iv && iv.alive) return iv;
+    }
+    return null;
+  }
+
+  function bunkersAliveCount() {
+    var n = 0;
+    for (var i = 0; i < bunkers.length; i++) if (countSolid(bunkers[i]) > 0) n++;
+    return n;
+  }
+
+  function bunkerLeft(i) {
+    return (FIELD_W / BUNKER_COUNT) * (i + 0.5) - (BUNKER_W * BUNKER_PX) / 2;
+  }
+
+  /* world coords -> bunker-local cell coords, then erode (non-mutating). */
+  function erodeBunkerWorld(i, wx, wy, rCells) {
+    var lx = (wx - bunkerLeft(i)) / BUNKER_PX;
+    var ly = (wy - BUNKER_TOP) / BUNKER_PX;
+    bunkers[i] = damageBunker(i, lx, ly, rCells);
+  }
+
+  /* ======================================================================
+   * 7. Setup / reset
+   * ==================================================================== */
+
+  function buildInvaders() {
+    invaders = [];
+    for (var r = 0; r < ROWS; r++) {
+      for (var c = 0; c < COLS; c++) {
+        invaders.push({ col: c, row: r, type: TYPE_BY_ROW[r], alive: true });
+      }
+    }
+  }
+
+  function buildBunkers() {
+    bunkers = [];
+    for (var i = 0; i < BUNKER_COUNT; i++) bunkers.push(makeBunker());
+  }
+
+  function newGame(opts) {
+    opts = opts || {};
+    wave = Math.max(1, (opts.wave | 0) || 1);
+    lives = Math.max(1, (opts.lives | 0) || 3);
+    seed = (opts.seed === undefined || opts.seed === null) ? 1 : (opts.seed | 0);
+    if (seed === 0) seed = 1;
+    score = 0;
+    steps = 0;
+    ufoSpawns = 0;
+    ship = { x: FIELD_W / 2, dir: 0 };
+    playerBullet = null;
+    bombs = [];
+    ufo = null;
+    particles = [];
+    floaters = [];
+    deathTimer = 0;
+    overlayKind = null;
+    heldDir = 0;
+    shake = 0;
+    flash = 0;
+    buildInvaders();
+    buildBunkers();
+    stepTimer = stepInterval(TOTAL_INVADERS, wave);
+    phase = 'playing';
+    updateHud();
+    return getState();
+  }
+
+  /* ======================================================================
+   * 8. Scoring + visual effects
+   * ==================================================================== */
+
+  function award(points, x, y, color) {
+    if (points <= 0) return;
+    score += points;
+    floaters.push({ x: x, y: y, text: '+' + points, life: 1.0, color: color || '#ffffff' });
+  }
+
+  function spawnBurst(x, y, color, n, speed) {
+    for (var i = 0; i < n; i++) {
+      var a = (i / n) * Math.PI * 2;
+      var sp = (speed || 90) * (0.5 + ((i % 3) * 0.35));
+      particles.push({
+        x: x, y: y,
+        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+        life: 0.6, maxLife: 0.6, color: color, size: 2 + (i % 2)
+      });
+    }
+  }
+
+  function updateEffects(dt) {
+    var i;
+    for (i = particles.length - 1; i >= 0; i--) {
+      var p = particles[i];
+      p.life -= dt;
+      p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 160 * dt;
+      if (p.life <= 0) particles.splice(i, 1);
+    }
+    for (i = floaters.length - 1; i >= 0; i--) {
+      var f = floaters[i];
+      f.life -= dt; f.y -= dt * 26;
+      if (f.life <= 0) floaters.splice(i, 1);
+    }
+    if (shake > 0) shake = Math.max(0, shake - dt * 22);
+    if (flash > 0) flash = Math.max(0, flash - dt * 2.4);
+  }
+
+  /* ======================================================================
+   * 9. Fleet stepping + shooting (all deterministic - no wall clock)
+   * ==================================================================== */
+
+  function doStep() {
+    steps++;
+    var f = formationState(steps, aliveCount(), wave);
+
+    /* Invasion: the fleet bottom reached the defence line -> instant loss. */
+    if (f.originY + ROWS * CELL >= INVADER_FLOOR) { invasionLanded(); return; }
+
+    /* Bomb release: pure oracle keyed on (step, seed, live columns). */
+    if (bombs.length < MAX_BOMBS) {
+      var col = bombColumnFor(steps, seed, aliveColumns());
+      if (col >= 0) {
+        var iv = bottomInvaderInColumn(col);
+        if (iv) {
+          bombs.push({
+            x: f.offsetX + iv.col * CELL + CELL / 2,
+            y: f.originY + iv.row * CELL + CELL
+          });
+        }
+      }
+    }
+
+    /* UFO fly-by: periodic, only while the fleet is still sizeable. */
+    var cfg = waveConfig(wave);
+    if (!ufo && aliveCount() >= UFO_MIN_ALIVE && steps % cfg.ufoPeriod === 0) {
+      var dir = (ufoSpawns % 2 === 0) ? 1 : -1;
+      ufo = {
+        x: (dir > 0) ? -CELL : FIELD_W + CELL,
+        y: UFO_Y, dir: dir,
+        score: ufoScoreAt(seed, ufoSpawns)
+      };
+      ufoSpawns++;
+    }
+  }
+
+  function fire() {
+    if (phase !== 'playing') return getState();
+    if (playerBullet) return getState();          // one bullet on screen, always
+    if (lives <= 0) return getState();
+    playerBullet = { x: ship.x, y: SHIP_Y - SHIP_H / 2 - BULLET_H };
+    return getState();
+  }
+
+  /* ======================================================================
+   * 10. Collisions
+   * ==================================================================== */
+
+  function bulletHitsUfo(bx, by) {
+    if (!ufo) return false;
+    return bx >= ufo.x - CELL * 0.7 && bx <= ufo.x + CELL * 0.7 &&
+           by <= ufo.y + CELL * 0.5 && by + BULLET_H >= ufo.y - CELL * 0.5;
+  }
+
+  function resolveBulletVsInvaders() {
+    if (!playerBullet) return false;
+    var f = formationState(steps, aliveCount(), wave);
+    var bx = playerBullet.x, by = playerBullet.y;
+    var hit = -1, hx = 0, hy = 0;
+    for (var i = 0; i < invaders.length; i++) {
+      var iv = invaders[i];
+      if (!iv.alive) continue;
+      var ix = f.offsetX + iv.col * CELL, iy = f.originY + iv.row * CELL;
+      if (bx + BULLET_W >= ix && bx <= ix + CELL && by <= iy + CELL && by + BULLET_H >= iy) {
+        hit = i; hx = ix + CELL / 2; hy = iy + CELL / 2;
+        break;                                   // bullets travel up: first hit wins
+      }
+    }
+    if (hit < 0) return false;
+    var iv2 = invaders[hit];
+    iv2.alive = false;
+    var pts = scoreFor('invader', iv2.row);
+    award(pts, hx, hy, TYPE_COLOR[iv2.type]);
+    spawnBurst(hx, hy, TYPE_COLOR[iv2.type], 10, 110);
+    playerBullet = null;
+    if (aliveCount() === 0) waveClear();
+    return true;
+  }
+
+  function resolveBulletVsUfo() {
+    if (!playerBullet || !ufo) return false;
+    if (!bulletHitsUfo(playerBullet.x, playerBullet.y)) return false;
+    var pts = scoreFor('ufo', UFO_SCORES.indexOf(ufo.score));
+    award(pts, ufo.x, ufo.y + 6, '#ffe08a');
+    spawnBurst(ufo.x, ufo.y, '#ffe08a', 16, 150);
+    flash = Math.max(flash, 0.5);
+    ufo = null;
+    playerBullet = null;
+    return true;
+  }
+
+  function resolveBulletVsBunkers() {
+    if (!playerBullet) return false;
+    var bx = playerBullet.x, by = playerBullet.y;
+    for (var i = 0; i < bunkers.length; i++) {
+      var l = bunkerLeft(i);
+      if (bx < l || bx > l + BUNKER_W * BUNKER_PX) continue;
+      if (by > BUNKER_TOP + BUNKER_H * BUNKER_PX || by + BULLET_H < BUNKER_TOP) continue;
+      if (hitTestBunker(i, (bx - l) / BUNKER_PX, (by - BUNKER_TOP) / BUNKER_PX)) {
+        erodeBunkerWorld(i, bx, by, 2.2);
+        spawnBurst(bx, by, '#7ce24b', 6, 70);
+        playerBullet = null;
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function resolveBombHitsBunkers(b) {
+    var l, i;
+    for (i = 0; i < bunkers.length; i++) {
+      l = bunkerLeft(i);
+      if (b.x < l - BOMB_W / 2 || b.x > l + BUNKER_W * BUNKER_PX) continue;
+      if (b.y + BOMB_H < BUNKER_TOP) continue;
+      var cx = Math.max(l, Math.min(l + BUNKER_W * BUNKER_PX - 1, b.x));
+      if (hitTestBunker(i, (cx - l) / BUNKER_PX, (b.y + BOMB_H - BUNKER_TOP) / BUNKER_PX)) {
+        erodeBunkerWorld(i, b.x, b.y, 2.6);
+        spawnBurst(b.x, b.y, '#7ce24b', 8, 80);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function shipHitByBomb(b) {
+    var half = SHIP_W / 2 - 2, top = SHIP_Y - SHIP_H / 2, bot = SHIP_Y + SHIP_H / 2;
+    return b.x >= ship.x - half && b.x <= ship.x + half &&
+           b.y + BOMB_H >= top && b.y <= bot;
+  }
+
+  function playerHit() {
+    if (phase !== 'playing') return;
+    lives--;
+    phase = 'dying';
+    deathTimer = DEATH_TIME;
+    shake = 9;
+    flash = Math.max(flash, 0.75);
+    spawnBurst(ship.x, SHIP_Y, '#ffd45e', 20, 180);
+    spawnBurst(ship.x, SHIP_Y, '#ff7a5a', 14, 130);
+    updateHud();
+  }
+
+  function finishDeath() {
+    if (lives <= 0) { gameOver(); return; }
+    /* Classic respawn: bombs cleared, fleet returns to its starting pose. */
+    bombs = [];
+    playerBullet = null;
+    ufo = null;
+    steps = 0;
+    stepTimer = stepInterval(aliveCount(), wave);
+    ship.x = FIELD_W / 2;
+    heldDir = 0;
+    phase = 'playing';
+    updateHud();
+  }
+
+  /* ======================================================================
+   * 11. Phase transitions
+   * ==================================================================== */
+
+  function waveClear() {
+    bombs = [];
+    playerBullet = null;
+    ufo = null;
+    award(300 + wave * 100, FIELD_W / 2, SHIP_Y - 40, '#8ef0a0');
+    phase = 'waveclear';
+    showResult('clear');
+    updateHud();
+  }
+
+  function nextWave() {
+    wave++;
+    steps = 0;
+    ufoSpawns = 0;
+    bombs = [];
+    playerBullet = null;
+    ufo = null;
+    particles = [];
+    floaters = [];
+    ship.x = FIELD_W / 2;
+    heldDir = 0;
+    buildInvaders();
+    buildBunkers();                 // fresh shields each wave (classic)
+    stepTimer = stepInterval(TOTAL_INVADERS, wave);
+    hideResult();
+    phase = 'playing';
+    updateHud();
+  }
+
+  function invasionLanded() {
+    flash = Math.max(flash, 0.9);
+    shake = 12;
+    phase = 'gameover';
+    showResult('over');
+    updateHud();
+  }
+
+  function gameOver() {
+    phase = 'gameover';
+    showResult('over');
+    updateHud();
+  }
+
+  function startPlay() {
+    hideStart();
+    hideResult();
+    phase = 'playing';
+    lastT = 0;
+    updateHud();
+  }
+
+  function togglePause() {
+    if (phase === 'playing') { phase = 'paused'; lastT = 0; updateHud(); }
+    else if (phase === 'paused') { phase = 'playing'; lastT = 0; updateHud(); }
+  }
+
+  /* ======================================================================
+   * 12. Per-frame simulation update (shared by rAF and tick)
+   * ==================================================================== */
+
+  function stepPlaying(dt) {
+    /* Player horizontal movement - a HELD, continuously integrated input. */
+    if (heldDir !== 0) {
+      ship.x += heldDir * SHIP_SPEED * dt;
+      ship.dir = heldDir;
+      var m = SHIP_W / 2 + 4;
+      if (ship.x < m) ship.x = m;
+      if (ship.x > FIELD_W - m) ship.x = FIELD_W - m;
+    }
+
+    /* Player bullet - smooth upward travel, one frame of interpolation. */
+    if (playerBullet) {
+      playerBullet.y -= BULLET_SPEED * dt;
+      if (playerBullet.y + BULLET_H < 0) playerBullet = null;
+      else {
+        if (!resolveBulletVsUfo()) {
+          if (!resolveBulletVsInvaders()) resolveBulletVsBunkers();
+        }
+      }
+    }
+
+    /* Alien bombs. */
+    for (var i = bombs.length - 1; i >= 0; i--) {
+      var b = bombs[i];
+      b.y += BOMB_SPEED * dt;
+      if (shipHitByBomb(b)) { bombs.splice(i, 1); playerHit(); return; }
+      if (resolveBombHitsBunkers(b)) { bombs.splice(i, 1); continue; }
+      if (b.y > FIELD_H) bombs.splice(i, 1);
+    }
+
+    /* UFO fly-by. */
+    if (ufo) {
+      ufo.x += ufo.dir * UFO_SPEED * dt;
+      if (ufo.x < -CELL * 2 || ufo.x > FIELD_W + CELL * 2) ufo = null;
+    }
+
+    /* Fleet marching clock - advances whole discrete steps. */
+    if (aliveCount() > 0) {
+      stepTimer -= dt;
+      var guard = 0;
+      while (stepTimer <= 0 && phase === 'playing' && aliveCount() > 0 && guard < 60) {
+        stepTimer += stepInterval(aliveCount(), wave);
+        doStep();
+        guard++;
+      }
+    }
+  }
+
+  function update(dt) {
+    if (phase === 'playing') stepPlaying(dt);
+    else if (phase === 'dying') {
+      deathTimer -= dt;
+      if (deathTimer <= 0) finishDeath();
+    }
+    updateEffects(dt);
+  }
+
+  /* Deterministic advance used by the test bridge: no rAF, no wall clock.
+   * Advances the model and then refreshes the DOM HUD, so a headless run stays
+   * in sync with the numbers on screen (the contract established by Frogger). */
+  function tick(seconds, step) {
+    var s = step || 1 / 60;
+    var secs = seconds || 0;
+    var n = Math.max(1, Math.round(secs / s));
+    var d = secs / n;
+    for (var i = 0; i < n; i++) {
+      clock += d;
+      update(d);
+    }
+    updateHud();
+    return getState();
+  }
+
+  /* ======================================================================
+   * 13. State snapshot
+   * ==================================================================== */
+
+  function getState() {
+    var f = formationState(steps, aliveCount(), wave);
+    return {
+      score: score,
+      lives: lives,
+      wave: wave,
+      phase: phase,
+      invadersLeft: aliveCount(),
+      rng: { seed: seed, steps: steps, ufoSpawns: ufoSpawns },
+      ship: { x: ship.x, dir: ship.dir },
+      bullets: playerBullet ? [{ x: playerBullet.x, y: playerBullet.y }] : [],
+      bombs: bombs.map(function (b) { return { x: b.x, y: b.y }; }),
+      bunkers: bunkersAliveCount(),
+      /* --- extras that make exhaustive / differential tests easy --- */
+      seed: seed,
+      steps: steps,
+      stepInterval: stepInterval(aliveCount(), wave),
+      formation: { offsetX: f.offsetX, originY: f.originY, dir: f.dir },
+      invaders: invaders.map(function (iv) {
+        return { col: iv.col, row: iv.row, alive: iv.alive, type: iv.type };
+      }),
+      aliveColumns: aliveColumns(),
+      ufo: ufo ? { x: ufo.x, y: ufo.y, dir: ufo.dir, score: ufo.score } : null,
+      bunkerSolid: bunkers.reduce(function (a, g) { return a + countSolid(g); }, 0),
+      deathTimer: deathTimer
+    };
+  }
+
+  /* Bridge helper: the (col,row,alive,type) of invader `index`, or null. */
+  function invaderAt(state, index) {
+    if (typeof state === 'number' && index === undefined) { index = state; state = null; }
+    var list = (state && state.invaders) ? state.invaders : invaders;
+    if (index === undefined || index === null || index < 0 || index >= list.length) return null;
+    var iv = list[index];
+    return { col: iv.col, row: iv.row, alive: iv.alive, type: iv.type };
+  }
+
+  /* Bridge helper: copy of bunker `i`'s bitmap (array of strings). */
+  function bunkerBitmap(i) {
+    if (i < 0 || i >= bunkers.length) return [];
+    return bunkers[i].slice();
+  }
+
+  /* ======================================================================
+   * 14. Canvas setup + drawing primitives
+   * ==================================================================== */
+
+  function setupCanvas() {
+    var dpr = (window.devicePixelRatio || 1);
+    cv.width = FIELD_W * dpr;
+    cv.height = FIELD_H * dpr;
+    cv.style.aspectRatio = FIELD_W + ' / ' + FIELD_H;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function buildStars() {
+    stars = [];
+    for (var i = 0; i < 70; i++) {
+      stars.push({
+        x: rngHash(11, i) * FIELD_W,
+        y: rngHash(23, i) * FIELD_H,
+        r: 0.6 + rngHash(37, i) * 1.4,
+        sp: 4 + rngHash(53, i) * 16
+      });
+    }
+  }
+
+  function drawStars() {
+    for (var i = 0; i < stars.length; i++) {
+      var st = stars[i];
+      var y = (st.y + clock * st.sp) % FIELD_H;
+      var tw = 0.35 + 0.35 * (0.5 + 0.5 * Math.sin(clock * 2 + i));
+      ctx.globalAlpha = tw;
+      ctx.fillStyle = (i % 7 === 0) ? '#9fd7ff' : '#ffffff';
+      ctx.beginPath();
+      ctx.arc(st.x, y, st.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /* ---- aliens ------------------------------------------------------------ */
+
+  function drawSprite(frame, x, y, size, color) {
+    var px = size / 11;
+    var ox = x + (size - 11 * px) / 2;
+    var oy = y + (size - 8 * px) / 2;
+    ctx.fillStyle = color;
+    for (var r = 0; r < 8; r++) {
+      var row = frame[r];
+      for (var c = 0; c < 11; c++) {
+        if (row.charAt(c) === '#') {
+          ctx.fillRect(ox + c * px, oy + r * px, px * 0.96, px * 0.96);
+        }
+      }
+    }
+  }
+
+  function drawInvaders() {
+    var f = formationState(steps, aliveCount(), wave);
+    var walk = steps % 2;                 // animation frame flips each fleet step
+    for (var i = 0; i < invaders.length; i++) {
+      var iv = invaders[i];
+      if (!iv.alive) continue;
+      var x = f.offsetX + iv.col * CELL;
+      var y = f.originY + iv.row * CELL;
+      ctx.save();
+      ctx.shadowColor = TYPE_COLOR[iv.type];
+      ctx.shadowBlur = 6;
+      drawSprite(SPRITES[iv.type][walk], x, y, CELL, TYPE_COLOR[iv.type]);
+      ctx.restore();
+    }
+  }
+
+  function drawUfo() {
+    if (!ufo) return;
+    var x = ufo.x, y = ufo.y;
+    var blink = 0.5 + 0.5 * Math.sin(clock * 18);
+    ctx.save();
+    ctx.globalAlpha = 0.6 + 0.4 * blink;
+    /* body */
+    ctx.fillStyle = '#ffd45e';
+    ctx.beginPath();
+    ctx.ellipse(x, y, 20, 7, 0, 0, Math.PI * 2);
+    ctx.fill();
+    /* dome */
+    ctx.fillStyle = '#ffeaa0';
+    ctx.beginPath();
+    ctx.ellipse(x, y - 5, 9, 8, Math.PI, Math.PI * 2);
+    ctx.fill();
+    /* running lights */
+    ctx.fillStyle = (Math.floor(clock * 8) % 2) ? '#ff7a5a' : '#7fd7ff';
+    for (var i = -1; i <= 1; i++) {
+      ctx.beginPath();
+      ctx.arc(x + i * 11, y + 3, 1.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.strokeStyle = 'rgba(255,224,138,.5)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x - 26, y);
+    ctx.lineTo(x - 14, y);
+    ctx.moveTo(x + 14, y);
+    ctx.lineTo(x + 26, y);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /* ---- bunkers ----------------------------------------------------------- */
+
+  function drawBunkers() {
+    for (var i = 0; i < bunkers.length; i++) {
+      var l = bunkerLeft(i);
+      var g = bunkers[i];
+      for (var r = 0; r < g.length; r++) {
+        var row = g[r];
+        for (var c = 0; c < row.length; c++) {
+          if (row.charAt(c) !== '#') continue;
+          var t = r / BUNKER_H;
+          ctx.fillStyle = 'rgb(' + Math.round(40 + 20 * t) + ',' +
+                                   Math.round(200 - 60 * t) + ',' +
+                                   Math.round(90 + 20 * t) + ')';
+          ctx.fillRect(l + c * BUNKER_PX, BUNKER_TOP + r * BUNKER_PX, BUNKER_PX, BUNKER_PX);
+        }
+      }
+    }
+  }
+
+  /* ---- player, bullet, bombs -------------------------------------------- */
+
+  function drawShip() {
+    var x = ship.x, y = SHIP_Y;
+    var hue = (phase === 'dying');
+    var col = hue ? '#ff7a5a' : '#7ce24b';
+    /* thruster flame (animated) */
+    if (!hue) {
+      var fl = 8 + Math.sin(clock * 26) * 4;
+      ctx.fillStyle = 'rgba(255,170,60,.85)';
+      ctx.beginPath();
+      ctx.moveTo(x - 8, y + SHIP_H / 2);
+      ctx.lineTo(x + 8, y + SHIP_H / 2);
+      ctx.lineTo(x, y + SHIP_H / 2 + fl);
+      ctx.closePath();
+      ctx.fill();
+    }
+    /* hull */
+    ctx.save();
+    ctx.shadowColor = col;
+    ctx.shadowBlur = 8;
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.moveTo(x, y - SHIP_H / 2);
+    ctx.lineTo(x + SHIP_W / 2, y + SHIP_H / 2);
+    ctx.lineTo(x + SHIP_W / 2 - 8, y + SHIP_H / 2);
+    ctx.lineTo(x + 6, y - SHIP_H / 2 + 6);
+    ctx.lineTo(x - 6, y - SHIP_H / 2 + 6);
+    ctx.lineTo(x - SHIP_W / 2 + 8, y + SHIP_H / 2);
+    ctx.lineTo(x - SHIP_W / 2, y + SHIP_H / 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+    /* cockpit */
+    ctx.fillStyle = '#0a3a1c';
+    ctx.beginPath();
+    ctx.arc(x, y + SHIP_H / 2 - 7, 3.4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function drawBullet() {
+    if (!playerBullet) return;
+    var b = playerBullet;
+    ctx.save();
+    ctx.shadowColor = '#aef0ff';
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = '#eaffff';
+    ctx.fillRect(b.x - BULLET_W / 2, b.y, BULLET_W, BULLET_H);
+    ctx.restore();
+  }
+
+  function drawBombs() {
+    for (var i = 0; i < bombs.length; i++) {
+      var b = bombs[i];
+      var wob = Math.sin(clock * 16 + i) * 2.4;
+      ctx.save();
+      ctx.shadowColor = '#ff9a6a';
+      ctx.shadowBlur = 8;
+      ctx.strokeStyle = '#ffd45e';
+      ctx.lineWidth = 2.4;
+      ctx.beginPath();
+      ctx.moveTo(b.x + wob, b.y);
+      ctx.lineTo(b.x - wob, b.y + BOMB_H * 0.5);
+      ctx.lineTo(b.x + wob, b.y + BOMB_H);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  /* ---- effects + chrome -------------------------------------------------- */
+
+  function drawEffects() {
+    var i;
+    for (i = 0; i < particles.length; i++) {
+      var p = particles[i];
+      ctx.globalAlpha = Math.max(0, Math.min(1, p.life / p.maxLife));
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    ctx.textAlign = 'center';
+    ctx.font = '700 13px "SFMono-Regular", Menlo, Consolas, monospace';
+    for (i = 0; i < floaters.length; i++) {
+      var f = floaters[i];
+      ctx.globalAlpha = Math.max(0, Math.min(1, f.life));
+      ctx.fillStyle = f.color;
+      ctx.fillText(f.text, f.x, f.y);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawGround() {
+    ctx.fillStyle = '#0a1c12';
+    ctx.fillRect(0, FIELD_H - 16, FIELD_W, 16);
+    ctx.strokeStyle = '#39d16b';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, FIELD_H - 16);
+    ctx.lineTo(FIELD_W, FIELD_H - 16);
+    ctx.stroke();
+  }
+
+  function drawPauseVeil() {
+    if (phase !== 'paused') return;
+    ctx.fillStyle = 'rgba(5,11,26,.55)';
+    ctx.fillRect(0, 0, FIELD_W, FIELD_H);
+    ctx.fillStyle = '#e8ecff';
+    ctx.font = '700 24px "SFMono-Regular", Menlo, Consolas, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(T.t('pause'), FIELD_W / 2, FIELD_H / 2);
+  }
+
+  function draw() {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    var dpr = (window.devicePixelRatio || 1);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    /* screen shake: deterministic jitter derived from the animation clock */
+    var sx = 0, sy = 0;
+    if (shake > 0) {
+      sx = Math.sin(clock * 71) * shake;
+      sy = Math.cos(clock * 57) * shake;
+    }
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.fillStyle = '#050b1a';
+    ctx.fillRect(-20, -20, FIELD_W + 40, FIELD_H + 40);
+    drawStars();
+    drawBunkers();
+    drawInvaders();
+    drawUfo();
+    drawShip();
+    drawBullet();
+    drawBombs();
+    drawEffects();
+    drawGround();
+    ctx.restore();
+
+    if (flash > 0) {
+      ctx.fillStyle = 'rgba(255,255,255,' + Math.min(1, flash) + ')';
+      ctx.fillRect(0, 0, FIELD_W, FIELD_H);
+    }
+    drawPauseVeil();
+  }
+
+  /* ======================================================================
+   * 15. HUD / overlays (value-cached; refreshed every frame from loop())
+   * ==================================================================== */
+
+  var hudCache = {
+    score: null, lives: null, wave: null, left: null,
+    pauseDisabled: null, pauseText: null
+  };
+
+  function updateHud() {
+    /* Value cache: updateHud() runs every frame from loop(), so remember the
+     * last value written for each field and only touch the DOM when it changes.
+     * At steady state this is ZERO writes per frame, and the event-time
+     * (start / die / waveClear / pause / boot) calls stay idempotent. `null`
+     * marks "never written", so the first call always writes. */
+    var c = hudCache;
+    if (c.score !== score) { scoreEl.textContent = score; c.score = score; }
+    if (c.lives !== lives) { livesEl.textContent = lives; c.lives = lives; }
+    if (c.wave !== wave) { waveEl.textContent = wave; c.wave = wave; }
+    var left = aliveCount();
+    if (c.left !== left) { remEl.textContent = left; c.left = left; }
+
+    var pauseDisabled = !(phase === 'playing' || phase === 'paused');
+    if (c.pauseDisabled !== pauseDisabled) { btnPause.disabled = pauseDisabled; c.pauseDisabled = pauseDisabled; }
+    var pauseTxt = (phase === 'paused') ? T.t('resume') : T.t('pause');
+    if (c.pauseText !== pauseTxt) { btnPause.textContent = pauseTxt; c.pauseText = pauseTxt; }
+  }
+
+  function showResult(kind) {
+    overlayKind = kind;
+    if (kind === 'clear') {
+      ovTitleEl.textContent = T.t('clearTitle');
+      ovSubEl.textContent = T.t('clearSub', { n: wave, m: wave + 1 });
+      ovBtnEl.textContent = T.t('nextWave');
+    } else {
+      ovTitleEl.textContent = T.t('overTitle');
+      ovSubEl.textContent = T.t('overSub', { n: score });
+      ovBtnEl.textContent = T.t('again');
+    }
+    resEl.classList.add('show');
+  }
+
+  function hideResult() { overlayKind = null; resEl.classList.remove('show'); }
+  function hideStart() { startEl.classList.remove('show'); }
+
+  /* ======================================================================
+   * 16. Input
+   *
+   * Two DIFFERENT input semantics live side by side, kept in SEPARATE tables
+   * on purpose:
+   *   HELD_KEYS  - left/right: the ship must keep moving while the key is held,
+   *                so these set `heldDir` and are cleared on keyup.
+   *   FIRE_KEYS  - fire / start / confirm: ONE-SHOT, acted on at keydown.
+   * A keydown handler that `return`s early for held keys must not also be the
+   * place one-shot keys are read - hence the split below.
+   * ==================================================================== */
+
+  var HELD_KEYS = {
+    ArrowLeft: -1, a: -1, A: -1,
+    ArrowRight: 1, d: 1, D: 1
+  };
+  var FIRE_KEYS = { ' ': 1, ArrowUp: 1, w: 1, W: 1, Enter: 1 };
+
+  function pressHeld(dir) {
+    heldDir = dir;
+    ship.dir = dir;
+  }
+
+  function releaseHeld(dir) {
+    if (heldDir === dir) heldDir = 0;
+  }
+
+  function onKeyDown(ev) {
+    var k = ev.key;
+
+    /* --- HELD semantics (movement): set state, then return. --- */
+    if (Object.prototype.hasOwnProperty.call(HELD_KEYS, k)) {
+      if (ev.preventDefault) ev.preventDefault();
+      pressHeld(HELD_KEYS[k]);
+      return;
+    }
+
+    /* --- ONE-SHOT semantics (fire / start / confirm). --- */
+    if (Object.prototype.hasOwnProperty.call(FIRE_KEYS, k)) {
+      if (ev.preventDefault) ev.preventDefault();
+      if (phase === 'ready') startPlay();
+      else if (phase === 'gameover') { newGame({ wave: 1, seed: seed }); startPlay(); }
+      else if (phase === 'paused') togglePause();
+      else if (phase === 'playing') fire();
+      return;
+    }
+
+    if (k === 'p' || k === 'P') togglePause();
+  }
+
+  function onKeyUp(ev) {
+    var k = ev.key;
+    if (Object.prototype.hasOwnProperty.call(HELD_KEYS, k)) releaseHeld(HELD_KEYS[k]);
+  }
+
+  document.addEventListener('keydown', onKeyDown);
+  document.addEventListener('keyup', onKeyUp);
+
+  /* On-screen touch pads: press-and-hold movement + a one-shot fire button. */
+  function holdButton(el, dir) {
+    var press = function (ev) { if (ev && ev.preventDefault) ev.preventDefault(); pressHeld(dir); };
+    var release = function () { releaseHeld(dir); };
+    el.addEventListener('pointerdown', press);
+    el.addEventListener('pointerup', release);
+    el.addEventListener('pointerleave', release);
+    el.addEventListener('pointercancel', release);
+    /* mouse fallback for environments without Pointer Events */
+    el.addEventListener('mousedown', press);
+    el.addEventListener('mouseup', release);
+  }
+  holdButton(btnLeft, -1);
+  holdButton(btnRight, 1);
+
+  /* Plain buttons use DIRECT click listeners (no closest() delegation - the
+   * real click target is the button itself, so a delegation branch would be
+   * dead code). */
+  btnFire.addEventListener('click', function () { fire(); });
+  btnStart.addEventListener('click', function () { startPlay(); });
+  btnNew.addEventListener('click', function () { newGame({ wave: 1, seed: seed }); startPlay(); });
+  btnPause.addEventListener('click', function () { togglePause(); });
+  ovBtnEl.addEventListener('click', function () {
+    if (overlayKind === 'clear') nextWave();
+    else if (overlayKind === 'over') { newGame({ wave: 1, seed: seed }); startPlay(); }
+  });
+
+  /* ======================================================================
+   * 17. rAF loop (delta-accumulating clock - never setTimeout/setInterval)
+   * ==================================================================== */
+
+  function nowMs() {
+    if (typeof performance !== 'undefined' && performance && performance.now) return performance.now();
+    return Date.now();
+  }
+
+  function loop() {
+    if (!running) return;
+    var t = nowMs();
+    var dt = lastT ? (t - lastT) / 1000 : 1 / 60;
+    lastT = t;
+    if (!isFinite(dt) || dt <= 0) dt = 1 / 60;
+    if (dt > 0.05) dt = 0.05;                    // clamp big hitches / tab restores
+    clock += dt;
+    update(dt);
+    updateHud();                                 // refresh DOM HUD every frame (cheap: value-cached)
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  /* ======================================================================
+   * 18. Test bridge + boot
+   * ==================================================================== */
+
+  window.SI = {
+    COLS: COLS,
+    ROWS: ROWS,
+    CELL: CELL,
+    FIELD_W: FIELD_W,
+    FIELD_H: FIELD_H,
+    /* pure geometry / scoring */
+    waveConfig: function (w) { return waveConfig(w || 1); },
+    stepInterval: function (aliveCount, w) { return stepInterval(aliveCount || 0, w || 1); },
+    formationState: function (steps, aliveCount, w) { return formationState(steps || 0, aliveCount || 0, w || 1); },
+    scoreFor: function (kind, row) { return scoreFor(kind, row); },
+    ufoScoreAt: function (seed, ufoIndex) { return ufoScoreAt(seed || 0, ufoIndex || 0); },
+    bombColumnFor: function (stepIndex, seed, aliveColumns) {
+      return bombColumnFor(stepIndex || 0, seed || 0, aliveColumns || []);
+    },
+    nextRandom: function (state) { return nextRandom(state); },
+    /* pure bunker model */
+    bunkers: function () { return bunkers.map(function (g) { return g.slice(); }); },
+    bunkerBitmap: function (i) { return bunkerBitmap(i); },
+    damageBunker: function (i, x, y, radius) { return damageBunker(i, x, y, radius); },
+    hitTestBunker: function (i, x, y) { return hitTestBunker(i, x, y); },
+    makeBunker: function () { return makeBunker(); },
+    /* fleet + position queries */
+    invaderAt: function (state, index) { return invaderAt(state, index); },
+    invaderBox: function (state, index) {
+      var st = state && state.formation ? state : getState();
+      var list = st.invaders || invaders;
+      var iv = list[index];
+      if (!iv) return null;
+      return {
+        x: st.formation.offsetX + iv.col * CELL,
+        y: st.formation.originY + iv.row * CELL,
+        w: CELL, h: CELL, col: iv.col, row: iv.row, alive: iv.alive, type: iv.type
+      };
+    },
+    /* player bullet / bomb position queries (current + closed-form) */
+    playerBulletAt: function (t) {
+      if (!playerBullet) return null;
+      return { x: playerBullet.x, y: playerBullet.y - BULLET_SPEED * (t || 0) };
+    },
+    bulletY: function (y0, t) { return (y0 || 0) - BULLET_SPEED * (t || 0); },
+    bombAt: function (i) {
+      var b = bombs[i | 0];
+      return b ? { x: b.x, y: b.y } : null;
+    },
+    bombs: function () { return bombs.map(function (b) { return { x: b.x, y: b.y }; }); },
+    /* control / lifecycle */
+    newGame: function (opts) { return newGame(opts); },
+    fire: function () { return fire(); },
+    move: function (dir) {
+      if (dir === 'left') dir = -1;
+      else if (dir === 'right') dir = 1;
+      dir = (dir < 0) ? -1 : (dir > 0 ? 1 : 0);
+      pressHeld(dir);
+      return getState();
+    },
+    start: function () { startPlay(); return getState(); },
+    pause: function () { togglePause(); return getState(); },
+    tick: function (seconds, step) { return tick(seconds, step); },
+    getState: function () { return getState(); }
+  };
+
+  /* Re-localise the dynamic text (HUD, pause button, result dialog) when the
+   * language changes. Exactly ONE onChange callback is registered. */
+  T.onChange(function () {
+    updateHud();
+    if (overlayKind) showResult(overlayKind);
+  });
+
+  setupCanvas();
+  buildStars();
+  newGame({ wave: 1, seed: 1 });
+  phase = 'ready';
+  startEl.classList.add('show');
+  updateHud();
+  T.start();
+  requestAnimationFrame(loop);
+
+})();
+</script>
+</body>
+</html>
