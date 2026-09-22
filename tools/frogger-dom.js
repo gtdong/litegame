@@ -81,11 +81,19 @@ const CJK = /[\u4e00-\u9fff]/;
   try {
     dom = await JSDOM.fromURL(TARGET, opts);
   } catch (e) {
-    // The optional URL argument may point at a page that is not deployed yet
-    // (e.g. the GitHub Pages copy before it goes live). That is a skip, not a
-    // failure - the local run is the real assertion.
-    console.log(`SKIP: could not load ${TARGET} (${(e && e.message) || e})`);
-    process.exit(0);
+    // An explicitly-passed REMOTE url may point at a page that is not deployed
+    // yet (e.g. the GitHub Pages copy before it goes live); that is a skip, not
+    // a failure. But a LOCAL target - including the default - must never exit 0
+    // on a failed load: a typo in the argument, a dead http server or a page
+    // that throws on boot would otherwise masquerade as a passing run. A bare
+    // path is not a remote url either.
+    const explicitlyRemote = /^https?:\/\//i.test(TARGET) && !IS_LOCAL && !!process.argv[2];
+    if (explicitlyRemote) {
+      console.log(`SKIP: could not load ${TARGET} (${(e && e.message) || e})`);
+      process.exit(0);
+    }
+    console.log(`FAIL: could not load ${TARGET} (${(e && e.message) || e})`);
+    process.exit(1);
   }
   const { window } = dom;
   window.addEventListener('error', e => errs.push(e.message || String(e)));
