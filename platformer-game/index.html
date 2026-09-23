@@ -1,0 +1,1580 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Platformer</title>
+<style>
+  :root {
+    --bg: #eef2fb;
+    --card: #ffffff;
+    --border: #d7deee;
+    --text: #1e2740;
+    --muted: #6b7592;
+    --accent: #6366f1;
+    --screen: #070b1c;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    margin: 0;
+    padding: 20px 12px 48px;
+    background: radial-gradient(120% 120% at 50% 0%, #ffffff 0%, var(--bg) 62%);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+  }
+
+  h1 { margin: 0 0 4px; font-size: 27px; letter-spacing: -.02em; }
+  .tip { margin: 0 0 16px; font-size: 13px; color: var(--muted); text-align: center; max-width: 500px; line-height: 1.6; }
+
+  .panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 14px;
+    box-shadow: 0 10px 30px rgba(30,39,64,.10);
+    width: min(540px, 100%);
+  }
+
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    margin-bottom: 10px;
+  }
+  .bar:last-child { margin-bottom: 0; margin-top: 10px; }
+
+  .stat {
+    background: #f5f7fd;
+    color: #3a4668;
+    font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 5px 9px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .stat small { font-family: inherit; font-weight: 600; font-size: 11px; color: var(--muted); }
+  .stat.low { background: #ffe4e6; color: #b8073a; }
+  .stat.low small { color: #b8073a; }
+
+  button {
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    background: #ffffff;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 14px;
+    cursor: pointer;
+    transition: transform .08s ease, background .15s ease, opacity .15s ease;
+  }
+  button:hover { background: #f3f5fc; }
+  button:active { transform: translateY(1px); }
+  button:disabled { opacity: .45; cursor: default; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary:hover { background: #5457e6; }
+  button.pad { min-width: 54px; font-size: 16px; padding: 8px 10px; }
+
+  .stage {
+    position: relative;
+    width: 100%;
+    background: var(--screen);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.06);
+  }
+  canvas { display: block; width: 100%; height: auto; background: var(--screen); }
+
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(7, 11, 28, .55);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 20;
+  }
+  .overlay.show { display: flex; }
+
+  .dialog {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 26px 28px 22px;
+    width: min(360px, 100%);
+    text-align: center;
+    box-shadow: 0 16px 50px rgba(20,27,48,.30);
+    animation: rise .2s ease-out;
+  }
+  @keyframes rise {
+    from { transform: translateY(12px); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+  }
+  .dialog h2 { margin: 0 0 10px; font-size: 22px; }
+  .dialog p  { color: var(--muted); font-size: 13px; line-height: 1.65; margin: 0 0 18px; }
+
+  @media (max-width: 480px) {
+    h1 { font-size: 22px; }
+    .panel { padding: 11px; }
+    .bar { gap: 5px; }
+    button { padding: 7px 11px; font-size: 12px; }
+    .stat { padding: 4px 7px; font-size: 11px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="lang-switch" data-lang-switch></div>
+
+<h1 data-i18n="title"></h1>
+<p class="tip" data-i18n-html="tip"></p>
+
+<div class="panel">
+  <div class="bar">
+    <span class="stat"><small data-i18n="score"></small> <b id="score">0</b></span>
+    <span class="stat"><small data-i18n="lives"></small> <b id="lives">3</b></span>
+    <span class="stat"><small data-i18n="level"></small> <b id="level">1</b></span>
+    <span class="stat"><small data-i18n="coins"></small> <b id="coins">0/0</b></span>
+    <span class="stat" id="timeStat"><small data-i18n="time"></small> <b id="time">120</b></span>
+    <span class="stat"><small data-i18n="best"></small> <b id="best">0</b></span>
+  </div>
+
+  <div class="stage">
+    <canvas id="cv" width="512" height="288"></canvas>
+  </div>
+
+  <div class="bar">
+    <button id="btnPause" data-i18n="pause" disabled></button>
+    <button id="btnNew" data-i18n="newgame"></button>
+    <button id="btnLeft" class="pad" aria-label="left">&#9664;</button>
+    <button id="btnJump" class="primary pad" data-i18n="jump"></button>
+    <button id="btnRight" class="pad" aria-label="right">&#9654;</button>
+  </div>
+</div>
+
+<!-- Start overlay: the required entry point out of the ready state. -->
+<div id="startOverlay" class="overlay show">
+  <div class="dialog">
+    <h2 data-i18n="title"></h2>
+    <p data-i18n-html="readySub"></p>
+    <button id="btnStart" class="primary" data-i18n="start"></button>
+  </div>
+</div>
+
+<!-- Result overlay: shown after clearing all levels or losing the last life. -->
+<div id="overlay" class="overlay">
+  <div class="dialog">
+    <h2 id="ovTitle"></h2>
+    <p id="ovSub"></p>
+    <button id="ovBtn" class="primary"></button>
+  </div>
+</div>
+
+<script src="../assets/i18n.js"></script>
+<script>
+/* ============================================================================
+ * Platformer - a single-file, zero-dependency, canvas-rendered side-scroller.
+ *
+ * A level IS an ASCII map: 32 columns x 18 rows of 16 px tiles, so the whole
+ * logical playfield is exactly 512 x 288 - one screen, no camera, no scrolling.
+ * The legend is a closed set of eight glyphs and is exposed via PF.legend():
+ *
+ *   '.' air   '#' solid   '=' one-way platform   'S' spawn
+ *   'G' goal  'c' coin    'e' patrolling enemy   '^' spike
+ *
+ * The physics is the product's single source of truth and lives in ONE pure
+ * function, movePlayerCore(player, level, dt). The live game and the test oracle
+ * (PF.simulateJump) both call it, so a headless proof of "this level is
+ * traversable" is a proof about the actual game, not a parallel model.
+ *
+ * Everything runs on ONE requestAnimationFrame clock that accumulates delta time
+ * (clamped to 50 ms) and feeds a fixed 1/120 s physics step. setTimeout and
+ * setInterval are never used: every timed transition (death, level-clear) is an
+ * explicit phase + phaseTimer advanced by the same clock.
+ *
+ * Determinism:
+ *   - No unseeded randomness anywhere. Enemy facing (and the background stars)
+ *     come from a seeded hash, rngHash(seed, index); the seed lives in the state
+ *     and is reported by getState().seed.
+ *   - Nothing outside draw() mutates state, so a step-driven run (PF.tick)
+ *     reproduces the on-screen game exactly.
+ *   - Geometry is owned by the TILE/COLS/ROWS/WIDTH/HEIGHT constants and is
+ *     NEVER read back from the canvas (a stub canvas reports garbage sizes).
+ * ========================================================================== */
+(function () {
+  'use strict';
+
+  /* ======================================================================
+   * 1. Constants (geometry is owned here - never read back from the canvas)
+   * ==================================================================== */
+
+  var TILE = 16;                 // one map cell (both axes), px
+  var COLS = 32;                 // map columns
+  var ROWS = 18;                 // map rows
+  var WIDTH = COLS * TILE;       // 512 logical px
+  var HEIGHT = ROWS * TILE;      // 288 logical px
+
+  var GRAVITY = 1800;            // px/s^2
+  var JUMP_V = -520;             // px/s   (upward launch speed)
+  var MAX_FALL = 900;            // px/s   (terminal velocity)
+  var WALK = 175;                // px/s   (horizontal speed)
+  var RUN = 265;                 // px/s   (holding Shift)
+  var COYOTE = 0.10;             // s      (grace after leaving the ground)
+  var BUFFER = 0.12;             // s      (jump pressed just before landing)
+  var JUMP_CUT = 0.45;           // x      (vy multiplier when jump is released)
+  var ENEMY_SPEED = 45;          // px/s   (patrol speed)
+  var STOMP_BOUNCE = -380;       // px/s   (rebound after stomping an enemy)
+  var DEATH_TIME = 0.8;          // s      (death animation)
+  var LEVEL_TIME = 120;          // s      (per-level countdown)
+  var LIVES_START = 3;
+
+  var PW = 10;                   // player AABB width, px
+  var PH = 14;                   // player AABB height, px
+  var EW = 12;                   // enemy AABB width, px
+  var EH = 12;                   // enemy AABB height, px
+  var EPS = 0.0001;              // boundary nudge so edge tiles are exclusive
+
+  var FIXED = 1 / 120;           // fixed physics step, s
+  var CLEAR_TIME = 1.2;          // s      (level-clear freeze before advancing)
+  var STORE_KEY = 'litegame_platformer_best';
+
+  /* ======================================================================
+   * 2. Level maps (10 hand-authored, machine-verified ASCII levels)
+   *
+   * Every map is 32 columns x 18 rows. Each is proven completable by a BFS
+   * over standTiles + simulateJump (see the READMEs): from 'S' you can always
+   * reach a 'G' with no jump ever touching a '^'.
+   * ==================================================================== */
+
+  var LEVELS = [
+    [ // 1 - First Steps: a long flat opening, then two gaps and small steps.
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '.............................cG.',
+      '..S..c.....c......##c..c.....##.',
+      '##############...########...####',
+      '##############...########...####'
+    ],
+    [ // 2 - Hop Up: one-way platforms introduce vertical climbing.
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '.............c..................',
+      '............====...........c.G..',
+      '.......cc.................====..',
+      '......====............c.........',
+      '....................=====.......',
+      '................................',
+      '..S.#...........................',
+      '###############....#############',
+      '###############....#############'
+    ],
+    [ // 3 - Patrol: enemies walk the ledges.
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '..........................c.....',
+      '..S#..e.c.#......ce.##..e..#c.G.',
+      '#############...################',
+      '#############...################'
+    ],
+    [ // 4 - Spikes: static hazards to jump over.
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '......c.......c.......c.........',
+      '..S.#...^^..#...^^..#...^^..c.G.',
+      '################################',
+      '################################'
+    ],
+    [ // 5 - Overhang: ceilings force low routes; one-way platform + gap.
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '....######....####..............',
+      '....######....####......c.......',
+      '......................=====.....',
+      '................................',
+      '..S...#c....c..#...........c.G..',
+      '##################...###########',
+      '##################...###########'
+    ],
+    [ // 6 - Gauntlet: enemies + spikes + gaps.
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '............................G...',
+      '..S.c#.e.......^.ce.##...e.##.c.',
+      '###########...########..########',
+      '###########...########..########'
+    ],
+    [ // 7 - Towers: climb stacked one-way towers.
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................c...............',
+      '...............====.............',
+      '...........c..........c.........',
+      '..........====.......====.......',
+      '........c.................c.G...',
+      '......====...............====...',
+      '..S#............................',
+      '################..##############',
+      '################..##############'
+    ],
+    [ // 8 - Descent: plateaus at two heights over a low basin.
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '..S.c.................c.=G==....',
+      '#########..c........#######.....',
+      '#############..c....#######.....',
+      '################################',
+      '################################'
+    ],
+    [ // 9 - Circuit: layered gaps, platforms, enemies and a spike.
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '.............c..................',
+      '.............=====..............',
+      '.......c........................',
+      '......=====...........c.........',
+      '....................====........',
+      '................................',
+      '..............###.c........c..G.',
+      '..S.##..e.....###..e.^......e...',
+      '#########...############...#####',
+      '#########...############...#####'
+    ],
+    [ // 10 - Finale: everything at once, tight.
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '................................',
+      '...................c............',
+      '.....c............====..........',
+      '...####.......c...........c.....',
+      '............#####.......=====...',
+      '..S...e.....#^###.............G.',
+      '########...##########...########',
+      '########...##########...########'
+    ]
+  ];
+
+  /* The legend is a closed set; legend() is part of the test bridge. */
+  var LEGEND = {
+    '.': 'air', '#': 'solid', '=': 'one-way', 'S': 'spawn',
+    'G': 'goal', 'c': 'coin', 'e': 'enemy', '^': 'spike'
+  };
+
+  var LEVEL_META = LEVELS.map(function (map, i) {
+    var coins = [], enemies = [], goals = [], start = { col: 1, row: 1 };
+    for (var r = 0; r < ROWS; r++) {
+      for (var c = 0; c < COLS; c++) {
+        var ch = map[r].charAt(c);
+        if (ch === 'c') coins.push({ col: c, row: r });
+        else if (ch === 'e') enemies.push({ col: c, row: r });
+        else if (ch === 'G') goals.push({ col: c, row: r });
+        else if (ch === 'S') start = { col: c, row: r };
+      }
+    }
+    return {
+      index: i + 1, map: map.slice(), rows: ROWS, cols: COLS,
+      coins: coins, enemies: enemies, start: start, goals: goals
+    };
+  });
+
+  /* ======================================================================
+   * 3. i18n
+   * ==================================================================== */
+
+  var T = LiteI18N.create({
+    title:   { en: 'Platformer', zh: '横版闯关' },
+    tip: {
+      en: 'Move with ← → / A D, jump with Space / ↑ / W (hold for a higher jump), hold Shift to run<br>Cross all 10 levels and reach the glowing door - stomp enemies, dodge spikes, grab coins',
+      zh: '用 ← → / A D 移动，空格 / ↑ / W 跳跃（按住跳得更高），按住 Shift 奔跑<br>闯过 10 关抵达发光之门——踩死怪物、躲开尖刺、收集金币'
+    },
+    score:   { en: 'Score', zh: '得分' },
+    lives:   { en: 'Lives', zh: '生命' },
+    level:   { en: 'Level', zh: '关卡' },
+    coins:   { en: 'Coins', zh: '金币' },
+    time:    { en: 'Time', zh: '时间' },
+    best:    { en: 'Best', zh: '最高分' },
+    pause:   { en: 'Pause', zh: '暂停' },
+    resume:  { en: 'Resume', zh: '继续' },
+    newgame: { en: 'New game', zh: '新游戏' },
+    jump:    { en: 'Jump', zh: '跳跃' },
+    start:   { en: 'Start game', zh: '开始游戏' },
+    readySub: {
+      en: 'Reach the glowing door at the end of every level.<br>Three lives, ten levels, fully deterministic physics.',
+      zh: '抵达每关尽头的发光之门。<br>3 条命、10 关，物理完全确定性。'
+    },
+    clearTitle: { en: 'Level clear!', zh: '过关！' },
+    clearSub:   { en: 'Level {n} cleared', zh: '第 {n} 关完成' },
+    winTitle:   { en: 'You win!', zh: '通关！' },
+    winSub:     { en: 'All 10 levels cleared - final score {n}', zh: '10 关全部通过——最终得分 {n}' },
+    overTitle:  { en: 'Game over', zh: '游戏结束' },
+    overSub:    { en: 'Final score {n}', zh: '最终得分 {n}' },
+    again:      { en: 'Play again', zh: '再来一局' }
+  });
+
+  /* ======================================================================
+   * 4. DOM handles (every id below must exist in the markup)
+   * ==================================================================== */
+
+  var cv = document.getElementById('cv');
+  var ctx = cv.getContext('2d');
+  var scoreEl = document.getElementById('score');
+  var livesEl = document.getElementById('lives');
+  var levelEl = document.getElementById('level');
+  var coinsEl = document.getElementById('coins');
+  var timeEl = document.getElementById('time');
+  var timeStatEl = document.getElementById('timeStat');
+  var bestEl = document.getElementById('best');
+  var btnPause = document.getElementById('btnPause');
+  var btnNew = document.getElementById('btnNew');
+  var btnLeft = document.getElementById('btnLeft');
+  var btnRight = document.getElementById('btnRight');
+  var btnJump = document.getElementById('btnJump');
+  var startEl = document.getElementById('startOverlay');
+  var btnStart = document.getElementById('btnStart');
+  var resEl = document.getElementById('overlay');
+  var ovTitleEl = document.getElementById('ovTitle');
+  var ovSubEl = document.getElementById('ovSub');
+  var ovBtnEl = document.getElementById('ovBtn');
+
+  /* ======================================================================
+   * 5. Pure helpers: PRNG, tile queries
+   * ==================================================================== */
+
+  /* Deterministic 32-bit hash -> float in [0, 1). Pure, O(1). */
+  function rngHash(seed, index) {
+    var h = (seed >>> 0) ^ Math.imul(((index | 0) + 0x9E3779B9) | 0, 0x85EBCA6B);
+    h = Math.imul(h ^ (h >>> 13), 0xC2B2AE35);
+    h ^= h >>> 16;
+    return (h >>> 0) / 4294967296;
+  }
+
+  /* Classic xorshift32 one-step PRNG. Pure: { s } -> { value, state }. */
+  function nextRandom(state) {
+    var x = ((state && state.s) >>> 0) || 1;
+    x ^= (x << 13); x >>>= 0;
+    x ^= (x >>> 17);
+    x ^= (x << 5);  x >>>= 0;
+    return { value: x / 4294967296, state: { s: x } };
+  }
+
+  function tileAt(level, c, r) {
+    if (!level || r < 0 || r >= ROWS || c < 0 || c >= COLS) return '.';
+    return level.map[r].charAt(c);
+  }
+  function isSolid(level, c, r) { return tileAt(level, c, r) === '#'; }
+  function isOneWay(level, c, r) { return tileAt(level, c, r) === '='; }
+  function isHazard(level, c, r) { return tileAt(level, c, r) === '^'; }
+  function isOpen(level, c, r) {
+    var ch = tileAt(level, c, r);
+    return ch !== '#' && ch !== '=' && ch !== '^';
+  }
+  function supports(level, c, r) { return isSolid(level, c, r) || isOneWay(level, c, r); }
+
+  /* Pure: every tile the player can STAND on - the tile and the one above it
+   * are open, and the tile below supports the player. */
+  function standTiles(level) {
+    var out = [];
+    for (var r = 0; r < ROWS; r++) {
+      for (var c = 0; c < COLS; c++) {
+        if (isOpen(level, c, r) && isOpen(level, c, r - 1) && supports(level, c, r + 1)) {
+          out.push({ col: c, row: r });
+        }
+      }
+    }
+    return out;
+  }
+
+  /* ======================================================================
+   * 6. The one true physics step (pure: takes a player + level, returns events)
+   *
+   * player: { x, y, vx, vy, onGround } with (x, y) = top-left of the AABB.
+   * Returns { dead, goal, coins } where `coins` is an optional list of coin
+   * tiles the AABB currently overlaps.
+   *
+   * vx is NOT zeroed on a wall hit: the controller re-derives vx from the held
+   * direction every step, so the player keeps pushing into the wall and resumes
+   * the instant it ends (that is what lets a jump clear a one-tile step).
+   * ==================================================================== */
+
+  function movePlayerCore(p, level, dt) {
+    var out = { dead: false, goal: false, coins: null };
+
+    /* --- X axis --- */
+    p.x += p.vx * dt;
+    var r0 = Math.floor(p.y / TILE), r1 = Math.floor((p.y + PH - EPS) / TILE);
+    if (p.vx > 0) {
+      var cR = Math.floor((p.x + PW - EPS) / TILE);
+      for (var rx = r0; rx <= r1; rx++) { if (isSolid(level, cR, rx)) { p.x = cR * TILE - PW; break; } }
+    } else if (p.vx < 0) {
+      var cL = Math.floor(p.x / TILE);
+      for (var rx2 = r0; rx2 <= r1; rx2++) { if (isSolid(level, cL, rx2)) { p.x = (cL + 1) * TILE; break; } }
+    }
+
+    /* --- Y axis --- */
+    var prevBottom = p.y + PH;
+    var vy0 = p.vy;
+    p.vy += GRAVITY * dt;
+    if (p.vy > MAX_FALL) p.vy = MAX_FALL;
+    /* Average-velocity update: for constant acceleration this is kinematically
+     * exact, so the discrete apex equals JUMP_V^2 / (2*GRAVITY) to the pixel. */
+    p.y += 0.5 * (vy0 + p.vy) * dt;
+    p.onGround = false;
+    var c0 = Math.floor(p.x / TILE), c1 = Math.floor((p.x + PW - EPS) / TILE);
+    if (p.vy > 0) {
+      var rB = Math.floor((p.y + PH - EPS) / TILE);
+      for (var cx = c0; cx <= c1; cx++) {
+        if (isSolid(level, cx, rB) || (isOneWay(level, cx, rB) && prevBottom <= rB * TILE + EPS)) {
+          p.y = rB * TILE - PH; p.vy = 0; p.onGround = true; break;
+        }
+      }
+    } else if (p.vy < 0) {
+      var rT = Math.floor(p.y / TILE);
+      for (var cx2 = c0; cx2 <= c1; cx2++) { if (isSolid(level, cx2, rT)) { p.y = (rT + 1) * TILE; p.vy = 0; break; } }
+    }
+
+    /* --- tile interactions (spike / goal / coin) --- */
+    var o0 = Math.floor(p.x / TILE), o1 = Math.floor((p.x + PW - EPS) / TILE);
+    var q0 = Math.floor(p.y / TILE), q1 = Math.floor((p.y + PH - EPS) / TILE);
+    for (var yr = q0; yr <= q1; yr++) {
+      for (var xc = o0; xc <= o1; xc++) {
+        var ch = tileAt(level, xc, yr);
+        if (ch === '^') out.dead = true;
+        else if (ch === 'G') out.goal = true;
+        else if (ch === 'c') { if (!out.coins) out.coins = []; out.coins.push({ col: xc, row: yr }); }
+      }
+    }
+    return out;
+  }
+
+  /* Pure + deterministic: launch from stand tile (col,row) with direction dir
+   * (-1/0/1) and optional run, integrate at 1/120 s, and report the first
+   * landing. Returns { landCol, landRow, hitGoal, hitHazard } or null (the
+   * player left the map / exceeded the sampling budget). Identical inputs give
+   * identical outputs - the oracle behind the level-completability proof. */
+  function simulateJump(level, col, row, dir, run) {
+    var d = (dir < 0) ? -1 : (dir > 0 ? 1 : 0);
+    var p = {
+      x: col * TILE + (TILE - PW) / 2,
+      y: (row + 1) * TILE - PH,
+      vx: d * (run ? RUN : WALK),
+      vy: JUMP_V,
+      onGround: false
+    };
+    var dt = 1 / 120, cap = 2400;
+    for (var i = 0; i < cap; i++) {
+      var ev = movePlayerCore(p, level, dt);
+      var cc = Math.floor((p.x + PW / 2) / TILE);
+      var landRow = Math.floor((p.y + PH - EPS) / TILE);
+      if (ev.dead) return { landCol: cc, landRow: landRow, hitGoal: false, hitHazard: true };
+      if (ev.goal) return { landCol: cc, landRow: landRow, hitGoal: true, hitHazard: false };
+      if (p.y > HEIGHT) return null;
+      if (p.onGround) return { landCol: cc, landRow: landRow, hitGoal: false, hitHazard: false };
+    }
+    return null;
+  }
+
+  /* ======================================================================
+   * 7. Game state
+   * ==================================================================== */
+
+  var lvl = LEVEL_META[0];         // current level meta
+  var levelIndex = 1;              // 1..10
+  var player = { x: 0, y: 0, vx: 0, vy: 0, onGround: true, facing: 1, coyote: 0, jumpBuffer: 0 };
+  var enemies = [];                // [{ col, row, x, y, vx, dir, alive }]
+  var collected = {};              // "col,row" -> true (coins taken THIS level)
+  var coinsTotal = 0;
+  var coinsCollected = 0;
+
+  var score = 0;
+  var lives = LIVES_START;
+  var timeLeft = LEVEL_TIME;
+  var seed = 1;
+  var ticks = 0;
+  var best = 0;
+  var unlocked = 1;
+  var wonFlag = false;
+
+  var phase = 'playing';          // ready | playing | paused | dying | levelclear | gameover
+  var phaseTimer = 0;
+  var overlayKind = null;         // 'win' | 'over' | null
+
+  var particles = [];
+  var floaters = [];
+  var stars = [];
+
+  var input = { left: false, right: false, jump: false, run: false };
+
+  var clock = 0;                  // render-only animation clock (seconds)
+  var running = true;
+  var lastT = 0;
+
+  function has(obj, k) { return Object.prototype.hasOwnProperty.call(obj, k); }
+  function inputDir() { return (input.right ? 1 : 0) - (input.left ? 1 : 0); }
+  function overlap(ax, ay, aw, ah, bx, by, bw, bh) {
+    return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
+  }
+
+  /* ======================================================================
+   * 8. Setup / reset
+   * ==================================================================== */
+
+  function resetPlayer() {
+    player.x = lvl.start.col * TILE + (TILE - PW) / 2;
+    player.y = (lvl.start.row + 1) * TILE - PH;
+    player.vx = 0; player.vy = 0;
+    player.onGround = true;
+    player.facing = 1;
+    player.coyote = COYOTE;
+    player.jumpBuffer = 0;
+  }
+
+  function buildEnemies() {
+    enemies = [];
+    for (var i = 0; i < lvl.enemies.length; i++) {
+      var e = lvl.enemies[i];
+      var roll = rngHash(seed, i * 2 + 1);          // seeded initial facing
+      enemies.push({
+        col: e.col, row: e.row,
+        x: e.col * TILE + (TILE - EW) / 2,
+        y: (e.row + 1) * TILE - EH,
+        vx: 0, dir: (roll < 0.5 ? -1 : 1), alive: true
+      });
+    }
+  }
+
+  /* Reset the mutable per-level state (used by new-game, death and level load). */
+  function loadLevelState(n) {
+    var idx = n | 0; if (!idx) idx = 1;
+    if (idx < 1) idx = 1;
+    if (idx > LEVEL_META.length) idx = LEVEL_META.length;
+    levelIndex = idx;
+    lvl = LEVEL_META[levelIndex - 1];
+    coinsTotal = lvl.coins.length;
+    coinsCollected = 0;
+    collected = {};
+    timeLeft = LEVEL_TIME;
+    particles = [];
+    floaters = [];
+    resetPlayer();
+    buildEnemies();
+    if (levelIndex > unlocked) { unlocked = levelIndex; saveProgress(); }
+  }
+
+  function newGame(opts) {
+    opts = opts || {};
+    seed = (opts.seed === undefined || opts.seed === null) ? 1 : (opts.seed | 0);
+    if (seed === 0) seed = 1;
+    score = 0;
+    lives = LIVES_START;
+    wonFlag = false;
+    overlayKind = null;
+    phaseTimer = 0;
+    ticks = 0;
+    input.left = false; input.right = false; input.jump = false; input.run = false;
+    loadLevelState(opts.level ? (opts.level | 0) : 1);
+    phase = 'playing';
+    hideStart();
+    hideResult();
+    updateHud();
+    return getState();
+  }
+
+  /* ======================================================================
+   * 9. Persistence (localStorage - always wrapped in try/catch)
+   * ==================================================================== */
+
+  function saveProgress() {
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify({ best: best, unlocked: unlocked }));
+    } catch (e) { /* storage unavailable - the game still works in memory */ }
+  }
+
+  function loadProgress() {
+    try {
+      var raw = localStorage.getItem(STORE_KEY);
+      if (raw) {
+        var o = JSON.parse(raw);
+        if (o && typeof o === 'object') {
+          best = o.best | 0;
+          unlocked = Math.max(1, (o.unlocked | 0) || 1);
+        }
+      }
+    } catch (e) { best = 0; unlocked = 1; }
+  }
+
+  function updateBest() { if (score > best) { best = score; saveProgress(); } }
+
+  /* ======================================================================
+   * 10. Effects
+   * ==================================================================== */
+
+  function spawnBurst(x, y, color, n) {
+    for (var i = 0; i < n; i++) {
+      var a = (i / n) * Math.PI * 2;
+      var sp = 40 + (i % 3) * 30;
+      particles.push({
+        x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 40,
+        life: 0.6, maxLife: 0.6, color: color, size: 2 + (i % 2)
+      });
+    }
+  }
+  function addFloater(x, y, text, color) {
+    floaters.push({ x: x, y: y, text: text, life: 1.0, color: color || '#ffffff' });
+  }
+  function updateEffects(dt) {
+    var i;
+    for (i = particles.length - 1; i >= 0; i--) {
+      var p = particles[i];
+      p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 320 * dt;
+      if (p.life <= 0) particles.splice(i, 1);
+    }
+    for (i = floaters.length - 1; i >= 0; i--) {
+      var f = floaters[i];
+      f.life -= dt; f.y -= dt * 26;
+      if (f.life <= 0) floaters.splice(i, 1);
+    }
+  }
+
+  /* ======================================================================
+   * 11. Simulation (fixed step, driven only by the accumulated clock)
+   * ==================================================================== */
+
+  function updateEnemies(dt) {
+    for (var i = 0; i < enemies.length; i++) {
+      var e = enemies[i];
+      if (!e.alive) continue;
+      e.x += e.dir * ENEMY_SPEED * dt;
+      e.vx = e.dir * ENEMY_SPEED;
+      var c = Math.floor((e.x + EW / 2) / TILE);
+      var ahead = e.dir > 0 ? c + 1 : c - 1;
+      /* turn at a wall, or before a ledge so the enemy never falls off. */
+      if (isSolid(lvl, ahead, e.row) || !supports(lvl, ahead, e.row + 1)) {
+        e.dir = -e.dir;
+        e.vx = e.dir * ENEMY_SPEED;
+        e.x = c * TILE + (TILE - EW) / 2;
+      }
+    }
+  }
+
+  function collectCoin(c, r) {
+    var k = c + ',' + r;
+    if (collected[k]) return;
+    collected[k] = true;
+    coinsCollected++;
+    score += 10;
+    addFloater(c * TILE + TILE / 2, r * TILE + 2, '+10', '#ffd45e');
+    spawnBurst(c * TILE + TILE / 2, r * TILE + TILE / 2, '#ffd45e', 6);
+  }
+
+  function playerHitEnemy() {
+    for (var i = 0; i < enemies.length; i++) {
+      var e = enemies[i];
+      if (!e.alive) continue;
+      if (!overlap(player.x, player.y, PW, PH, e.x, e.y, EW, EH)) continue;
+      /* falling onto the head -> stomp; anything else -> hurt. */
+      if (player.vy > 0 && (player.y + PH) - e.y < EH * 0.7) {
+        e.alive = false;
+        player.vy = STOMP_BOUNCE;
+        score += 20;
+        addFloater(e.x + EW / 2, e.y, '+20', '#ff9db0');
+        spawnBurst(e.x + EW / 2, e.y + EH / 2, '#ff9db0', 10);
+      } else {
+        killPlayer('enemy');
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /* One fixed physics step of the live game (mirrors simulateJump's core). */
+  function physicsStep(dt) {
+    ticks++;
+    if (phase !== 'playing') return;
+
+    var dir = inputDir();
+    player.vx = dir * (input.run ? RUN : WALK);
+    if (dir !== 0) player.facing = dir;
+
+    if (player.jumpBuffer > 0 && (player.onGround || player.coyote > 0)) {
+      player.vy = JUMP_V;
+      player.onGround = false;
+      player.coyote = 0;
+      player.jumpBuffer = 0;
+    }
+
+    var ev = movePlayerCore(player, lvl, dt);
+
+    if (player.onGround) player.coyote = COYOTE;
+    else { player.coyote -= dt; if (player.coyote < 0) player.coyote = 0; }
+    player.jumpBuffer -= dt; if (player.jumpBuffer < 0) player.jumpBuffer = 0;
+
+    if (ev.coins) { for (var i = 0; i < ev.coins.length; i++) collectCoin(ev.coins[i].col, ev.coins[i].row); }
+    if (ev.dead) { killPlayer('spike'); return; }
+    if (ev.goal) { reachGoal(); return; }
+    if (player.y > HEIGHT + 32) { killPlayer('fall'); return; }
+
+    updateEnemies(dt);
+    if (playerHitEnemy()) return;
+  }
+
+  function stepPlaying(dt) {
+    timeLeft -= dt;
+    if (timeLeft <= 0) { timeLeft = 0; killPlayer('time'); return; }
+    var rem = dt, guard = 0;
+    while (rem > 1e-9 && guard < 64 && phase === 'playing') {
+      var h = rem < FIXED ? rem : FIXED;
+      physicsStep(h);
+      rem -= h;
+      guard++;
+    }
+  }
+
+  function update(dt) {
+    if (phase === 'playing') stepPlaying(dt);
+    else if (phase === 'dying') { phaseTimer -= dt; if (phaseTimer <= 0) finishDeath(); }
+    else if (phase === 'levelclear') { phaseTimer -= dt; if (phaseTimer <= 0) advanceLevel(); }
+    updateEffects(dt);
+  }
+
+  /* Deterministic advance used by the test bridge: no rAF, no wall clock.
+   * Advances the model and then refreshes the DOM HUD (value-cached), so a
+   * headless run stays in sync with the numbers on screen. */
+  function tick(seconds, step) {
+    var s = step || (1 / 60);
+    var secs = seconds || 0;
+    var n = Math.max(1, Math.round(secs / s));
+    var d = secs / n;
+    for (var i = 0; i < n; i++) { clock += d; update(d); }
+    updateHud();
+    return getState();
+  }
+
+  /* ======================================================================
+   * 12. Phase transitions
+   * ==================================================================== */
+
+  function killPlayer(kind) {
+    if (phase !== 'playing') return;
+    lives--;
+    phase = 'dying';
+    phaseTimer = DEATH_TIME;
+    var col = kind === 'spike' ? '#ff5d6c' : kind === 'time' ? '#ffffff' : kind === 'fall' ? '#7fd7ff' : '#ff9db0';
+    spawnBurst(player.x + PW / 2, player.y + PH / 2, col, 16);
+    updateHud();
+  }
+
+  function finishDeath() {
+    if (lives <= 0) { gameOver(false); return; }
+    loadLevelState(levelIndex);      // whole level restarts (coins, enemies, timer)
+    phase = 'playing';
+    updateHud();
+  }
+
+  function reachGoal() {
+    if (phase !== 'playing') return;
+    var bonus = 100 + coinsCollected * 10;
+    score += bonus;
+    updateBest();
+    spawnBurst(player.x + PW / 2, player.y + PH / 2, '#8ef0a0', 20);
+    addFloater(player.x + PW / 2, player.y, '+' + bonus, '#8ef0a0');
+    phase = 'levelclear';
+    phaseTimer = CLEAR_TIME;
+    updateHud();
+  }
+
+  function advanceLevel() {
+    if (levelIndex >= LEVEL_META.length) { gameOver(true); return; }
+    loadLevelState(levelIndex + 1);
+    phase = 'playing';
+    updateHud();
+  }
+
+  function gameOver(won) {
+    wonFlag = !!won;
+    updateBest();
+    saveProgress();
+    phase = 'gameover';
+    showResult(won ? 'win' : 'over');
+    updateHud();
+  }
+
+  function startPlay() {
+    hideStart();
+    hideResult();
+    phase = 'playing';
+    lastT = 0;
+    updateHud();
+  }
+
+  function togglePause() {
+    if (phase === 'playing') { phase = 'paused'; lastT = 0; updateHud(); }
+    else if (phase === 'paused') { phase = 'playing'; lastT = 0; updateHud(); }
+  }
+
+  function proceed() {
+    if (phase === 'ready') startPlay();
+    else if (phase === 'paused') togglePause();
+    else if (phase === 'gameover') { newGame({ seed: seed, level: 1 }); startPlay(); }
+  }
+
+  function restartLevel() {
+    if (phase === 'ready' || phase === 'gameover') return getState();
+    loadLevelState(levelIndex);
+    phase = 'playing';
+    updateHud();
+    return getState();
+  }
+
+  /* ======================================================================
+   * 13. State snapshot + queries
+   * ==================================================================== */
+
+  function collectedList() {
+    var out = [];
+    for (var k in collected) {
+      if (has(collected, k) && collected[k]) {
+        var parts = k.split(',');
+        out.push({ col: parseInt(parts[0], 10), row: parseInt(parts[1], 10) });
+      }
+    }
+    out.sort(function (a, b) { return a.row - b.row || a.col - b.col; });
+    return out;
+  }
+
+  function enemySnapshot(e) {
+    return {
+      x: e.x, y: e.y, vx: e.vx, alive: e.alive,
+      col: Math.floor((e.x + EW / 2) / TILE), row: e.row
+    };
+  }
+
+  function getState() {
+    return {
+      score: score,
+      lives: lives,
+      level: levelIndex,
+      phase: phase,
+      coins: coinsCollected,
+      coinsTotal: coinsTotal,
+      timeLeft: timeLeft,
+      player: {
+        x: player.x, y: player.y, vx: player.vx, vy: player.vy,
+        onGround: !!player.onGround, facing: player.facing
+      },
+      enemies: enemies.map(enemySnapshot),
+      collectedCoins: collectedList(),
+      seed: seed,
+      ticks: ticks,
+      best: best,
+      /* --- extras that make exhaustive / differential tests easy --- */
+      won: wonFlag,
+      unlocked: unlocked,
+      phaseTimer: phaseTimer,
+      levelStart: { col: lvl.start.col, row: lvl.start.row }
+    };
+  }
+
+  /* ======================================================================
+   * 14. Canvas setup + drawing
+   * ==================================================================== */
+
+  function setupCanvas() {
+    var dpr = (window.devicePixelRatio || 1);
+    cv.width = WIDTH * dpr;
+    cv.height = HEIGHT * dpr;
+    cv.style.aspectRatio = WIDTH + ' / ' + HEIGHT;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function rr(x, y, w, h, rad) {
+    var r = Math.min(rad, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function buildStars() {
+    stars = [];
+    for (var i = 0; i < 60; i++) {
+      stars.push({
+        x: rngHash(101, i) * WIDTH,
+        y: rngHash(211, i) * (HEIGHT * 0.7),
+        r: 0.6 + rngHash(307, i) * 1.3,
+        tw: rngHash(409, i) * 6.28
+      });
+    }
+  }
+
+  function drawBackground() {
+    var g = ctx.createLinearGradient(0, 0, 0, HEIGHT);
+    g.addColorStop(0, '#0b1230');
+    g.addColorStop(1, '#070b1c');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+    for (var i = 0; i < stars.length; i++) {
+      var s = stars[i];
+      ctx.globalAlpha = 0.35 + 0.4 * (0.5 + 0.5 * Math.sin(clock * 2 + s.tw));
+      ctx.fillStyle = '#cfe0ff';
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    /* distant parallax hills */
+    ctx.fillStyle = 'rgba(80,110,200,.10)';
+    for (var h = 0; h < 6; h++) {
+      var hx = h * 120 - (clock * 6) % 120;
+      ctx.beginPath();
+      ctx.arc(hx, HEIGHT - 40, 70, Math.PI, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  function drawTiles() {
+    for (var r = 0; r < ROWS; r++) {
+      var row = lvl.map[r];
+      for (var c = 0; c < COLS; c++) {
+        var ch = row.charAt(c);
+        var x = c * TILE, y = r * TILE;
+        if (ch === '#') {
+          ctx.fillStyle = '#2b3565';
+          ctx.fillRect(x, y, TILE, TILE);
+          ctx.fillStyle = 'rgba(120,150,255,.28)';
+          ctx.fillRect(x, y, TILE, 3);
+          ctx.strokeStyle = 'rgba(10,14,40,.55)';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(x + 0.5, y + 0.5, TILE - 1, TILE - 1);
+        } else if (ch === '=') {
+          ctx.fillStyle = '#4fb2e8';
+          ctx.fillRect(x, y + 2, TILE, 5);
+          ctx.fillStyle = 'rgba(190,235,255,.55)';
+          ctx.fillRect(x, y + 2, TILE, 2);
+        } else if (ch === '^') {
+          ctx.fillStyle = '#ff5d6c';
+          for (var s = 0; s < 3; s++) {
+            var bx = x + s * (TILE / 3);
+            ctx.beginPath();
+            ctx.moveTo(bx, y + TILE);
+            ctx.lineTo(bx + TILE / 6, y + 3);
+            ctx.lineTo(bx + TILE / 3, y + TILE);
+            ctx.closePath();
+            ctx.fill();
+          }
+        } else if (ch === 'c') {
+          var cx = x + TILE / 2, cy = y + TILE / 2;
+          var pulse = 0.5 + 0.5 * Math.sin(clock * 5 + c);
+          ctx.save();
+          ctx.shadowColor = '#ffd45e';
+          ctx.shadowBlur = 6 + pulse * 4;
+          ctx.fillStyle = '#ffd45e';
+          ctx.beginPath();
+          ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#a97b12';
+          ctx.beginPath();
+          ctx.arc(cx, cy, 1.8, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        } else if (ch === 'G') {
+          var gx = x + TILE / 2, gy = y + TILE / 2;
+          var glow = 0.5 + 0.5 * Math.sin(clock * 4);
+          ctx.save();
+          ctx.shadowColor = '#8ef0a0';
+          ctx.shadowBlur = 8 + glow * 10;
+          ctx.fillStyle = '#8ef0a0';
+          rr(x + 3, y + 1, TILE - 6, TILE - 2, 3);
+          ctx.fill();
+          ctx.restore();
+          ctx.fillStyle = '#06281c';
+          ctx.beginPath();
+          ctx.arc(gx + 2, gy, 1.4, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
+  }
+
+  function drawEnemies() {
+    for (var i = 0; i < enemies.length; i++) {
+      var e = enemies[i];
+      if (!e.alive) continue;
+      var cx = e.x + EW / 2, cy = e.y + EH / 2;
+      ctx.save();
+      ctx.shadowColor = '#ff7a9c';
+      ctx.shadowBlur = 7;
+      ctx.fillStyle = '#d25a86';
+      rr(e.x, e.y, EW, EH, 4);
+      ctx.fill();
+      ctx.restore();
+      /* eyes track the facing direction */
+      var ex = e.dir >= 0 ? cx + 2 : cx - 2;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.arc(ex - 1.8, cy - 2, 1.7, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(ex + 1.8, cy - 2, 1.7, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#3a1020';
+      ctx.beginPath(); ctx.arc(ex - 1.8 + e.dir * 0.6, cy - 2, 0.9, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(ex + 1.8 + e.dir * 0.6, cy - 2, 0.9, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  function drawPlayer() {
+    var dead = (phase === 'dying');
+    if (dead && Math.floor(clock * 20) % 2 === 0) return;   // death blink
+    var x = player.x, y = player.y;
+    ctx.save();
+    ctx.shadowColor = dead ? '#ff7a5a' : '#4be0a0';
+    ctx.shadowBlur = 8;
+    ctx.fillStyle = dead ? '#ff7a5a' : '#4be0a0';
+    rr(x, y + 2, PW, PH - 2, 3);
+    ctx.fill();
+    ctx.restore();
+    /* feet */
+    ctx.fillStyle = dead ? '#b23a2a' : '#2fae79';
+    ctx.fillRect(x + 1, y + PH - 1, 3, 2);
+    ctx.fillRect(x + PW - 4, y + PH - 1, 3, 2);
+    /* eyes look toward the facing direction */
+    var ef = player.facing >= 0 ? 1 : -1;
+    var exx = x + PW / 2 + ef * 2;
+    ctx.fillStyle = '#06281c';
+    ctx.beginPath(); ctx.arc(exx - 2, y + 5, 1.3, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(exx + 2, y + 5, 1.3, 0, Math.PI * 2); ctx.fill();
+  }
+
+  function drawEffects() {
+    var i;
+    for (i = 0; i < particles.length; i++) {
+      var p = particles[i];
+      ctx.globalAlpha = Math.max(0, Math.min(1, p.life / p.maxLife));
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    ctx.textAlign = 'center';
+    ctx.font = '700 12px "SFMono-Regular", Menlo, Consolas, monospace';
+    for (i = 0; i < floaters.length; i++) {
+      var f = floaters[i];
+      ctx.globalAlpha = Math.max(0, Math.min(1, f.life));
+      ctx.fillStyle = f.color;
+      ctx.fillText(f.text, f.x, f.y);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawVeils() {
+    if (phase === 'levelclear') {
+      ctx.fillStyle = 'rgba(7,11,28,.55)';
+      ctx.fillRect(0, 0, WIDTH, HEIGHT);
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#eafff0';
+      ctx.font = '700 22px "SFMono-Regular", Menlo, Consolas, monospace';
+      ctx.fillText(T.t('clearTitle'), WIDTH / 2, HEIGHT / 2);
+      ctx.fillStyle = '#9fe8a0';
+      ctx.font = '700 13px "SFMono-Regular", Menlo, Consolas, monospace';
+      ctx.fillText(T.t('clearSub', { n: levelIndex }), WIDTH / 2, HEIGHT / 2 + 24);
+    }
+    if (phase === 'paused') {
+      ctx.fillStyle = 'rgba(7,11,28,.58)';
+      ctx.fillRect(0, 0, WIDTH, HEIGHT);
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#e8ecff';
+      ctx.font = '700 22px "SFMono-Regular", Menlo, Consolas, monospace';
+      ctx.fillText(T.t('pause'), WIDTH / 2, HEIGHT / 2);
+    }
+  }
+
+  function draw() {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    var dpr = (window.devicePixelRatio || 1);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    drawBackground();
+    drawTiles();
+    drawEnemies();
+    drawPlayer();
+    drawEffects();
+    drawVeils();
+  }
+
+  /* ======================================================================
+   * 15. HUD / overlays (value-cached; refreshed every frame from loop())
+   * ==================================================================== */
+
+  /* Value cache backing updateHud(); `null` = "never written". */
+  var hudCache = {
+    score: null, lives: null, level: null, coins: null, time: null,
+    low: null, best: null, pauseDisabled: null, pauseText: null
+  };
+
+  function updateHud() {
+    /* Value cache: updateHud() runs every frame from loop(), so remember the
+     * last value written for each field and only touch the DOM when it changes.
+     * At steady state this is ZERO writes per frame, and the event-time
+     * (newGame / die / goal / pause / boot) calls stay idempotent. `null` marks
+     * "never written", so the first call always writes. */
+    var c = hudCache;
+    if (c.score !== score) { scoreEl.textContent = score; c.score = score; }
+    if (c.lives !== lives) { livesEl.textContent = lives; c.lives = lives; }
+    if (c.level !== levelIndex) { levelEl.textContent = levelIndex; c.level = levelIndex; }
+    var coinsTxt = coinsCollected + '/' + coinsTotal;
+    if (c.coins !== coinsTxt) { coinsEl.textContent = coinsTxt; c.coins = coinsTxt; }
+    var timeTxt = Math.ceil(Math.max(0, timeLeft));
+    if (c.time !== timeTxt) { timeEl.textContent = timeTxt; c.time = timeTxt; }
+    var low = (timeLeft <= 15);
+    if (c.low !== low) {
+      if (low) timeStatEl.classList.add('low'); else timeStatEl.classList.remove('low');
+      c.low = low;
+    }
+    if (c.best !== best) { bestEl.textContent = best; c.best = best; }
+
+    var pauseDisabled = !(phase === 'playing' || phase === 'paused');
+    if (c.pauseDisabled !== pauseDisabled) { btnPause.disabled = pauseDisabled; c.pauseDisabled = pauseDisabled; }
+    var pauseTxt = (phase === 'paused') ? T.t('resume') : T.t('pause');
+    if (c.pauseText !== pauseTxt) { btnPause.textContent = pauseTxt; c.pauseText = pauseTxt; }
+  }
+
+  function showResult(kind) {
+    overlayKind = kind;
+    if (kind === 'win') {
+      ovTitleEl.textContent = T.t('winTitle');
+      ovSubEl.textContent = T.t('winSub', { n: score });
+    } else {
+      ovTitleEl.textContent = T.t('overTitle');
+      ovSubEl.textContent = T.t('overSub', { n: score });
+    }
+    ovBtnEl.textContent = T.t('again');
+    resEl.classList.add('show');
+  }
+
+  function hideResult() { overlayKind = null; resEl.classList.remove('show'); }
+  function hideStart() { startEl.classList.remove('show'); }
+
+  /* ======================================================================
+   * 16. Input
+   * ==================================================================== */
+
+  var KEY_LEFT = { ArrowLeft: 1, a: 1, A: 1 };
+  var KEY_RIGHT = { ArrowRight: 1, d: 1, D: 1 };
+  var JUMP_KEYS = { ' ': 1, ArrowUp: 1, w: 1, W: 1 };
+
+  function setMove(dir) {
+    dir = (dir < 0) ? -1 : (dir > 0 ? 1 : 0);
+    input.left = (dir < 0);
+    input.right = (dir > 0);
+  }
+
+  function jump(down) {
+    if (down) {
+      input.jump = true;
+      if (phase === 'playing') player.jumpBuffer = BUFFER;
+    } else {
+      input.jump = false;
+      if (phase === 'playing' && player.vy < 0) player.vy *= JUMP_CUT;   // variable jump height
+    }
+    return getState();
+  }
+
+  function onKeyDown(ev) {
+    var k = ev.key;
+    if (k === 'Shift') { input.run = true; return; }
+    if (has(KEY_LEFT, k)) { if (ev.preventDefault) ev.preventDefault(); input.left = true; return; }
+    if (has(KEY_RIGHT, k)) { if (ev.preventDefault) ev.preventDefault(); input.right = true; return; }
+    if (has(JUMP_KEYS, k)) {
+      if (ev.preventDefault) ev.preventDefault();
+      if (phase === 'ready' || phase === 'gameover') proceed();
+      else jump(true);
+      return;
+    }
+    if (k === 'Enter') { proceed(); return; }
+    if (k === 'r' || k === 'R') { restartLevel(); return; }
+    if (k === 'p' || k === 'P') { togglePause(); }
+  }
+
+  function onKeyUp(ev) {
+    var k = ev.key;
+    if (k === 'Shift') { input.run = false; return; }
+    if (has(KEY_LEFT, k)) { input.left = false; return; }
+    if (has(KEY_RIGHT, k)) { input.right = false; return; }
+    if (has(JUMP_KEYS, k)) { jump(false); }
+  }
+
+  document.addEventListener('keydown', onKeyDown);
+  document.addEventListener('keyup', onKeyUp);
+
+  /* On-screen controls: press-and-hold pads for movement, a jump button. */
+  function holdBtn(el, on, off) {
+    var press = function (ev) { if (ev && ev.preventDefault) ev.preventDefault(); on(); };
+    var release = function () { off(); };
+    el.addEventListener('pointerdown', press);
+    el.addEventListener('pointerup', release);
+    el.addEventListener('pointerleave', release);
+    el.addEventListener('pointercancel', release);
+    /* mouse fallback for environments without Pointer Events */
+    el.addEventListener('mousedown', press);
+    el.addEventListener('mouseup', release);
+  }
+  holdBtn(btnLeft, function () { input.left = true; }, function () { input.left = false; });
+  holdBtn(btnRight, function () { input.right = true; }, function () { input.right = false; });
+  holdBtn(btnJump, function () { jump(true); }, function () { jump(false); });
+
+  /* Plain buttons use DIRECT click listeners (no closest() delegation - the
+   * real click target is the button itself, so a delegation branch is dead). */
+  btnStart.addEventListener('click', function () { startPlay(); });
+  btnNew.addEventListener('click', function () { newGame({ seed: seed, level: 1 }); startPlay(); });
+  btnPause.addEventListener('click', function () { togglePause(); });
+  ovBtnEl.addEventListener('click', function () {
+    if (overlayKind === 'win' || overlayKind === 'over') { newGame({ seed: seed, level: 1 }); startPlay(); }
+  });
+
+  /* ======================================================================
+   * 17. rAF loop (delta-accumulating clock - never setTimeout/setInterval)
+   * ==================================================================== */
+
+  function nowMs() {
+    if (typeof performance !== 'undefined' && performance && performance.now) return performance.now();
+    return Date.now();
+  }
+
+  function loop() {
+    if (!running) return;
+    var t = nowMs();
+    var dt = lastT ? (t - lastT) / 1000 : 1 / 60;
+    lastT = t;
+    if (!isFinite(dt) || dt <= 0) dt = 1 / 60;
+    if (dt > 0.05) dt = 0.05;                    // clamp big hitches / tab restores
+    clock += dt;
+    update(dt);
+    updateHud();                                 // refresh DOM HUD every frame (cheap: value-cached)
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  /* ======================================================================
+   * 18. Test bridge + boot
+   * ==================================================================== */
+
+  window.PF = {
+    /* constants */
+    TILE: TILE, COLS: COLS, ROWS: ROWS, WIDTH: WIDTH, HEIGHT: HEIGHT,
+    GRAVITY: GRAVITY, JUMP_V: JUMP_V, MAX_FALL: MAX_FALL,
+    WALK: WALK, RUN: RUN, COYOTE: COYOTE, BUFFER: BUFFER, JUMP_CUT: JUMP_CUT,
+    ENEMY_SPEED: ENEMY_SPEED, STOMP_BOUNCE: STOMP_BOUNCE,
+    DEATH_TIME: DEATH_TIME, LEVEL_TIME: LEVEL_TIME, LIVES_START: LIVES_START,
+    /* levels + legend */
+    levels: function () {
+      return LEVEL_META.map(function (l) {
+        return {
+          index: l.index, map: l.map.slice(), rows: l.rows, cols: l.cols,
+          coins: l.coins.map(function (p) { return { col: p.col, row: p.row }; }),
+          enemies: l.enemies.map(function (p) { return { col: p.col, row: p.row }; }),
+          start: { col: l.start.col, row: l.start.row },
+          goals: l.goals.map(function (p) { return { col: p.col, row: p.row }; })
+        };
+      });
+    },
+    levelAt: function (n) {
+      n = n | 0;
+      if (n >= 1 && n <= LEVEL_META.length) {
+        var l = LEVEL_META[n - 1];
+        return {
+          index: l.index, map: l.map.slice(), rows: l.rows, cols: l.cols,
+          coins: l.coins.map(function (p) { return { col: p.col, row: p.row }; }),
+          enemies: l.enemies.map(function (p) { return { col: p.col, row: p.row }; }),
+          start: { col: l.start.col, row: l.start.row },
+          goals: l.goals.map(function (p) { return { col: p.col, row: p.row }; })
+        };
+      }
+      return null;
+    },
+    legend: function () { return { '.': LEGEND['.'], '#': LEGEND['#'], '=': LEGEND['='], 'S': LEGEND['S'], 'G': LEGEND['G'], 'c': LEGEND['c'], 'e': LEGEND['e'], '^': LEGEND['^'] }; },
+    /* pure geometry */
+    tileAt: function (level, c, r) { return tileAt(level || lvl, c | 0, r | 0); },
+    isSolid: function (level, c, r) { return isSolid(level || lvl, c | 0, r | 0); },
+    isOneWay: function (level, c, r) { return isOneWay(level || lvl, c | 0, r | 0); },
+    isHazard: function (level, c, r) { return isHazard(level || lvl, c | 0, r | 0); },
+    standTiles: function (level) { return standTiles(level || lvl); },
+    simulateJump: function (level, col, row, dir, run) {
+      return simulateJump(level || lvl, col | 0, row | 0, dir | 0, !!run);
+    },
+    /* queries */
+    playerState: function () {
+      return {
+        x: player.x, y: player.y, vx: player.vx, vy: player.vy,
+        onGround: !!player.onGround, facing: player.facing
+      };
+    },
+    enemies: function () { return enemies.map(enemySnapshot); },
+    enemyAt: function (i) {
+      i = i | 0;
+      if (i < 0 || i >= enemies.length) return null;
+      return enemySnapshot(enemies[i]);
+    },
+    collectedCoins: function () { return collectedList(); },
+    hudCache: function () {
+      return {
+        score: hudCache.score, lives: hudCache.lives, level: hudCache.level,
+        coins: hudCache.coins, time: hudCache.time, low: hudCache.low,
+        best: hudCache.best, pauseDisabled: hudCache.pauseDisabled, pauseText: hudCache.pauseText
+      };
+    },
+    /* lifecycle */
+    newGame: function (opts) { return newGame(opts); },
+    start: function () { startPlay(); return getState(); },
+    pause: function () { togglePause(); return getState(); },
+    move: function (dir) {
+      if (dir === 'left') dir = -1;
+      else if (dir === 'right') dir = 1;
+      setMove(dir);
+      return getState();
+    },
+    jump: function (down) { return jump(!!down); },
+    restartLevel: function () { return restartLevel(); },
+    loadLevel: function (n) {
+      loadLevelState(n | 0);
+      phase = 'playing';
+      hideStart();
+      hideResult();
+      updateHud();
+      return getState();
+    },
+    tick: function (seconds, step) { return tick(seconds, step); },
+    getState: function () { return getState(); },
+    /* seeded PRNG, exposed so tests can drive explicit reproducible streams */
+    rngHash: function (seed, index) { return rngHash(seed | 0, index | 0); },
+    nextRandom: function (state) { return nextRandom(state); }
+  };
+
+  /* Re-localise the dynamic text (HUD, pause button, result dialog) when the
+   * language changes. Exactly ONE onChange callback is registered. */
+  T.onChange(function () {
+    updateHud();
+    if (overlayKind) showResult(overlayKind);
+  });
+
+  setupCanvas();
+  buildStars();
+  loadProgress();
+  newGame({ seed: 1, level: 1 });
+  phase = 'ready';
+  startEl.classList.add('show');
+  updateHud();
+  T.start();
+  requestAnimationFrame(loop);
+
+})();
+</script>
+</body>
+</html>

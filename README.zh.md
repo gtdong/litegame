@@ -2,7 +2,7 @@
 
 **[简体中文](README.zh.md)** · [English](README.md)
 
-[![games](https://img.shields.io/badge/games-28-blue?style=flat-square)](#游戏列表)
+[![games](https://img.shields.io/badge/games-29-blue?style=flat-square)](#游戏列表)
 [![AI-generated](https://img.shields.io/badge/AI--generated-100%25-8b5cf6?style=flat-square)](#这个项目是怎么做出来的)
 [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen?style=flat-square)](#为什么是-litegame)
 [![vanilla JS](https://img.shields.io/badge/vanilla-JS-f7df1e?style=flat-square&logo=javascript&logoColor=black)](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript)
@@ -57,6 +57,7 @@
 | [pacman-game](pacman-game) | 吃豆人，四只性格各异的幽灵、能量豆反击、200/400/800/1600 连击 | `街机` `迷宫` `追逐` |
 | [frogger-game](frogger-game) | 青蛙过河，躲车流踩木头占满五个家，倒计时归零前完成，乌龟会定时下潜 | `街机` `时机` `反应` |
 | [invaders-game](invaders-game) | 太空侵略者，顶住每次撞边整体下移的敌阵，剩下越少它越快 | `街机` `射击` `波次` |
+| [platformer-game](platformer-game) | 横版闯关，十张单屏关卡，跑到终点门，踩怪躲刺捡金币 | `平台跳跃` `关卡` `键盘` |
 
 ## 为什么是 litegame
 

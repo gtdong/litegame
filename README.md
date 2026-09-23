@@ -2,7 +2,7 @@
 
 [简体中文](README.zh.md) · **[English](README.md)**
 
-[![games](https://img.shields.io/badge/games-28-blue?style=flat-square)](#games)
+[![games](https://img.shields.io/badge/games-29-blue?style=flat-square)](#games)
 [![AI-generated](https://img.shields.io/badge/AI--generated-100%25-8b5cf6?style=flat-square)](#how-this-was-made)
 [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen?style=flat-square)](#why-litegame)
 [![vanilla JS](https://img.shields.io/badge/vanilla-JS-f7df1e?style=flat-square&logo=javascript&logoColor=black)](https://developer.mozilla.org/docs/Web/JavaScript)
@@ -57,6 +57,7 @@ Each game lives in its own folder and is a single self-contained `index.html`. T
 | [pacman-game](pacman-game) | The arcade chase: four distinct ghost personalities, power pellets, 200/400/800/1600 combos | `arcade` `maze` `chase` |
 | [frogger-game](frogger-game) | Cross five lanes of traffic and a river of logs to fill five homes before the timer runs out | `arcade` `timing` `reflex` |
 | [invaders-game](invaders-game) | Hold the line against a marching fleet that drops a row at every edge and speeds up as you thin it out | `arcade` `shooter` `waves` |
+| [platformer-game](platformer-game) | Ten single-screen levels: run, jump and stomp your way to the goal door | `platformer` `levels` `keyboard` |
 
 ## Why litegame
 
