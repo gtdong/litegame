@@ -63,6 +63,18 @@ const CJK = /[\u4e00-\u9fff]/;
     // Capture rAF so the test owns the frame clock (PM.tick drives the sim);
     // the loop still runs when the test calls window.__pump().
     beforeParse(window) {
+      // jsdom ships no 2D canvas unless the optional native `canvas` package is
+      // present. Every game here treats the canvas as write-only (geometry is
+      // owned by constants and never read back), so a no-op context keeps this
+      // harness running without a native build dependency.
+      window.HTMLCanvasElement.prototype.getContext = function () {
+        const el = this;
+        const noop = new Proxy(function () {}, {
+          apply: () => noop,
+          get: (t, k) => (k === 'canvas' ? el : (k === 'then' ? undefined : noop))
+        });
+        return noop;
+      };
       let cb = null;
       window.requestAnimationFrame = fn => { cb = fn; return 1; };
       window.cancelAnimationFrame = () => { cb = null; };

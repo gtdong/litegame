@@ -46,7 +46,23 @@ function group(title) { console.log(`\n[${title}]`); }
   const vc = new VirtualConsole();
   vc.on('jsdomError', e => errs.push(String((e && e.stack) || e)));
 
-  const opts = { runScripts: 'dangerously', resources: 'usable', pretendToBeVisual: true, virtualConsole: vc };
+  const opts = {
+    runScripts: 'dangerously', resources: 'usable', pretendToBeVisual: true, virtualConsole: vc,
+    beforeParse(window) {
+      // jsdom ships no 2D canvas unless the optional native `canvas` package is
+      // present. Every game here treats the canvas as write-only (geometry is
+      // owned by constants and never read back), so a no-op context keeps this
+      // harness running without a native build dependency.
+      window.HTMLCanvasElement.prototype.getContext = function () {
+        const el = this;
+        const noop = new Proxy(function () {}, {
+          apply: () => noop,
+          get: (t, k) => (k === 'canvas' ? el : (k === 'then' ? undefined : noop))
+        });
+        return noop;
+      };
+    }
+  };
   const dom = REMOTE ? await JSDOM.fromURL(TARGET, opts) : await JSDOM.fromFile(TARGET, opts);
   const { window } = dom;
   window.addEventListener('error', e => errs.push(e.message || String(e)));

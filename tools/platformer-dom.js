@@ -72,6 +72,18 @@ const CJK = /[\u4e00-\u9fff]/;
     // performance.now() to a counter the test advances so the real frame path is
     // reproducible instead of racing wall time.
     beforeParse(window) {
+      // jsdom ships no 2D canvas unless the optional native `canvas` package is
+      // present. Every game here treats the canvas as write-only (geometry is
+      // owned by constants and never read back), so a no-op context keeps this
+      // harness running without a native build dependency.
+      window.HTMLCanvasElement.prototype.getContext = function () {
+        const el = this;
+        const noop = new Proxy(function () {}, {
+          apply: () => noop,
+          get: (t, k) => (k === 'canvas' ? el : (k === 'then' ? undefined : noop))
+        });
+        return noop;
+      };
       let cb = null;
       let clock = 0;
       window.requestAnimationFrame = fn => { cb = fn; return 1; };
