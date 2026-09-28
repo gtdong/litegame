@@ -1,0 +1,1690 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tower Defense</title>
+<style>
+  :root {
+    --bg: #eef2fb;
+    --card: #ffffff;
+    --border: #d7deee;
+    --text: #1e2740;
+    --muted: #6b7592;
+    --accent: #6366f1;
+    --screen: #070b1c;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    margin: 0;
+    padding: 20px 12px 48px;
+    background: radial-gradient(120% 120% at 50% 0%, #ffffff 0%, var(--bg) 62%);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+  }
+
+  h1 { margin: 0 0 4px; font-size: 27px; letter-spacing: -.02em; }
+  .tip { margin: 0 0 16px; font-size: 13px; color: var(--muted); text-align: center; max-width: 640px; line-height: 1.6; }
+
+  .panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 14px;
+    box-shadow: 0 10px 30px rgba(30,39,64,.10);
+    width: min(700px, 100%);
+  }
+
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    margin-bottom: 10px;
+  }
+  .bar:last-child { margin-bottom: 0; margin-top: 10px; }
+
+  .stat {
+    background: #f5f7fd;
+    color: #3a4668;
+    font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 5px 9px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .stat small { font-weight: 600; opacity: .72; }
+  .stat.low { background: #ffe8ec; color: #c0304a; }
+
+  button {
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    color: #2a3350;
+    background: #f1f4fc;
+    border: 1px solid var(--border);
+    border-radius: 11px;
+    padding: 8px 13px;
+    cursor: pointer;
+    transition: transform .06s ease, background .12s ease;
+  }
+  button:hover { background: #e7ecfa; }
+  button:active { transform: translateY(1px); }
+  button:disabled { opacity: .45; cursor: default; }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  button.primary:disabled { background: var(--accent); }
+  button.sel { background: #dfe6ff; border-color: var(--accent); color: #1b2350; box-shadow: inset 0 0 0 1px var(--accent); }
+
+  .stage { display: block; width: 100%; }
+  canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+    background: var(--screen);
+    border-radius: 14px;
+    touch-action: manipulation;
+    cursor: pointer;
+  }
+
+  .info {
+    font-size: 12px;
+    color: var(--muted);
+    text-align: center;
+    min-height: 18px;
+    margin: 8px 0 0;
+    font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+  }
+
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(7, 11, 28, .55);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 20;
+  }
+  .overlay.show { display: flex; }
+
+  .dialog {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 26px 28px 22px;
+    width: min(380px, 100%);
+    text-align: center;
+    box-shadow: 0 16px 50px rgba(20,27,48,.30);
+    animation: rise .2s ease-out;
+  }
+  @keyframes rise {
+    from { transform: translateY(12px); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+  }
+  .dialog h2 { margin: 0 0 10px; font-size: 22px; }
+  .dialog p  { color: var(--muted); font-size: 13px; line-height: 1.65; margin: 0 0 18px; }
+
+  @media (max-width: 520px) {
+    h1 { font-size: 22px; }
+    .panel { padding: 11px; }
+    .bar { gap: 5px; }
+    button { padding: 7px 10px; font-size: 12px; }
+    .stat { padding: 4px 7px; font-size: 11px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="lang-switch" data-lang-switch></div>
+
+<h1 data-i18n="title"></h1>
+<p class="tip" data-i18n-html="tip"></p>
+
+<div class="panel">
+  <div class="bar">
+    <span class="stat"><small data-i18n="score"></small> <b id="score">0</b></span>
+    <span class="stat"><small data-i18n="lives"></small> <b id="lives">20</b></span>
+    <span class="stat"><small data-i18n="gold"></small> <b id="gold">220</b></span>
+    <span class="stat"><small data-i18n="wave"></small> <b id="wave">1/12</b></span>
+    <span class="stat"><small data-i18n="speedLabel"></small> <b id="speed">1&times;</b></span>
+  </div>
+
+  <div class="stage">
+    <canvas id="cv" width="640" height="384"></canvas>
+  </div>
+
+  <p class="info" id="nextInfo"></p>
+
+  <div class="bar">
+    <button id="btnGun"></button>
+    <button id="btnCannon"></button>
+    <button id="btnFrost"></button>
+  </div>
+
+  <div class="bar">
+    <button id="btnUpgrade"></button>
+    <button id="btnSell"></button>
+    <button id="btnCall" class="primary"></button>
+  </div>
+
+  <div class="bar">
+    <button id="btnPause" disabled></button>
+    <button id="btnSpeed"></button>
+    <button id="btnNew"></button>
+  </div>
+
+  <p class="info" id="selInfo"></p>
+</div>
+
+<!-- Start overlay: the required visible entry point out of the ready state. -->
+<div id="startOverlay" class="overlay show">
+  <div class="dialog">
+    <h2 data-i18n="title"></h2>
+    <p data-i18n-html="readySub"></p>
+    <button id="btnStart" class="primary" data-i18n="start"></button>
+  </div>
+</div>
+
+<!-- Result overlay: shown after clearing all 12 waves or losing all lives. -->
+<div id="overlay" class="overlay">
+  <div class="dialog">
+    <h2 id="ovTitle"></h2>
+    <p id="ovSub"></p>
+    <button id="ovBtn" class="primary"></button>
+  </div>
+</div>
+
+<script src="../assets/i18n.js"></script>
+<script>
+/* ============================================================================
+ * Tower Defense - a single-file, zero-dependency, canvas-rendered tower defense.
+ *
+ * The playfield is a fixed 20 x 12 grid of 32 px tiles, so the logical canvas
+ * is exactly 640 x 384. Enemies walk a FIXED polyline (declared as grid-space
+ * vertices in PATH) from the off-screen entrance to the off-screen base; any
+ * in-grid tile the polyline does not touch and that is not a decorative blocker
+ * is buildable.
+ *
+ * Everything runs on ONE requestAnimationFrame clock that accumulates delta
+ * time (clamped to 50 ms) and feeds the model. Browser timer APIs are never
+ * used: every timed transition (wave spawning, the inter-wave break, win,
+ * lose) is an explicit phase tracked by the model clock.
+ *
+ * Determinism:
+ *   - Fully deterministic: there is no randomness anywhere - not even seeded.
+ *     The wave table, the spawn schedule and every spawn position are fixed
+ *     data, and addBurst() places particles at exact coordinates with no
+ *     jitter. newGame({ seed }) accepts and echoes a seed for API uniformity
+ *     with the other games in this collection, but it has no effect on the
+ *     simulation: every seed produces a bit-for-bit identical run.
+ *   - draw() never mutates state (it is read-only), and geometry is owned by
+ *     the TILE/COLS/ROWS/WIDTH/HEIGHT constants - NEVER read back from the
+ *     canvas.
+ *   - The whole model advances through update(dt); TD.tick(seconds) drives the
+ *     exact same update() with no rAF and no wall clock, so a headless run is
+ *     in lock-step with the on-screen game.
+ *
+ * The tower / enemy / wave numbers are pure data tables (TOWER_SPEC, ENEMY_SPEC,
+ * WAVES) and the balance proof (exposureSeconds, towerDps, bestKillBudget,
+ * waveFeasibilityRatio) is built from the very same tables - so the headless
+ * "every wave is winnable" proof is a statement about the shipped game.
+ * ========================================================================== */
+(function () {
+  'use strict';
+
+  /* ======================================================================
+   * 1. Constants (geometry is owned here - never read back from the canvas)
+   * ==================================================================== */
+
+  var TILE = 32;                  // one grid cell (both axes), px
+  var COLS = 20;                  // grid columns
+  var ROWS = 12;                  // grid rows
+  var WIDTH = COLS * TILE;        // 640 logical px
+  var HEIGHT = ROWS * TILE;       // 384 logical px
+
+  var START_GOLD = 220;           // gold at the start of a game
+  var START_LIVES = 20;           // base lives
+  var WAVE_COUNT = 12;            // waves per game
+  var SELL_RATE = 0.7;            // fraction of gold returned when selling
+  var NEXT_WAVE_DELAY = 6;        // s (break between waves, auto-start)
+  var SAMPLE_STEP = 4;            // px (exposureSeconds polyline sampling step)
+  var DEFAULT_STEP = 1 / 60;      // s (default tick() sub-step)
+
+  var FIXED = DEFAULT_STEP;       // s (alias used by the render clock)
+
+  /* ======================================================================
+   * 2. i18n (shared zero-dependency module: ../assets/i18n.js)
+   * ==================================================================== */
+
+  var T = LiteI18N.create({
+    title:      { en: 'Tower Defense', zh: '塔防' },
+    tip: {
+      en: 'Click a buildable tile to place a tower, click a tower to upgrade or sell.<br>Hold the line for 12 waves - nothing may reach the base.',
+      zh: '点击可建造格放下防御塔，点击已有塔可升级或出售。<br>守住 12 波进攻 —— 别让任何敌人抵达基地。'
+    },
+    score:      { en: 'Score', zh: '得分' },
+    lives:      { en: 'Base', zh: '基地' },
+    gold:       { en: 'Gold', zh: '金币' },
+    wave:       { en: 'Wave', zh: '波次' },
+    speedLabel: { en: 'Speed', zh: '速度' },
+    pause:      { en: 'Pause', zh: '暂停' },
+    resume:     { en: 'Resume', zh: '继续' },
+    newgame:    { en: 'New game', zh: '新游戏' },
+    start:      { en: 'Start game', zh: '开始游戏' },
+    readySub: {
+      en: 'Three towers, twelve waves. Build, upgrade, sell - and call the next wave early to cash in.',
+      zh: '三种塔，十二波。建造、升级、出售 —— 也可以提前召唤下一波把奖励落袋。'
+    },
+    tower_gun:    { en: 'Gun', zh: '机枪' },
+    tower_cannon: { en: 'Cannon', zh: '迫击炮' },
+    tower_frost:  { en: 'Frost', zh: '冰霜' },
+    callWave:   { en: 'Call next wave', zh: '召唤下一波' },
+    upgrade:    { en: 'Upgrade', zh: '升级' },
+    sell:       { en: 'Sell', zh: '出售' },
+    maxLevel:   { en: 'Max level', zh: '已满级' },
+    readyInfo:  { en: 'Pick a tower type, then click a buildable tile.', zh: '先选一种塔，再点击可建造格。' },
+    waveActive: { en: 'Wave in progress - {n} enemy(ies) left', zh: '本波进行中 —— 剩余 {n} 个敌人' },
+    nextIn:     { en: 'Next wave in {n}s', zh: '{n} 秒后开始下一波' },
+    allDone:    { en: 'All waves cleared!', zh: '全部波次已清空！' },
+    selNone:    { en: 'No tile selected.', zh: '未选中任何格子。' },
+    selPick:    { en: 'Buildable tile ({c},{r}) - choose a tower type.', zh: '可建造格 ({c},{r}) —— 请选择塔类型。' },
+    selBuild:   { en: 'Click to build {t} here ({g}g).', zh: '点击在此建造 {t}（{g} 金币）。' },
+    selNoGold:  { en: 'Not enough gold for {t} ({g}g).', zh: '金币不足，无法建造 {t}（需要 {g} 金币）。' },
+    selTower:   { en: '{t} Lv{l} - dmg {d}, range {rg}, rate {rt}/s', zh: '{t} {l} 级 —— 伤害 {d}，射程 {rg}，射速 {rt}/秒' },
+    selBlocked: { en: 'Cannot build here (path or blocker).', zh: '此处不可建造（路径或障碍）。' },
+    winTitle:   { en: 'You win!', zh: '胜利！' },
+    winSub:     { en: 'All 12 waves held. Score {n}.', zh: '守住全部 12 波。得分 {n}。' },
+    loseTitle:  { en: 'Base overrun', zh: '基地失守' },
+    loseSub:    { en: 'Fell on wave {n}. Score {m}.', zh: '倒在第 {n} 波。得分 {m}。' },
+    again:      { en: 'Play again', zh: '再来一局' }
+  });
+
+  /* ======================================================================
+   * 3. DOM handles (every id below must exist in the markup)
+   * ==================================================================== */
+
+  var cv = document.getElementById('cv');
+  var ctx = cv.getContext('2d');
+  var scoreEl = document.getElementById('score');
+  var livesEl = document.getElementById('lives');
+  var goldEl = document.getElementById('gold');
+  var waveEl = document.getElementById('wave');
+  var speedEl = document.getElementById('speed');
+  var nextInfoEl = document.getElementById('nextInfo');
+  var selInfoEl = document.getElementById('selInfo');
+  var btnGun = document.getElementById('btnGun');
+  var btnCannon = document.getElementById('btnCannon');
+  var btnFrost = document.getElementById('btnFrost');
+  var btnCall = document.getElementById('btnCall');
+  var btnPause = document.getElementById('btnPause');
+  var btnSpeed = document.getElementById('btnSpeed');
+  var btnNew = document.getElementById('btnNew');
+  var btnUpgrade = document.getElementById('btnUpgrade');
+  var btnSell = document.getElementById('btnSell');
+  var startEl = document.getElementById('startOverlay');
+  var btnStart = document.getElementById('btnStart');
+  var resEl = document.getElementById('overlay');
+  var ovTitleEl = document.getElementById('ovTitle');
+  var ovSubEl = document.getElementById('ovSub');
+  var ovBtnEl = document.getElementById('ovBtn');
+
+  var towerBtns = { gun: btnGun, cannon: btnCannon, frost: btnFrost };
+
+  /* ======================================================================
+   * 4. Fixed path (a polyline of grid-space vertices), its rasterised tiles
+   *    and the pure geometry built on top of it.
+   *
+   * The path is axis-aligned, non-self-intersecting, and every in-grid vertex
+   * is inside the grid (the first and last vertices stick one tile out of the
+   * grid so enemies enter and leave the screen cleanly). These properties are
+   * machine-checkable and are asserted by the test suite.
+   * ==================================================================== */
+
+  var PATH = [
+    [-1, 2], [4, 2], [4, 6], [9, 6], [9, 1],
+    [15, 1], [15, 9], [20, 9]
+  ];
+
+  /* Decorative blocker cells: buildable() says no, but they are NOT path. */
+  var BLOCKED = [
+    [0, 0], [1, 0], [2, 0], [0, 1],
+    [17, 0], [18, 0], [19, 0],
+    [0, 11], [1, 11], [2, 11],
+    [17, 11], [18, 11], [19, 11]
+  ];
+
+  function tileCenter(col, row) {
+    return { x: col * TILE + TILE / 2, y: row * TILE + TILE / 2 };
+  }
+
+  /* Segment table in pixels: cumulative offsets make pathPointAt() O(1)-ish. */
+  var SEG = [];
+  var PATH_LEN = 0;
+  (function buildSegments() {
+    var acc = 0;
+    for (var i = 0; i < PATH.length - 1; i++) {
+      var a = PATH[i], b = PATH[i + 1];
+      var p0 = tileCenter(a[0], a[1]);
+      var p1 = tileCenter(b[0], b[1]);
+      var len = Math.abs(p1.x - p0.x) + Math.abs(p1.y - p0.y); // axis-aligned
+      SEG.push({ x0: p0.x, y0: p0.y, x1: p1.x, y1: p1.y, len: len, acc: acc });
+      acc += len;
+    }
+    PATH_LEN = acc;
+  })();
+
+  function pathLength() { return PATH_LEN; }
+
+  function segPoint(s, t) {
+    var dx = s.x1 - s.x0, dy = s.y1 - s.y0;
+    var L = s.len || 1;
+    return { x: s.x0 + dx * (t / L), y: s.y0 + dy * (t / L) };
+  }
+
+  /* Pixel position at path distance `d` (px from the entrance). Clamped. */
+  function pathPointAt(d) {
+    if (d <= 0) return segPoint(SEG[0], 0);
+    if (d >= PATH_LEN) { var last = SEG[SEG.length - 1]; return segPoint(last, last.len); }
+    for (var i = 0; i < SEG.length; i++) {
+      var s = SEG[i];
+      if (d <= s.acc + s.len) return segPoint(s, d - s.acc);
+    }
+    var e = SEG[SEG.length - 1];
+    return { x: e.x1, y: e.y1 };
+  }
+
+  /* The set of grid tiles the polyline passes through. */
+  var PATH_TILES = {};
+  (function markPathTiles() {
+    for (var i = 0; i < PATH.length - 1; i++) {
+      var a = PATH[i], b = PATH[i + 1];
+      var dc = b[0] === a[0] ? 0 : (b[0] > a[0] ? 1 : -1);
+      var dr = b[1] === a[1] ? 0 : (b[1] > a[1] ? 1 : -1);
+      var c = a[0], r = a[1];
+      PATH_TILES[c + ',' + r] = true;
+      /* Hard cap. PATH is required to be axis-aligned (the test suite asserts
+       * it). A future diagonal segment would make this rasteriser walk past
+       * its own target forever - both axes would overshoot independently and
+       * could never match at the same time - so bound the walk by the grid
+       * extent instead of trusting the data. */
+      var guard = 0, maxGuard = COLS + ROWS + 2;
+      while ((c !== b[0] || r !== b[1]) && guard++ < maxGuard) {
+        c += dc; r += dr;
+        PATH_TILES[c + ',' + r] = true;
+      }
+    }
+  })();
+
+  var BLOCKED_SET = {};
+  for (var bi = 0; bi < BLOCKED.length; bi++) {
+    BLOCKED_SET[BLOCKED[bi][0] + ',' + BLOCKED[bi][1]] = true;
+  }
+
+  function inGrid(col, row) {
+    return col >= 0 && col < COLS && row >= 0 && row < ROWS;
+  }
+
+  function isOnPath(col, row) {
+    return !!PATH_TILES[col + ',' + row];
+  }
+
+  function isBlocked(col, row) {
+    return !!BLOCKED_SET[col + ',' + row];
+  }
+
+  function buildable(col, row) {
+    return inGrid(col, row) && !isOnPath(col, row) && !isBlocked(col, row);
+  }
+
+  function buildableSlots() {
+    var out = [];
+    for (var r = 0; r < ROWS; r++) {
+      for (var c = 0; c < COLS; c++) {
+        if (buildable(c, r)) out.push({ col: c, row: r });
+      }
+    }
+    return out;
+  }
+
+  function tileAtPoint(px, py) {
+    return { col: Math.floor(px / TILE), row: Math.floor(py / TILE) };
+  }
+
+  function pointSegDist(px, py, x0, y0, x1, y1) {
+    var dx = x1 - x0, dy = y1 - y0;
+    var L2 = dx * dx + dy * dy;
+    if (L2 === 0) return Math.sqrt((px - x0) * (px - x0) + (py - y0) * (py - y0));
+    var t = ((px - x0) * dx + (py - y0) * dy) / L2;
+    t = Math.max(0, Math.min(1, t));
+    var cxp = x0 + t * dx, cyp = y0 + t * dy;
+    return Math.sqrt((px - cxp) * (px - cxp) + (py - cyp) * (py - cyp));
+  }
+
+  function pointOnPath(px, py) {
+    for (var i = 0; i < SEG.length; i++) {
+      var s = SEG[i];
+      if (pointSegDist(px, py, s.x0, s.y0, s.x1, s.y1) <= TILE / 2) return true;
+    }
+    return false;
+  }
+
+  /* ======================================================================
+   * 5. Pure data tables (the single source of truth for balance)
+   *
+   * TOWER_SPEC holds each tower's level-1 numbers plus its special trait;
+   * buildTowerLevels() derives levels 2 and 3 from the documented upgrade
+   * rules. ENEMY_SPEC and WAVES are hand-authored.
+   * ==================================================================== */
+
+  function round2(x) { return Math.round(x * 100) / 100; }
+
+  /* Level curve: L2 = 0.8 * base cost, dmg x1.7, range +0.4;
+   *               L3 = 1.4 * base cost, dmg x1.7, rate x1.25, range +0.4
+   *               (L3 multipliers apply on top of L2).                 */
+  function buildTowerLevels(spec) {
+    var l1 = { level: 1, cost: spec.cost, dmg: round2(spec.dmg), rate: round2(spec.rate), range: round2(spec.range) };
+    var l2 = { level: 2, cost: Math.round(spec.cost * 0.8), dmg: round2(spec.dmg * 1.7), rate: round2(spec.rate), range: round2(spec.range + 0.4) };
+    var l3 = { level: 3, cost: Math.round(spec.cost * 1.4), dmg: round2(l2.dmg * 1.7), rate: round2(l2.rate * 1.25), range: round2(l2.range + 0.4) };
+    return [l1, l2, l3];
+  }
+
+  var TOWER_SPEC = {
+    gun: {
+      key: 'gun', kind: 'single',
+      cost: 50, dmg: 8, rate: 2.5, range: 2.5
+    },
+    cannon: {
+      key: 'cannon', kind: 'splash', splash: 1.2,
+      cost: 90, dmg: 26, rate: 0.7, range: 3.5
+    },
+    frost: {
+      key: 'frost', kind: 'slow', slowPct: 0.45, slowTime: 1.5,
+      cost: 70, dmg: 3, rate: 1.2, range: 2.8
+    }
+  };
+  var TOWER_ORDER = ['gun', 'cannon', 'frost'];
+
+  TOWER_SPEC.gun.levels = buildTowerLevels(TOWER_SPEC.gun);
+  TOWER_SPEC.cannon.levels = buildTowerLevels(TOWER_SPEC.cannon);
+  TOWER_SPEC.frost.levels = buildTowerLevels(TOWER_SPEC.frost);
+
+  function levelSpec(type, level) {
+    var spec = TOWER_SPEC[type];
+    if (!spec) return null;
+    var lv = Math.max(1, Math.min(3, level | 0));
+    return spec.levels[lv - 1];
+  }
+  function towerDmg(type, level) { var s = levelSpec(type, level); return s ? s.dmg : 0; }
+  function towerRate(type, level) { var s = levelSpec(type, level); return s ? s.rate : 0; }
+  function towerRange(type, level) { var s = levelSpec(type, level); return s ? s.range : 0; }
+  function towerCost(type, level) { var s = levelSpec(type, level); return s ? s.cost : 0; }
+  /* Cost to raise an existing tower from `level` to `level + 1`. */
+  function upgradeCost(type, level) {
+    if (level >= 3) return 0;
+    return towerCost(type, level + 1);
+  }
+
+  var ENEMY_SPEC = {
+    swarm:  { key: 'swarm',  color: '#8ef0a0', hp: 22,  speed: 2.2, armor: 0, gold: 3,  radius: 9 },
+    runner: { key: 'runner', color: '#7fd7ff', hp: 40,  speed: 1.6, armor: 0, gold: 6,  radius: 8 },
+    brute:  { key: 'brute',  color: '#ffb37a', hp: 140, speed: 0.9, armor: 3, gold: 14, radius: 13 }
+  };
+  var ENEMY_ORDER = ['swarm', 'runner', 'brute'];
+
+  /* 12 waves of groups: { type, count, gapSec, delaySec }.
+   * gapSec = seconds between consecutive spawns in the group;
+   * delaySec = seconds from wave start until the group's first spawn. */
+  var WAVES = [
+    { groups: [ { type: 'swarm',  count: 8,  gapSec: 1.6, delaySec: 0 } ] },
+    { groups: [ { type: 'swarm',  count: 10, gapSec: 1.4, delaySec: 0 },
+                { type: 'runner', count: 2,  gapSec: 1.8, delaySec: 4 } ] },
+    { groups: [ { type: 'swarm',  count: 10, gapSec: 1.2, delaySec: 0 },
+                { type: 'runner', count: 3,  gapSec: 1.5, delaySec: 5 } ] },
+    { groups: [ { type: 'runner', count: 8,  gapSec: 1.2, delaySec: 0 },
+                { type: 'swarm',  count: 6,  gapSec: 1.4, delaySec: 6 } ] },
+    { groups: [ { type: 'runner', count: 8,  gapSec: 1.1, delaySec: 0 },
+                { type: 'swarm',  count: 6,  gapSec: 1.3, delaySec: 7 },
+                { type: 'brute',  count: 1,  gapSec: 1.0, delaySec: 10 } ] },
+    { groups: [ { type: 'swarm',  count: 10, gapSec: 1.1, delaySec: 0 },
+                { type: 'runner', count: 6,  gapSec: 1.3, delaySec: 6 },
+                { type: 'brute',  count: 1,  gapSec: 1.0, delaySec: 12 } ] },
+    { groups: [ { type: 'runner', count: 8,  gapSec: 1.0, delaySec: 0 },
+                { type: 'swarm',  count: 8,  gapSec: 1.2, delaySec: 5 },
+                { type: 'brute',  count: 2,  gapSec: 1.4, delaySec: 10 } ] },
+    { groups: [ { type: 'swarm',  count: 10, gapSec: 1.0, delaySec: 0 },
+                { type: 'runner', count: 8,  gapSec: 1.1, delaySec: 5 },
+                { type: 'brute',  count: 2,  gapSec: 1.3, delaySec: 12 } ] },
+    { groups: [ { type: 'runner', count: 10, gapSec: 0.95, delaySec: 0 },
+                { type: 'swarm',  count: 8,  gapSec: 1.1, delaySec: 5 },
+                { type: 'brute',  count: 2,  gapSec: 1.2, delaySec: 12 } ] },
+    { groups: [ { type: 'swarm',  count: 10, gapSec: 0.95, delaySec: 0 },
+                { type: 'runner', count: 10, gapSec: 1.0, delaySec: 4 },
+                { type: 'brute',  count: 3,  gapSec: 1.2, delaySec: 10 } ] },
+    { groups: [ { type: 'runner', count: 11, gapSec: 0.9, delaySec: 0 },
+                { type: 'swarm',  count: 10, gapSec: 1.0, delaySec: 4 },
+                { type: 'brute',  count: 3,  gapSec: 1.1, delaySec: 10 } ] },
+    { groups: [ { type: 'swarm',  count: 12, gapSec: 0.9, delaySec: 0 },
+                { type: 'runner', count: 10, gapSec: 0.95, delaySec: 4 },
+                { type: 'brute',  count: 4,  gapSec: 1.1, delaySec: 9 } ] }
+  ];
+
+  /* ======================================================================
+   * 6. Pure balance math (side-effect free, deterministic, no game state)
+   *
+   * These are the primitives behind the "every wave is winnable" proof in
+   * the READMEs. They only read the data tables above, so the headless proof
+   * is a statement about the shipped numbers.
+   * ==================================================================== */
+
+  /* Expand wave w (1-based) into the ordered list of enemy type keys. */
+  function expandWaveTypes(w) {
+    var wave = WAVES[w - 1];
+    if (!wave) return [];
+    var out = [];
+    for (var gi = 0; gi < wave.groups.length; gi++) {
+      var g = wave.groups[gi];
+      for (var i = 0; i < g.count; i++) out.push(g.type);
+    }
+    return out;
+  }
+
+  function waveEnemyCount(w) { return expandWaveTypes(w).length; }
+
+  /* Sum of raw HP across a wave. */
+  function waveHpTotal(w) {
+    var types = expandWaveTypes(w), total = 0;
+    for (var i = 0; i < types.length; i++) total += ENEMY_SPEC[types[i]].hp;
+    return total;
+  }
+
+  /* HP weighted by armour: the effective HP one hit costs an unarmoured shot
+   * (each enemy is worth hp + armor, because every hit loses at least `armor`
+   * points to flat reduction before any damage lands). */
+  function waveArmorWeightedHp(w) {
+    var types = expandWaveTypes(w), total = 0;
+    for (var i = 0; i < types.length; i++) {
+      var e = ENEMY_SPEC[types[i]];
+      total += e.hp + e.armor;
+    }
+    return total;
+  }
+
+  /* Total kill gold a wave pays out. */
+  function waveKillGold(w) {
+    var types = expandWaveTypes(w), total = 0;
+    for (var i = 0; i < types.length; i++) total += ENEMY_SPEC[types[i]].gold;
+    return total;
+  }
+
+  var exposureCache = {};
+
+  /* Seconds a single enemy moving at `speedTilesPerSec` spends inside a tower's
+   * range at (col,row). Computed by sampling the path polyline at SAMPLE_STEP px
+   * (default 4 px) and dividing the in-range arc length by the enemy speed.
+   * Monotonic in speed: a faster enemy spends strictly less time in range. */
+  function exposureSeconds(col, row, rangeTiles, speedTilesPerSec) {
+    if (!(speedTilesPerSec > 0)) return 0;
+    var key = col + ',' + row + ',' + rangeTiles + ',' + speedTilesPerSec;
+    if (exposureCache[key] !== undefined) return exposureCache[key];
+    var c = tileCenter(col, row);
+    var rp = rangeTiles * TILE;
+    var rp2 = rp * rp;
+    var inPx = 0;
+    for (var d = 0; d <= PATH_LEN; d += SAMPLE_STEP) {
+      var p = pathPointAt(d);
+      var dx = p.x - c.x, dy = p.y - c.y;
+      if (dx * dx + dy * dy <= rp2) inPx += SAMPLE_STEP;
+    }
+    var val = (inPx / TILE) / speedTilesPerSec;
+    exposureCache[key] = val;
+    return val;
+  }
+
+  /* Damage per second against an enemy with `armor`:
+   *   rate x max(1, damage - armor)      (flat reduction, floor of 1). */
+  function towerDps(type, level, armor) {
+    var dmg = towerDmg(type, level);
+    var rate = towerRate(type, level);
+    var a = armor || 0;
+    return rate * Math.max(1, dmg - a);
+  }
+
+  /* Maximum gold a player can have at the START of wave w, assuming perfect
+   * play: the starting purse, every inter-wave clear bonus up to w-1, and every
+   * kill in those waves. */
+  function goldAvailableByWave(w) {
+    var g = START_GOLD;
+    for (var k = 1; k < w; k++) {
+      g += 40 + 8 * k;      // clear bonus for wave k
+      g += waveKillGold(k); // every kill in wave k pays out
+    }
+    return g;
+  }
+
+  /* Optimistic total damage the affordable towers can deal across the whole
+   * wave: greedily buy the most damage-per-gold tower (level 1) on the best
+   * buildable slots, then sum exposure x dps over every (tower, enemy) pair.
+   * Every enemy is assumed to pass every tower for its full exposure time, so
+   * this is a strict upper bound on real damage - exactly what a feasibility
+   * check wants. */
+  function bestKillBudget(w) {
+    var types = expandWaveTypes(w);
+    if (!types.length) return 0;
+    var gold = goldAvailableByWave(w);
+    var slots = buildableSlots();
+    var cands = [];
+    for (var si = 0; si < slots.length; si++) {
+      var s = slots[si];
+      for (var ti = 0; ti < TOWER_ORDER.length; ti++) {
+        var type = TOWER_ORDER[ti];
+        var spec = TOWER_SPEC[type];
+        var dmg = 0;
+        for (var ei = 0; ei < types.length; ei++) {
+          var e = ENEMY_SPEC[types[ei]];
+          dmg += exposureSeconds(s.col, s.row, spec.range, e.speed) * towerDps(type, 1, e.armor);
+        }
+        cands.push({ col: s.col, row: s.row, type: type, cost: spec.cost, dmg: dmg, eff: dmg / spec.cost });
+      }
+    }
+    cands.sort(function (a, b) {
+      if (b.eff !== a.eff) return b.eff - a.eff;
+      if (a.row !== b.row) return a.row - b.row;
+      if (a.col !== b.col) return a.col - b.col;
+      return a.type < b.type ? -1 : (a.type > b.type ? 1 : 0);
+    });
+    var used = {}, total = 0, spent = 0;
+    for (var i = 0; i < cands.length; i++) {
+      var c = cands[i];
+      var key = c.col + ',' + c.row;
+      if (used[key]) continue;
+      if (spent + c.cost > gold) continue;
+      used[key] = 1; spent += c.cost; total += c.dmg;
+    }
+    return total;
+  }
+
+  /* > 1 means "not impossible": the affordable damage exceeds the (armour
+   * weighted) HP pool of the wave. The READMEs assert >= 1.5 for every wave. */
+  function waveFeasibilityRatio(w) {
+    var demand = waveArmorWeightedHp(w);
+    if (demand <= 0) return 0;
+    return bestKillBudget(w) / demand;
+  }
+
+  /* ======================================================================
+   * 7. Game state (all mutation happens through the functions below)
+   * ==================================================================== */
+
+  var STORE_KEY = 'litegame_towerdefense_best';
+
+  var phase = 'ready';        // ready | playing | paused | win | lose
+  var waveIdx = 1;            // current wave (1..WAVE_COUNT)
+  var waveActive = false;     // is waveIdx spawning / on the field?
+  var waveClock = 0;          // s since the current wave started
+  var intermission = 0;       // s until the next wave auto-starts
+  var gold = START_GOLD;
+  var lives = START_LIVES;
+  var score = 0;
+  var speedMultiplier = 1;    // 1 or 2
+  var seed = 1;
+  var ticks = 0;
+
+  var towers = [];            // { col, row, type, level, invested, cd }
+  var enemies = [];           // live enemies only
+  var spawnQueue = [];        // [{ t, type }] sorted ascending
+  var spawnPtr = 0;           // index of the next spawn
+  var fx = [];                // cosmetic bursts { x, y, color, t, life }
+
+  var selectedType = null;    // chosen tower type, or null
+  var selectedTile = null;    // { col, row } last clicked, or null
+
+  var running = true;
+  var lastT = 0;
+  var clock = 0;              // model clock (s)
+
+  function bestLoad() {
+    try {
+      var v = localStorage.getItem(STORE_KEY);
+      var n = v === null ? 0 : parseInt(v, 10);
+      return isNaN(n) ? 0 : n;
+    } catch (e) { return 0; }
+  }
+  var best = bestLoad();
+
+  function bestSave() {
+    try {
+      if (score > best) { best = score; localStorage.setItem(STORE_KEY, String(best)); }
+    } catch (e) { /* storage unavailable - keep running */ }
+  }
+
+  /* ======================================================================
+   * 8. Lifecycle: newGame / start / pause / phases
+   * ==================================================================== */
+
+  function spawnCount() { return spawnQueue.length - spawnPtr; }
+
+  function countAliveOfWave(w) {
+    var n = 0;
+    for (var i = 0; i < enemies.length; i++) if (enemies[i].waveTag === w) n++;
+    return n;
+  }
+
+  function pendingCount() {
+    if (!waveActive || waveIdx > WAVE_COUNT) return 0;
+    return Math.max(0, spawnCount()) + countAliveOfWave(waveIdx);
+  }
+
+  function newGame(opts) {
+    opts = opts || {};
+    seed = (opts.seed === undefined || opts.seed === null) ? 1 : (opts.seed | 0);
+    if (seed === 0) seed = 1;
+    var w = opts.wave === undefined ? 1 : (opts.wave | 0);
+    if (w < 1 || w > WAVE_COUNT) w = 1;
+    waveIdx = w;
+    gold = w > 1 ? goldAvailableByWave(w) : START_GOLD;
+    lives = START_LIVES;
+    score = 0;
+    speedMultiplier = 1;
+    ticks = 0;
+    clock = 0;
+    towers = [];
+    enemies = [];
+    spawnQueue = [];
+    spawnPtr = 0;
+    fx = [];
+    waveActive = false;
+    waveClock = 0;
+    intermission = 0;
+    selectedType = null;
+    selectedTile = null;
+    phase = 'ready';
+    resetHudCache();
+    updateHud();
+    return getState();
+  }
+
+  function beginPlay() {
+    phase = 'playing';
+    startWave();
+    updateHud();
+  }
+
+  function start() { return beginPlay(); }
+
+  function togglePause() {
+    if (phase === 'playing') { phase = 'paused'; updateHud(); }
+    else if (phase === 'paused') { phase = 'playing'; updateHud(); }
+    return getState();
+  }
+
+  function proceed() {
+    if (phase === 'ready') beginPlay();
+    else if (phase === 'paused') togglePause();
+    else if (phase === 'win' || phase === 'lose') { newGame({ seed: seed, wave: 1 }); beginPlay(); }
+  }
+
+  function win() { phase = 'win'; bestSave(); updateHud(); }
+
+  function lose() { phase = 'lose'; bestSave(); updateHud(); }
+
+  /* ======================================================================
+   * 9. Waves: schedule, spawn, complete
+   * ==================================================================== */
+
+  function buildSpawnQueue(w) {
+    var wave = WAVES[w - 1];
+    var list = [];
+    if (!wave) return list;
+    var seq = 0;
+    for (var gi = 0; gi < wave.groups.length; gi++) {
+      var g = wave.groups[gi];
+      for (var i = 0; i < g.count; i++) {
+        list.push({ t: g.delaySec + i * g.gapSec, type: g.type, seq: seq++ });
+      }
+    }
+    list.sort(function (a, b) { return (a.t - b.t) || (a.seq - b.seq); });
+    return list;
+  }
+
+  function startWave() {
+    if (waveIdx > WAVE_COUNT) return;
+    spawnQueue = buildSpawnQueue(waveIdx);
+    spawnPtr = 0;
+    waveActive = true;
+    waveClock = 0;
+    intermission = 0;
+  }
+
+  function spawnEnemy(type) {
+    var spec = ENEMY_SPEC[type];
+    if (!spec) return;
+    var p = pathPointAt(0);
+    enemies.push({
+      type: type,
+      hp: spec.hp,
+      maxHp: spec.hp,
+      speed: spec.speed,
+      armor: spec.armor,
+      goldValue: spec.gold,
+      radius: spec.radius,
+      pathDist: 0,
+      x: p.x, y: p.y,
+      slowT: 0,
+      alive: true,
+      waveTag: waveIdx
+    });
+  }
+
+  function finishWave(early) {
+    var bonus = 40 + 8 * waveIdx;
+    gold += bonus;
+    score += bonus;
+    waveActive = false;
+    spawnQueue = [];
+    spawnPtr = 0;
+    waveIdx++;
+    if (waveIdx > WAVE_COUNT) { win(); return; }
+    if (early) startWave();
+    else intermission = NEXT_WAVE_DELAY;
+    updateHud();
+  }
+
+  /* Call the next wave. If none is running it starts the current one; if a wave
+   * IS running the player is cashing it in early - the clear bonus is settled
+   * and the next wave begins at once (any stragglers keep walking). */
+  function callNextWave() {
+    if (phase === 'ready') { beginPlay(); return getState(); }
+    if (phase !== 'playing') return getState();
+    if (!waveActive) {
+      if (waveIdx <= WAVE_COUNT) startWave();
+    } else {
+      finishWave(true);
+    }
+    updateHud();
+    return getState();
+  }
+
+  /* ======================================================================
+   * 10. Combat: enemies, towers, damage
+   * ==================================================================== */
+
+  function addBurst(x, y, color) {
+    fx.push({ x: x, y: y, color: color, t: 0, life: 0.35 });
+  }
+
+  function updateEffects(dt) {
+    for (var i = fx.length - 1; i >= 0; i--) {
+      fx[i].t += dt;
+      if (fx[i].t >= fx[i].life) fx.splice(i, 1);
+    }
+  }
+
+  function dealDamage(e, base) {
+    if (!e.alive) return;
+    var actual = Math.max(1, base - e.armor);
+    e.hp -= actual;
+    if (e.hp <= 0) {
+      e.alive = false;
+      gold += e.goldValue;
+      score += e.goldValue;
+      addBurst(e.x, e.y, ENEMY_SPEC[e.type].color);
+    }
+  }
+
+  function leakEnemy(e) {
+    e.alive = false;
+    lives -= 1;
+    addBurst(e.x, e.y, '#ff6b6b');
+    if (lives <= 0) { lives = 0; lose(); }
+  }
+
+  function updateEnemies(dt) {
+    var total = PATH_LEN;
+    for (var i = 0; i < enemies.length; i++) {
+      var e = enemies[i];
+      if (!e.alive) continue;
+      var sp = e.speed * TILE;                 // px/s
+      if (e.slowT > 0) {
+        e.slowT -= dt;
+        sp *= (1 - TOWER_SPEC.frost.slowPct);  // frost does not stack; take the strongest
+      }
+      e.pathDist += sp * dt;
+      var p = pathPointAt(e.pathDist);
+      e.x = p.x; e.y = p.y;
+      if (e.pathDist >= total) leakEnemy(e);
+    }
+  }
+
+  function enemyInRange(tx, ty, rangePx, e) {
+    var dx = e.x - tx, dy = e.y - ty;
+    return dx * dx + dy * dy <= rangePx * rangePx;
+  }
+
+  function acquireTarget(tower) {
+    var rangePx = towerRange(tower.type, tower.level) * TILE;
+    var c = tileCenter(tower.col, tower.row);
+    var best = null, bestDist = -1;
+    for (var i = 0; i < enemies.length; i++) {
+      var e = enemies[i];
+      if (!e.alive) continue;
+      if (enemyInRange(c.x, c.y, rangePx, e) && e.pathDist > bestDist) {
+        best = e; bestDist = e.pathDist;      // furthest along the path first
+      }
+    }
+    return best;
+  }
+
+  function fireTower(tower, target) {
+    var spec = TOWER_SPEC[tower.type];
+    var dmg = towerDmg(tower.type, tower.level);
+    if (spec.kind === 'splash') {
+      var radiusPx = spec.splash * TILE;
+      var tx = target.x, ty = target.y;
+      for (var i = 0; i < enemies.length; i++) {
+        var e = enemies[i];
+        if (!e.alive) continue;
+        if (enemyInRange(tx, ty, radiusPx, e)) dealDamage(e, dmg);
+      }
+    } else {
+      dealDamage(target, dmg);
+      if (spec.kind === 'slow') {
+        target.slowT = Math.max(target.slowT, spec.slowTime);
+      }
+    }
+    tower.cd = 1 / towerRate(tower.type, tower.level);
+  }
+
+  function updateTowers(dt) {
+    for (var i = 0; i < towers.length; i++) {
+      var t = towers[i];
+      t.cd = Math.max(0, t.cd - dt);
+      if (t.cd > 0) continue;
+      var target = acquireTarget(t);
+      if (target) fireTower(t, target);
+    }
+  }
+
+  function cleanupEnemies() {
+    var out = [];
+    for (var i = 0; i < enemies.length; i++) if (enemies[i].alive) out.push(enemies[i]);
+    enemies = out;
+  }
+
+  /* ======================================================================
+   * 11. The one update() the whole model runs through
+   * ==================================================================== */
+
+  function update(dt) {
+    clock += dt;
+    updateEffects(dt);
+    if (phase !== 'playing') return;
+
+    if (!waveActive) {
+      if (waveIdx <= WAVE_COUNT && intermission > 0) {
+        intermission -= dt;
+        if (intermission <= 0) { intermission = 0; startWave(); }
+      }
+    }
+    if (waveActive) {
+      waveClock += dt;
+      while (spawnPtr < spawnQueue.length && spawnQueue[spawnPtr].t <= waveClock) {
+        spawnEnemy(spawnQueue[spawnPtr].type);
+        spawnPtr++;
+      }
+    }
+    updateEnemies(dt);
+    updateTowers(dt);
+    cleanupEnemies();
+
+    if (phase === 'playing' && waveActive && spawnPtr >= spawnQueue.length && countAliveOfWave(waveIdx) === 0) {
+      finishWave(false);
+    }
+  }
+
+  /* Deterministic advance used by the test bridge: no rAF, no wall clock.
+   * `seconds` is REAL seconds; the current speed multiplier scales the game
+   * time advanced. Afterwards the DOM HUD is refreshed once. */
+  function tick(seconds, step) {
+    var real = (typeof seconds === 'number' && isFinite(seconds)) ? seconds : 0;
+    var total = real * speedMultiplier;
+    var s = (typeof step === 'number' && step > 0) ? step : DEFAULT_STEP;
+    var n = Math.max(1, Math.round(total / s));
+    var d = total / n;
+    for (var i = 0; i < n; i++) { ticks++; update(d); }
+    updateHud();
+    return getState();
+  }
+
+  /* ======================================================================
+   * 12. Building: place / upgrade / sell, selection, tile clicks
+   * ==================================================================== */
+
+  function towerRef(col, row) {
+    for (var i = 0; i < towers.length; i++) {
+      if (towers[i].col === col && towers[i].row === row) return towers[i];
+    }
+    return null;
+  }
+
+  function towerAt(col, row) {
+    var t = towerRef(col, row);
+    return t ? { col: t.col, row: t.row, type: t.type, level: t.level } : null;
+  }
+
+  function placeTower(col, row, type) {
+    if (phase !== 'playing') return null;
+    type = type || selectedType;
+    if (!type || !TOWER_SPEC[type]) return null;
+    if (!buildable(col, row)) return null;
+    if (towerRef(col, row)) return null;
+    var cost = towerCost(type, 1);
+    if (gold < cost) return null;
+    gold -= cost;
+    towers.push({ col: col, row: row, type: type, level: 1, invested: cost, cd: 0 });
+    updateHud();
+    return towerAt(col, row);
+  }
+
+  function upgradeTower(col, row) {
+    if (phase !== 'playing') return null;
+    var t = towerRef(col, row);
+    if (!t || t.level >= 3) return null;
+    var cost = upgradeCost(t.type, t.level);
+    if (gold < cost) return null;
+    gold -= cost;
+    t.invested += cost;
+    t.level += 1;
+    updateHud();
+    return towerAt(col, row);
+  }
+
+  function sellTower(col, row) {
+    if (phase !== 'playing') return null;
+    var t = towerRef(col, row);
+    if (!t) return null;
+    var refund = Math.floor(t.invested * SELL_RATE);
+    gold += refund;
+    towers = towers.filter(function (x) { return x !== t; });
+    updateHud();
+    return { col: col, row: row, refund: refund };
+  }
+
+  function selectTowerType(type) {
+    if (type === null || type === undefined) selectedType = null;
+    else if (TOWER_SPEC[type]) selectedType = type;
+    /* Convenience: if a buildable, empty tile is already selected, build now. */
+    if (selectedType && selectedTile &&
+        buildable(selectedTile.col, selectedTile.row) &&
+        !towerRef(selectedTile.col, selectedTile.row)) {
+      placeTower(selectedTile.col, selectedTile.row, selectedType);
+    }
+    updateHud();
+    return getState();
+  }
+
+  function handleTileClick(col, row) {
+    if (phase === 'ready') { return; }
+    selectedTile = { col: col, row: row };
+    if (!towerRef(col, row) && buildable(col, row) && selectedType && phase === 'playing') {
+      placeTower(col, row, selectedType);
+    }
+    updateHud();
+  }
+
+  function setSpeed(x) {
+    speedMultiplier = (x === 2) ? 2 : 1;
+    updateHud();
+    return getState();
+  }
+
+  function toggleSpeed() { return setSpeed(speedMultiplier === 1 ? 2 : 1); }
+
+  function loadWave(n) {
+    newGame({ seed: seed, wave: n });
+    phase = 'playing';
+    startWave();
+    updateHud();
+    return getState();
+  }
+
+  /* ======================================================================
+   * 13. State snapshot + queries
+   * ==================================================================== */
+
+  function enemySnapshot(e) {
+    return {
+      type: e.type, hp: e.hp, maxHp: e.maxHp,
+      x: e.x, y: e.y, pathDist: e.pathDist,
+      slowT: e.slowT, alive: !!e.alive,
+      col: Math.floor(e.x / TILE), row: Math.floor(e.y / TILE)
+    };
+  }
+
+  function getState() {
+    return {
+      phase: phase,
+      wave: waveIdx,
+      lives: lives,
+      gold: gold,
+      score: score,
+      speed: speedMultiplier,
+      towers: towers.map(function (t) { return { col: t.col, row: t.row, type: t.type, level: t.level }; }),
+      enemies: enemies.map(enemySnapshot),
+      pendingCount: pendingCount(),
+      seed: seed,
+      ticks: ticks,
+      selectedType: selectedType,
+      best: best,
+      waveActive: waveActive,
+      intermission: intermission,
+      selected: selectedTile ? { col: selectedTile.col, row: selectedTile.row } : null,
+      waveClock: waveClock
+    };
+  }
+
+  function waveState() {
+    return {
+      wave: waveIdx,
+      active: waveActive,
+      intermission: intermission,
+      pending: pendingCount(),
+      spawned: spawnPtr,
+      total: spawnQueue.length,
+      clock: waveClock,
+      count: WAVE_COUNT
+    };
+  }
+
+  /* ======================================================================
+   * 14. HUD / overlays - value-cached, refreshed from updateHud() ONLY.
+   *
+   * Every write to a HUD node lives inside updateHud(); event handlers only
+   * mutate state and call updateHud(). resetHudCache() forces a rewrite (used
+   * on language change and on newGame).
+   * ==================================================================== */
+
+  var hudCache = {
+    score: null, lives: null, gold: null, wave: null, speed: null, info: null,
+    sel: null, tGun: null, tCannon: null, tFrost: null,
+    sGun: null, sCannon: null, sFrost: null,
+    callLbl: null, callDis: null, upTxt: null, upDis: null,
+    sellTxt: null, sellDis: null, pauseTxt: null, pauseDis: null,
+    spBtn: null, newTxt: null, showStart: null, showRes: null,
+    ovTitle: null, ovSub: null, ovBtn: null
+  };
+
+  function resetHudCache() {
+    for (var k in hudCache) if (Object.prototype.hasOwnProperty.call(hudCache, k)) hudCache[k] = null;
+  }
+
+  function updateHud() {
+    var c = hudCache;
+
+    if (c.score !== score) { scoreEl.textContent = String(score); c.score = score; }
+    if (c.lives !== lives) { livesEl.textContent = String(lives); c.lives = lives; }
+    if (c.gold !== gold) { goldEl.textContent = String(gold); c.gold = gold; }
+    var waveTxt = waveIdx + '/' + WAVE_COUNT;
+    if (c.wave !== waveTxt) { waveEl.textContent = waveTxt; c.wave = waveTxt; }
+    var speedTxt = speedMultiplier + '\u00d7';
+    if (c.speed !== speedTxt) { speedEl.textContent = speedTxt; c.speed = speedTxt; }
+
+    var info;
+    if (phase === 'ready') info = T.t('readyInfo');
+    else if (waveActive) info = T.t('waveActive', { n: pendingCount() });
+    else if (waveIdx > WAVE_COUNT) info = T.t('allDone');
+    else info = T.t('nextIn', { n: Math.ceil(Math.max(0, intermission)) });
+    if (c.info !== info) { nextInfoEl.textContent = info; c.info = info; }
+
+    /* Tower pick buttons: label carries the cost, highlight carries selection. */
+    var labels = {
+      gun: T.t('tower_gun') + ' ' + TOWER_SPEC.gun.cost,
+      cannon: T.t('tower_cannon') + ' ' + TOWER_SPEC.cannon.cost,
+      frost: T.t('tower_frost') + ' ' + TOWER_SPEC.frost.cost
+    };
+    var tKeys = { gun: 'tGun', cannon: 'tCannon', frost: 'tFrost' };
+    var sKeys = { gun: 'sGun', cannon: 'sCannon', frost: 'sFrost' };
+    for (var ti = 0; ti < TOWER_ORDER.length; ti++) {
+      var ty = TOWER_ORDER[ti];
+      var el = towerBtns[ty];
+      if (c[tKeys[ty]] !== labels[ty]) { el.textContent = labels[ty]; c[tKeys[ty]] = labels[ty]; }
+      var isSel = (selectedType === ty);
+      if (c[sKeys[ty]] !== isSel) {
+        if (isSel) el.classList.add('sel'); else el.classList.remove('sel');
+        c[sKeys[ty]] = isSel;
+      }
+    }
+
+    var callLbl = T.t('callWave');
+    if (c.callLbl !== callLbl) { btnCall.textContent = callLbl; c.callLbl = callLbl; }
+    var callDis = !(phase === 'playing' && waveIdx <= WAVE_COUNT);
+    if (c.callDis !== callDis) { btnCall.disabled = callDis; c.callDis = callDis; }
+
+    var pauseTxt = (phase === 'paused') ? T.t('resume') : T.t('pause');
+    if (c.pauseTxt !== pauseTxt) { btnPause.textContent = pauseTxt; c.pauseTxt = pauseTxt; }
+    var pauseDis = !(phase === 'playing' || phase === 'paused');
+    if (c.pauseDis !== pauseDis) { btnPause.disabled = pauseDis; c.pauseDis = pauseDis; }
+
+    var spBtn = speedMultiplier + '\u00d7';
+    if (c.spBtn !== spBtn) { btnSpeed.textContent = spBtn; c.spBtn = spBtn; }
+    var newTxt = T.t('newgame');
+    if (c.newTxt !== newTxt) { btnNew.textContent = newTxt; c.newTxt = newTxt; }
+
+    /* Upgrade / sell reflect the selected tower (or stay disabled). */
+    var selT = selectedTile ? towerRef(selectedTile.col, selectedTile.row) : null;
+    var upTxt, upDis, sellTxt, sellDis;
+    if (selT) {
+      if (selT.level >= 3) { upTxt = T.t('maxLevel'); upDis = true; }
+      else {
+        var uc = upgradeCost(selT.type, selT.level);
+        upTxt = T.t('upgrade') + ' ' + uc;
+        upDis = (gold < uc);
+      }
+      sellTxt = T.t('sell') + ' ' + Math.floor(selT.invested * SELL_RATE);
+      sellDis = false;
+    } else {
+      upTxt = T.t('upgrade'); upDis = true;
+      sellTxt = T.t('sell'); sellDis = true;
+    }
+    if (c.upTxt !== upTxt) { btnUpgrade.textContent = upTxt; c.upTxt = upTxt; }
+    if (c.upDis !== upDis) { btnUpgrade.disabled = upDis; c.upDis = upDis; }
+    if (c.sellTxt !== sellTxt) { btnSell.textContent = sellTxt; c.sellTxt = sellTxt; }
+    if (c.sellDis !== sellDis) { btnSell.disabled = sellDis; c.sellDis = sellDis; }
+
+    /* Selection hint line. */
+    var selText;
+    if (!selectedTile) selText = T.t('selNone');
+    else if (selT) {
+      selText = T.t('selTower', {
+        t: T.t('tower_' + selT.type), l: selT.level,
+        d: towerDmg(selT.type, selT.level), rg: towerRange(selT.type, selT.level),
+        rt: towerRate(selT.type, selT.level)
+      });
+    } else if (!buildable(selectedTile.col, selectedTile.row)) selText = T.t('selBlocked');
+    else if (selectedType) {
+      var gcost = towerCost(selectedType, 1);
+      selText = (gold >= gcost)
+        ? T.t('selBuild', { t: T.t('tower_' + selectedType), g: gcost })
+        : T.t('selNoGold', { t: T.t('tower_' + selectedType), g: gcost });
+    } else {
+      selText = T.t('selPick', { c: selectedTile.col, r: selectedTile.row });
+    }
+    if (c.sel !== selText) { selInfoEl.textContent = selText; c.sel = selText; }
+
+    /* Overlays are driven purely by phase. */
+    var showStart = (phase === 'ready');
+    if (c.showStart !== showStart) {
+      if (showStart) startEl.classList.add('show'); else startEl.classList.remove('show');
+      c.showStart = showStart;
+    }
+    var showRes = (phase === 'win' || phase === 'lose');
+    if (c.showRes !== showRes) {
+      if (showRes) resEl.classList.add('show'); else resEl.classList.remove('show');
+      c.showRes = showRes;
+    }
+    if (showRes) {
+      var title = (phase === 'win') ? T.t('winTitle') : T.t('loseTitle');
+      var sub = (phase === 'win')
+        ? T.t('winSub', { n: score })
+        : T.t('loseSub', { n: waveIdx, m: score });
+      var obtn = T.t('again');
+      if (c.ovTitle !== title) { ovTitleEl.textContent = title; c.ovTitle = title; }
+      if (c.ovSub !== sub) { ovSubEl.textContent = sub; c.ovSub = sub; }
+      if (c.ovBtn !== obtn) { ovBtnEl.textContent = obtn; c.ovBtn = obtn; }
+    }
+  }
+
+  /* ======================================================================
+   * 15. Rendering (canvas only - nothing here touches a DOM node)
+   * ==================================================================== */
+
+  var TOWER_COLOR = { gun: '#ffd58a', cannon: '#ff8f6b', frost: '#8fe3ff' };
+
+  function draw() {
+    ctx.clearRect(0, 0, WIDTH, HEIGHT);
+    ctx.fillStyle = '#0a0f22';
+    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+    /* Base grid: path / blocker / open floor. */
+    for (var r = 0; r < ROWS; r++) {
+      for (var c = 0; c < COLS; c++) {
+        if (isOnPath(c, r)) ctx.fillStyle = '#243057';
+        else if (isBlocked(c, r)) ctx.fillStyle = '#161c33';
+        else ctx.fillStyle = '#0e1430';
+        ctx.fillRect(c * TILE, r * TILE, TILE, TILE);
+      }
+    }
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+    ctx.lineWidth = 1;
+    for (var gx = 0; gx <= COLS; gx++) {
+      ctx.beginPath(); ctx.moveTo(gx * TILE, 0); ctx.lineTo(gx * TILE, HEIGHT); ctx.stroke();
+    }
+    for (var gy = 0; gy <= ROWS; gy++) {
+      ctx.beginPath(); ctx.moveTo(0, gy * TILE); ctx.lineTo(WIDTH, gy * TILE); ctx.stroke();
+    }
+
+    /* The enemy path as a fat polyline. */
+    ctx.strokeStyle = '#4a5aa0';
+    ctx.lineWidth = TILE * 0.72;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    var p0 = tileCenter(PATH[0][0], PATH[0][1]);
+    ctx.moveTo(p0.x, p0.y);
+    for (var i = 1; i < PATH.length; i++) {
+      var p = tileCenter(PATH[i][0], PATH[i][1]);
+      ctx.lineTo(p.x, p.y);
+    }
+    ctx.stroke();
+
+    /* Range preview for the selected tile. */
+    if (selectedTile) {
+      var st = towerRef(selectedTile.col, selectedTile.row);
+      var rt = st ? towerRange(st.type, st.level)
+                  : (selectedType ? towerRange(selectedType, 1) : 0);
+      if (rt > 0 && (st || (selectedType && buildable(selectedTile.col, selectedTile.row)))) {
+        var cc = tileCenter(selectedTile.col, selectedTile.row);
+        ctx.beginPath();
+        ctx.arc(cc.x, cc.y, rt * TILE, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(150,205,255,0.55)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 5]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+
+    /* Towers. */
+    for (var ti = 0; ti < towers.length; ti++) {
+      var t = towers[ti];
+      var cx = t.col * TILE + TILE / 2, cy = t.row * TILE + TILE / 2;
+      ctx.fillStyle = TOWER_COLOR[t.type] || '#cfd6ea';
+      ctx.beginPath(); ctx.arc(cx, cy, TILE * 0.34, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#0a0f22';
+      ctx.beginPath(); ctx.arc(cx, cy, TILE * 0.15, 0, Math.PI * 2); ctx.fill();
+      for (var li = 0; li < t.level; li++) {
+        ctx.beginPath();
+        ctx.arc(cx - 5 + li * 5, cy + TILE * 0.42, 2.1, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    /* Enemies + health bars. */
+    for (var ei = 0; ei < enemies.length; ei++) {
+      var e = enemies[ei];
+      var spec = ENEMY_SPEC[e.type];
+      ctx.fillStyle = spec.color;
+      ctx.beginPath(); ctx.arc(e.x, e.y, e.radius, 0, Math.PI * 2); ctx.fill();
+      if (e.slowT > 0) {
+        ctx.strokeStyle = '#bfe9ff';
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(e.x, e.y, e.radius + 2, 0, Math.PI * 2); ctx.stroke();
+      }
+      var w = 22, h = 4, hx = e.x - w / 2, hy = e.y - e.radius - 8;
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.fillRect(hx, hy, w, h);
+      ctx.fillStyle = '#8ef0a0';
+      ctx.fillRect(hx, hy, w * Math.max(0, e.hp / e.maxHp), h);
+    }
+
+    /* Cosmetic hit bursts. */
+    for (var fi = 0; fi < fx.length; fi++) {
+      var f = fx[fi];
+      var k = f.t / f.life;
+      ctx.globalAlpha = 1 - k;
+      ctx.strokeStyle = f.color;
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(f.x, f.y, 4 + k * 16, 0, Math.PI * 2); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+
+    if (phase === 'paused') {
+      ctx.fillStyle = 'rgba(7,11,28,0.55)';
+      ctx.fillRect(0, 0, WIDTH, HEIGHT);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 28px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(T.t('pause'), WIDTH / 2, HEIGHT / 2);
+    }
+  }
+
+  /* ======================================================================
+   * 16. Input
+   * ==================================================================== */
+
+  /* Mouse / touch -> canvas coordinates. Prefers the getBoundingClientRect()
+   * + clientX/clientY path, and falls back to offsetX/offsetY when the rect is
+   * degenerate (width 0, e.g. a headless stub) or the event has no client
+   * coordinates. Non-finite results are ignored. */
+  function evToCanvas(ev) {
+    var x = NaN, y = NaN;
+    var rect = (cv && cv.getBoundingClientRect) ? cv.getBoundingClientRect() : null;
+    if (rect && rect.width > 0 && ev && ev.clientX !== undefined && ev.clientY !== undefined) {
+      x = (ev.clientX - rect.left) * (WIDTH / rect.width);
+      y = (ev.clientY - rect.top) * (HEIGHT / rect.height);
+    }
+    if (!isFinite(x) || !isFinite(y)) {
+      if (ev && typeof ev.offsetX === 'number' && typeof ev.offsetY === 'number') {
+        x = ev.offsetX; y = ev.offsetY;
+      }
+    }
+    if (!isFinite(x) || !isFinite(y)) return null;
+    return { x: x, y: y };
+  }
+
+  function onCanvasClick(ev) {
+    if (ev && ev.preventDefault) ev.preventDefault();
+    var pt = evToCanvas(ev);
+    if (!pt) return;
+    var t = tileAtPoint(pt.x, pt.y);
+    handleTileClick(t.col, t.row);
+  }
+  cv.addEventListener('click', onCanvasClick);
+
+  btnGun.addEventListener('click', function () { selectTowerType('gun'); });
+  btnCannon.addEventListener('click', function () { selectTowerType('cannon'); });
+  btnFrost.addEventListener('click', function () { selectTowerType('frost'); });
+  btnCall.addEventListener('click', function () { callNextWave(); });
+  btnPause.addEventListener('click', function () { togglePause(); });
+  btnSpeed.addEventListener('click', function () { toggleSpeed(); });
+  btnNew.addEventListener('click', function () { newGame({ seed: seed, wave: 1 }); beginPlay(); });
+  btnUpgrade.addEventListener('click', function () {
+    if (selectedTile) upgradeTower(selectedTile.col, selectedTile.row);
+  });
+  btnSell.addEventListener('click', function () {
+    if (selectedTile) sellTower(selectedTile.col, selectedTile.row);
+  });
+  btnStart.addEventListener('click', function () { beginPlay(); });
+  ovBtnEl.addEventListener('click', function () { newGame({ seed: seed, wave: 1 }); beginPlay(); });
+
+  function onKeyDown(ev) {
+    var k = ev.key;
+    if (k === ' ' || k === 'Spacebar') {
+      if (ev.preventDefault) ev.preventDefault();
+      if (phase === 'ready') beginPlay(); else callNextWave();
+      return;
+    }
+    if (k === '1') { selectTowerType('gun'); return; }
+    if (k === '2') { selectTowerType('cannon'); return; }
+    if (k === '3') { selectTowerType('frost'); return; }
+    if (k === 'p' || k === 'P') { togglePause(); return; }
+    if (k === 'r' || k === 'R') { newGame({ seed: seed, wave: 1 }); beginPlay(); return; }
+    if (k === 'Enter') { proceed(); return; }
+    if (k === 'Escape') { selectedType = null; updateHud(); return; }
+    if (k === 'u' || k === 'U') {
+      if (selectedTile) upgradeTower(selectedTile.col, selectedTile.row);
+      return;
+    }
+    if (k === 's' || k === 'S') {
+      if (selectedTile) sellTower(selectedTile.col, selectedTile.row);
+    }
+  }
+  document.addEventListener('keydown', onKeyDown);
+
+  /* ======================================================================
+   * 17. rAF loop (delta-accumulating clock - no browser timer APIs are used)
+   * ==================================================================== */
+
+  function nowMs() {
+    if (typeof performance !== 'undefined' && performance && performance.now) return performance.now();
+    return Date.now();
+  }
+
+  function loop() {
+    if (!running) return;
+    var t = nowMs();
+    var dt = lastT ? (t - lastT) / 1000 : FIXED;
+    lastT = t;
+    if (!isFinite(dt) || dt <= 0) dt = FIXED;
+    if (dt > 0.05) dt = 0.05;                 // clamp big hitches / tab restores
+    update(dt * speedMultiplier);
+    updateHud();                              // refresh the DOM HUD every frame (value-cached)
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  /* ======================================================================
+   * 18. Test bridge (window.TD) + boot
+   * ==================================================================== */
+
+  window.TD = {
+    /* constants */
+    TILE: TILE, COLS: COLS, ROWS: ROWS, WIDTH: WIDTH, HEIGHT: HEIGHT,
+    START_GOLD: START_GOLD, START_LIVES: START_LIVES,
+    WAVE_COUNT: WAVE_COUNT, SELL_RATE: SELL_RATE,
+    SAMPLE_STEP: SAMPLE_STEP, NEXT_WAVE_DELAY: NEXT_WAVE_DELAY,
+
+    /* pure data tables */
+    towers: function () {
+      return TOWER_ORDER.map(function (type) {
+        var s = TOWER_SPEC[type];
+        var entry = {
+          type: type, kind: s.kind,
+          levels: s.levels.map(function (lv) {
+            return { level: lv.level, cost: lv.cost, dmg: lv.dmg, rate: lv.rate, range: lv.range };
+          })
+        };
+        if (s.kind === 'splash') entry.splash = s.splash;
+        if (s.kind === 'slow') { entry.slowPct = s.slowPct; entry.slowTime = s.slowTime; }
+        return entry;
+      });
+    },
+    towerSpec: function (type) {
+      var s = TOWER_SPEC[type];
+      if (!s) return null;
+      return {
+        type: type, kind: s.kind,
+        splash: s.splash, slowPct: s.slowPct, slowTime: s.slowTime,
+        levels: s.levels.map(function (lv) {
+          return { level: lv.level, cost: lv.cost, dmg: lv.dmg, rate: lv.rate, range: lv.range };
+        })
+      };
+    },
+    enemies: function () {
+      return ENEMY_ORDER.map(function (type) {
+        var e = ENEMY_SPEC[type];
+        return { type: type, hp: e.hp, speed: e.speed, armor: e.armor, gold: e.gold };
+      });
+    },
+    waves: function () {
+      return WAVES.map(function (w, i) {
+        return {
+          wave: i + 1,
+          groups: w.groups.map(function (g) {
+            return { type: g.type, count: g.count, gapSec: g.gapSec, delaySec: g.delaySec };
+          }),
+          count: waveEnemyCount(i + 1),
+          hpTotal: waveHpTotal(i + 1),
+          armorWeightedHp: waveArmorWeightedHp(i + 1)
+        };
+      });
+    },
+    path: function () { return PATH.map(function (a) { return [a[0], a[1]]; }); },
+    blocked: function () { return BLOCKED.map(function (a) { return [a[0], a[1]]; }); },
+
+    /* pure geometry */
+    buildable: function (col, row) { return buildable(col | 0, row | 0); },
+    buildableSlots: function () {
+      return buildableSlots().map(function (s) { return { col: s.col, row: s.row }; });
+    },
+    isOnPath: function (col, row) { return isOnPath(col | 0, row | 0); },
+    pathLength: function () { return pathLength(); },
+    pathPointAt: function (d) { return pathPointAt(d || 0); },
+    tileAtPoint: function (px, py) { return tileAtPoint(px || 0, py || 0); },
+    pointOnPath: function (px, py) { return pointOnPath(px || 0, py || 0); },
+
+    /* pure balance math (no side effects, deterministic) */
+    exposureSeconds: function (col, row, rangeTiles, speed) {
+      return exposureSeconds(col | 0, row | 0, rangeTiles || 0, speed || 0);
+    },
+    towerDps: function (type, level, armor) { return towerDps(type, level | 0, armor || 0); },
+    goldAvailableByWave: function (w) { return goldAvailableByWave(w | 0); },
+    waveHpTotal: function (w) { return waveHpTotal(w | 0); },
+    waveArmorWeightedHp: function (w) { return waveArmorWeightedHp(w | 0); },
+    bestKillBudget: function (w) { return bestKillBudget(w | 0); },
+    waveFeasibilityRatio: function (w) { return waveFeasibilityRatio(w | 0); },
+
+    /* live queries */
+    towerAt: function (col, row) { return towerAt(col | 0, row | 0); },
+    builtTowers: function () {
+      return towers.map(function (t) { return { col: t.col, row: t.row, type: t.type, level: t.level }; });
+    },
+    towerList: function () {
+      return towers.map(function (t) { return { col: t.col, row: t.row, type: t.type, level: t.level }; });
+    },
+    enemyAt: function (i) {
+      i = i | 0;
+      if (i < 0 || i >= enemies.length) return null;
+      return enemySnapshot(enemies[i]);
+    },
+    enemyList: function () { return enemies.map(enemySnapshot); },
+    waveState: function () { return waveState(); },
+    gold: function () { return gold; },
+    lives: function () { return lives; },
+    hudCache: function () {
+      var out = {};
+      for (var k in hudCache) if (Object.prototype.hasOwnProperty.call(hudCache, k)) out[k] = hudCache[k];
+      return out;
+    },
+
+    /* lifecycle */
+    newGame: function (opts) { return newGame(opts); },
+    start: function () { return start(); },
+    pause: function () { return togglePause(); },
+    setSpeed: function (x) { return setSpeed(x); },
+    selectTowerType: function (t) { return selectTowerType(t); },
+    placeTower: function (col, row, type) { return placeTower(col | 0, row | 0, type); },
+    upgradeTower: function (col, row) { return upgradeTower(col | 0, row | 0); },
+    sellTower: function (col, row) { return sellTower(col | 0, row | 0); },
+    callNextWave: function () { return callNextWave(); },
+    tick: function (seconds, step) { return tick(seconds, step); },
+    getState: function () { return getState(); },
+    loadWave: function (n) { return loadWave(n | 0); }
+  };
+
+  /* Re-localise dynamic text (HUD, tower panel, overlays) on language change.
+   * Exactly ONE onChange callback is registered. */
+  T.onChange(function () {
+    resetHudCache();
+    updateHud();
+  });
+
+  newGame({ seed: 1, wave: 1 });
+  T.start();
+  requestAnimationFrame(loop);
+
+})();
+</script>
+</body>
+</html>
