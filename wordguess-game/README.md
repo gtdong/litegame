@@ -78,7 +78,7 @@ Group 11 **re-injects deliberate bugs** and requires the suite to notice. Each o
 It needs `jsdom`, which lives in an isolated directory so this repo stays dependency-free:
 
 ```
-NODE_PATH=/Users/dgt/.workbuddy/binaries/node/workspace/node_modules \
+NODE_PATH=<isolated-node-modules> \
   node tools/wordguess-dom.js
 ```
 

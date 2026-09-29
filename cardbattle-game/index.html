@@ -1,0 +1,1615 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title data-i18n="title"></title>
+<style>
+  :root {
+    --bg: #0b1020;
+    --panel: #131b31;
+    --panel-2: #101728;
+    --border: #2a3452;
+    --text: #e8edff;
+    --muted: #8f9dc4;
+    --accent: #f0b429;
+    --ally: #4aa8ff;
+    --foe: #ff5f6d;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    margin: 0;
+    padding: 18px 12px 44px;
+    background: radial-gradient(120% 90% at 50% 0%, #1b2544 0%, var(--bg) 62%);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+  }
+
+  h1 { margin: 0 0 4px; font-size: 26px; letter-spacing: -.02em; }
+  .tip { margin: 0 0 14px; font-size: 12.5px; color: var(--muted); text-align: center; max-width: 640px; line-height: 1.65; }
+
+  .panel {
+    width: min(700px, 100%);
+    background: linear-gradient(var(--panel), var(--panel-2));
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 14px;
+    box-shadow: 0 16px 44px rgba(0,0,0,.55);
+  }
+
+  /* ---------- HUD ---------- */
+  .hud { display: flex; flex-wrap: wrap; justify-content: center; gap: 7px; margin-bottom: 12px; }
+  .stat {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: #1b2440; border: 1px solid var(--border); border-radius: 999px;
+    padding: 5px 10px; font-size: 12px; font-weight: 700;
+    font-family: "SFMono-Regular", Menlo, Consolas, monospace; color: #c9d4f5;
+  }
+  .stat sm { font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .stat b { color: #fff; }
+  .stat.ally b { color: var(--ally); }
+  .stat.foe b { color: var(--foe); }
+
+  /* ---------- Board ---------- */
+  .field { position: relative; }
+  .board { display: flex; flex-direction: column; gap: 7px; }
+  .lane {
+    display: grid; grid-template-rows: auto auto; gap: 5px;
+    padding: 6px 6px; border-radius: 13px;
+    background: rgba(255,255,255,.022);
+    border: 1px solid rgba(255,255,255,.055);
+  }
+  .slot {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 44px; padding: 4px 8px;
+    border: 1px dashed #33405f; border-radius: 9px;
+    font-size: 12px; color: #6f7da2; background: rgba(0,0,0,.16);
+  }
+  .slot.player { cursor: pointer; }
+  .slot.player:hover { border-color: var(--accent); }
+  .slot.target { border-style: solid; border-color: var(--accent); box-shadow: inset 0 0 0 1px rgba(240,180,41,.35); }
+  .slot.place { border-style: solid; border-color: var(--accent); background: rgba(240,180,41,.10); }
+
+  .chip {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 3px 10px; border-radius: 8px;
+    border: 1px solid transparent; font-weight: 700; color: #fff;
+  }
+  .chip.ally { background: linear-gradient(#1d3f66, #16304f); border-color: #2f6ba8; }
+  .chip.foe  { background: linear-gradient(#632028, #4b1a20); border-color: #9c3b45; }
+  .chip .cname { font-size: 12.5px; letter-spacing: .01em; }
+  .chip .stats {
+    font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 12px; color: #ffd88a;
+  }
+  .chip .stats i { font-style: normal; color: var(--ally); }
+  .chip .stats b { color: var(--foe); }
+  .chip.hurt { animation: none; }
+
+  /* ---------- Phase banner (sibling of the board, never inside it) ---------- */
+  .fx {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    pointer-events: none;
+  }
+  .fx span {
+    padding: 6px 16px; border-radius: 999px; font-size: 13px; font-weight: 700;
+    background: rgba(11,16,32,.86); border: 1px solid var(--border); color: var(--accent);
+    opacity: 0; transition: opacity .18s ease;
+  }
+  .fx.on span { opacity: 1; }
+
+  /* ---------- Hand ---------- */
+  .hand { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-top: 12px; }
+  .card {
+    position: relative;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    min-height: 76px; padding: 8px 4px 6px; border-radius: 11px;
+    background: linear-gradient(#1e2946, #17203a);
+    border: 1px solid var(--border);
+    cursor: pointer; text-align: center;
+    outline: 0 solid transparent; outline-offset: 2px;
+  }
+  .card .cname { font-size: 12px; font-weight: 700; color: #fff; line-height: 1.2; }
+  .card .stats { font-family: "SFMono-Regular", Menlo, Consolas, monospace; font-size: 11.5px; color: #ffd88a; }
+  .card .stats i { font-style: normal; color: var(--ally); }
+  .card .stats b { color: var(--foe); }
+  .card .cost {
+    position: absolute; top: -5px; right: -5px;
+    width: 19px; height: 19px; border-radius: 50%;
+    background: var(--accent); color: #241a00;
+    font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 11px; font-weight: 700; line-height: 19px; text-align: center;
+  }
+  .card.sel {
+    outline-width: 3px; outline-color: var(--accent);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 4px rgba(240,180,41,.18), 0 0 14px rgba(240,180,41,.35);
+  }
+  .card.poor { opacity: .45; }
+  /* An empty hand slot is greyed out and inert, never removed from the layout. */
+  .card.empty {
+    background: rgba(255,255,255,.026); border-style: dashed; cursor: default; opacity: .35;
+  }
+
+  /* ---------- Controls ---------- */
+  .controls { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 12px; }
+  button {
+    font-family: inherit; font-size: 13px; font-weight: 600; color: var(--text);
+    background: #1e2946; border: 1px solid var(--border); border-radius: 9px;
+    padding: 8px 15px; cursor: pointer;
+  }
+  button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+
+  .hint { margin: 11px 0 0; font-size: 12.5px; color: var(--muted); text-align: center; min-height: 17px; line-height: 1.5; }
+
+  .logbox { margin-top: 9px; max-height: 96px; overflow-y: auto; }
+  .log { margin: 0; padding: 0 0 0 3px; list-style: none; }
+  .log li {
+    font-size: 11.5px; color: #93a2c8; padding: 2px 0;
+    border-bottom: 1px solid rgba(255,255,255,.04);
+  }
+  .log li:first-child { color: #d5deff; font-weight: 600; }
+
+  /* ---------- Overlays ---------- */
+  .overlay {
+    position: fixed; inset: 0; z-index: 30;
+    display: none; align-items: center; justify-content: center;
+    background: rgba(6,9,19,.78); padding: 18px;
+  }
+  .overlay.show { display: flex; }
+  .sheet {
+    width: min(360px, 100%); text-align: center;
+    background: linear-gradient(#18213b, #121a2f);
+    border: 1px solid var(--border); border-radius: 16px;
+    padding: 24px 20px; box-shadow: 0 20px 60px rgba(0,0,0,.6);
+  }
+  .sheet h2 { margin: 0 0 8px; font-size: 21px; color: #fff; }
+  .sheet p { margin: 0 0 16px; font-size: 13px; color: var(--muted); line-height: 1.6; }
+</style>
+</head>
+<body>
+  <div class="lang-switch" data-lang-switch></div>
+  <h1 data-i18n="title"></h1>
+  <p class="tip" data-i18n="tip"></p>
+
+  <div class="panel">
+    <div class="hud">
+      <span class="stat"><sm data-i18n="turnLabel"></sm><b id="turn">1</b></span>
+      <span class="stat"><sm data-i18n="energyLabel"></sm><b id="energy">2/2</b></span>
+      <span class="stat ally"><sm data-i18n="hpLabel"></sm><b id="php">20</b></span>
+      <span class="stat foe"><sm data-i18n="enemyHpLabel"></sm><b id="ehp">20</b></span>
+      <span class="stat"><sm data-i18n="deckLabel"></sm><b id="deckP">0</b></span>
+      <span class="stat"><sm data-i18n="enemyDeckLabel"></sm><b id="deckE">0</b></span>
+    </div>
+
+    <div class="field">
+      <div class="board" id="board">
+        <div class="lane" data-lane="0">
+          <div class="slot enemy" id="eSlot0"></div>
+          <div class="slot player" id="pSlot0"></div>
+        </div>
+        <div class="lane" data-lane="1">
+          <div class="slot enemy" id="eSlot1"></div>
+          <div class="slot player" id="pSlot1"></div>
+        </div>
+        <div class="lane" data-lane="2">
+          <div class="slot enemy" id="eSlot2"></div>
+          <div class="slot player" id="pSlot2"></div>
+        </div>
+      </div>
+      <!-- Floating phase banner. Kept OUTSIDE #board on purpose: the headless
+           harness dispatches clicks to classed children of any element it can
+           reach by id, so an effects layer parked inside the board would eat
+           real clicks meant for a lane slot. -->
+      <div class="fx" id="fx"></div>
+    </div>
+
+    <div class="hand" id="hand">
+      <div class="card" id="card0"></div>
+      <div class="card" id="card1"></div>
+      <div class="card" id="card2"></div>
+      <div class="card" id="card3"></div>
+      <div class="card" id="card4"></div>
+    </div>
+
+    <div class="controls">
+      <button id="btnEnd" data-i18n="endTurn" disabled></button>
+      <button id="btnPause" disabled></button>
+      <button id="btnNew" data-i18n="newGame"></button>
+    </div>
+
+    <p class="hint" id="hint"></p>
+    <div class="logbox"><ol class="log" id="log"></ol></div>
+  </div>
+
+  <div class="overlay" id="startOverlay">
+    <div class="sheet">
+      <h2 data-i18n="startTitle"></h2>
+      <p data-i18n="startSub"></p>
+      <button id="btnStart" data-i18n="startBtn"></button>
+    </div>
+  </div>
+
+  <div class="overlay" id="overlay">
+    <div class="sheet">
+      <h2 id="ovTitle"></h2>
+      <p id="ovSub"></p>
+      <button id="ovBtn"></button>
+    </div>
+  </div>
+
+<script src="../assets/i18n.js"></script>
+<script>
+/* ============================================================================
+ * Card Battle - a single-file, zero-dependency, DOM-rendered card duel.
+ *
+ * Three lanes sit between two 20 HP bases, one unit per side per lane. Both
+ * sides draw from the SAME 20-card table; a seeded mulberry32 shuffle decides
+ * the order, so a (seed) pair fully determines a game. The player sees their
+ * hand as five fixed card slots, clicks one to select it, then clicks a lane
+ * slot to play it. Spells share the lane click target: Fireball burns the
+ * enemy unit in that lane (or the enemy base when the lane is empty), Mend
+ * heals the friendly unit there, Rally ignores the lane but still takes one.
+ *
+ * Rendering is DOM + CSS on purpose. A card game is a set of discrete, named
+ * objects, so every slot and card is a real element whose text can be compared
+ * against the model - and no drawing surface is involved anywhere in this file.
+ *
+ * Everything runs on ONE requestAnimationFrame clock that accumulates delta
+ * time (clamped to 50 ms). Browser timer APIs are never used: the turn is an
+ * explicit phase machine (ready | player | resolve | enemy | win | lose |
+ * paused) and each timed phase carries its own countdown advanced by that same
+ * clock, so CB.tick(seconds) drives the exact code path the screen does.
+ *
+ * Determinism:
+ *   - The only randomness is the seeded mulberry32 stream: the unseeded
+ *     generator is never called, and every draw goes through nextRandom() so it
+ *     is counted and reproducible. Same seed, same game, bit for bit.
+ *   - resolveCombat(), canPlay(), enemyChooseAction(), shuffle() and energyFor()
+ *     are pure: they read their arguments, allocate a new value and never touch
+ *     module state - which is what makes the headless proofs in the README a
+ *     statement about the shipped code.
+ *   - The enemy is a pure function of (board, hand, energy): no clock, no
+ *     randomness, no hidden state, so the same position always yields the same
+ *     move.
+ *
+ * Every DOM write in this file lives inside updateHud(), which is value-cached
+ * and runs once per frame; handlers only mutate the model and let the frame
+ * paint it. That makes "what is on screen" and "what getState() says" the same
+ * statement.
+ * ========================================================================== */
+(function () {
+  'use strict';
+
+  /* ======================================================================
+   * 1. Constants - the balance contract lives here and nowhere else
+   * ==================================================================== */
+
+  var LANES = 3;            // lanes 0/1/2, left to right; 1 unit per side per lane
+  var HAND_MAX = 5;         // five fixed hand slots
+  var DECK_SIZE = 20;       // both sides shuffle the same 20-card list
+  var START_HP = 20;        // each base starts here and floors at 0
+  var MAX_ENERGY = 10;      // energyFor() saturates here
+  var START_HAND = 3;       // opening hand, before the turn-1 draw
+
+  var RESOLVE_SEC = 0.5;    // combat phase length
+  var ENEMY_SEC = 0.6;      // enemy phase length (it may run longer if the AI chains plays)
+  var ENEMY_STEP = 0.2;     // seconds between two enemy plays - the "one beat" pacing
+  var ENEMY_MAX_PLAYS = 12; // hard stop so a hypothetical non-spending AI cannot loop
+
+  var LOG_SHOW = 6;         // log lines rendered
+  var LOG_MAX = 48;         // log lines retained
+  var BEST_KEY = 'litegame_cardbattle_best';
+
+  /* The catalogue. `kind` is 'unit' or 'spell'; unit cards carry atk/hp and
+   * spell cards carry neither (a spell that needs a number reads it from its
+   * own effect, e.g. Fireball's flat 3). `text` is the rules line, kept as a
+   * {en, zh} pair so cards() stays language-free pure data. */
+  var CARDS = [
+    { id: 'scout',   en: 'Scout',   zh: '斥候', cost: 1, atk: 2, hp: 1, kind: 'unit',
+      text: { en: 'A cheap body. Trades with anything it can reach.',
+              zh: '廉价的单位，能换掉任何挡得住的目标。' } },
+    { id: 'soldier', en: 'Soldier', zh: '步兵', cost: 2, atk: 3, hp: 3, kind: 'unit',
+      text: { en: 'The baseline: 3/3 for 2 energy.',
+              zh: '基准单位：2 点能量换 3/3。' } },
+    { id: 'wall',    en: 'Bulwark', zh: '盾墙', cost: 2, atk: 0, hp: 8, kind: 'unit',
+      text: { en: 'Blocks, never punches. 8 HP of pure stalling.',
+              zh: '只挡不打，8 点生命的纯拖延。' } },
+    { id: 'archer',  en: 'Archer',  zh: '弓手', cost: 3, atk: 4, hp: 2, kind: 'unit',
+      text: { en: 'On play: deal 1 damage to the enemy unit in its lane.',
+              zh: '登场时：对其所在线的敌方单位造成 1 点伤害。' } },
+    { id: 'knight',  en: 'Knight',  zh: '骑士', cost: 4, atk: 5, hp: 6, kind: 'unit',
+      text: { en: 'The biggest body in the deck, and the slowest to arrive.',
+              zh: '牌库里最大的单位，也是最贵的一张。' } },
+    { id: 'fireball', en: 'Fireball', zh: '火球', cost: 3, kind: 'spell',
+      text: { en: 'Deal 3 damage to the enemy unit in that lane, or to the enemy base if the lane is empty.',
+              zh: '对该线敌方单位造成 3 点伤害；该线无敌方单位则对敌方基地造成 3 点。' } },
+    { id: 'mend',    en: 'Mend',    zh: '治疗', cost: 2, kind: 'spell',
+      text: { en: 'Heal the friendly unit in that lane for 4 (never above its starting HP). Needs a unit there.',
+              zh: '为该线友方单位回复 4 点（不超过其初始生命）。该线必须有己方单位。' } },
+    { id: 'rally',   en: 'Rally',   zh: '集结', cost: 4, kind: 'spell',
+      text: { en: 'Every friendly unit gains +2 attack, permanently. Ignores the lane.',
+              zh: '所有友方单位永久 +2 攻击。忽略线参数。' } }
+  ];
+
+  var CARD_ORDER = ['scout', 'soldier', 'wall', 'archer', 'knight', 'fireball', 'mend', 'rally'];
+
+  var CARD_BY_ID = {};
+  (function () {
+    var guard = 0;
+    for (var i = 0; i < CARDS.length && guard++ < 64; i++) CARD_BY_ID[CARDS[i].id] = CARDS[i];
+  })();
+
+  /* The deck: 20 cards, 3/3/2/3/2/3/2/2 by the order above. Both sides shuffle
+   * this exact list, which is what makes the duel provably fair. */
+  var DECK_COUNTS = { scout: 3, soldier: 3, wall: 2, archer: 3, knight: 2, fireball: 3, mend: 2, rally: 2 };
+
+  function deckList() {
+    var out = {};
+    var guard = 0;
+    for (var i = 0; i < CARD_ORDER.length && guard++ < 64; i++) out[CARD_ORDER[i]] = DECK_COUNTS[CARD_ORDER[i]];
+    return out;
+  }
+
+  function deck() {
+    var out = [];
+    var guard = 0;
+    for (var i = 0; i < CARD_ORDER.length && guard++ < 64; i++) {
+      var id = CARD_ORDER[i];
+      var n = DECK_COUNTS[id];
+      for (var k = 0; k < n && guard++ < 4096; k++) out.push(id);
+    }
+    return out;
+  }
+
+  function cardSpec(id) { return CARD_BY_ID[id] || null; }
+  function cardName(id) { return T.t('name_' + id); }
+  function isUnit(id) { var c = CARD_BY_ID[id]; return !!c && c.kind === 'unit'; }
+
+  /* ======================================================================
+   * 2. i18n - one dictionary, two languages, exactly one onChange callback
+   * ==================================================================== */
+
+  var DICT = {
+    title: { en: 'Card Battle', zh: '卡牌对战' },
+    tip: {
+      en: 'Three lanes, two 20 HP bases, one card per click. Select a card from your hand, then click a lane slot to play it. Units hold a lane and trade; spells need the same lane click.',
+      zh: '三条兵线、双方各 20 点基地生命，一次点击打出一张牌。先点手牌选中，再点某条线的槽位打出。单位占线换血，法术也走同一个槽位点击。'
+    },
+
+    turnLabel: { en: 'Turn', zh: '回合' },
+    energyLabel: { en: 'Energy', zh: '能量' },
+    hpLabel: { en: 'You', zh: '我方' },
+    enemyHpLabel: { en: 'Foe', zh: '敌方' },
+    deckLabel: { en: 'Deck', zh: '牌库' },
+    enemyDeckLabel: { en: 'Foe deck', zh: '敌库' },
+
+    endTurn: { en: 'End turn', zh: '结束回合' },
+    pause: { en: 'Pause', zh: '暂停' },
+    resume: { en: 'Resume', zh: '继续' },
+    newGame: { en: 'New game', zh: '新游戏' },
+
+    startTitle: { en: 'Card Battle', zh: '卡牌对战' },
+    startSub: {
+      en: 'You draw first. Break the enemy base before yours falls.',
+      zh: '你先手。在自家基地倒下之前先击破敌方基地。'
+    },
+    startBtn: { en: 'Start game', zh: '开始游戏' },
+
+    winTitle: { en: 'Victory', zh: '胜利' },
+    loseTitle: { en: 'Defeat', zh: '失败' },
+    winSub: { en: 'Enemy base destroyed on turn {n}. Best: {best}.', zh: '第 {n} 回合击破敌方基地。最佳纪录：{best}。' },
+    loseSub: { en: 'Your base fell on turn {n}. Best: {best}.', zh: '你的基地在第 {n} 回合倒下。最佳纪录：{best}。' },
+    bestNone: { en: 'none yet', zh: '暂无' },
+    again: { en: 'Play again', zh: '再来一局' },
+
+    bannerReady: { en: 'Press start', zh: '点击开始' },
+    bannerPlayer: { en: 'Your turn', zh: '你的回合' },
+    bannerResolve: { en: 'Combat', zh: '战斗结算' },
+    bannerEnemy: { en: 'Enemy turn', zh: '敌方回合' },
+    bannerWin: { en: 'Enemy base destroyed', zh: '敌方基地被击破' },
+    bannerLose: { en: 'Your base has fallen', zh: '我方基地陷落' },
+    bannerPaused: { en: 'Paused', zh: '已暂停' },
+
+    hintReady: { en: 'Click Start, or press Space.', zh: '点击「开始游戏」，或按空格。' },
+    hintPick: { en: 'Click a card (or press 1-5), then a lane slot (Q/W/E).', zh: '点一张手牌（或按 1-5），再点某条线槽位（Q/W/E）。' },
+    hintSelected: { en: 'Selected {card} ({cost}). Choose a lane: Q/W/E or click a slot. Esc cancels.', zh: '已选中 {card}（{cost} 费）。选择兵线：Q/W/E 或点击槽位。Esc 取消。' },
+    hintPoor: { en: '{card} costs {cost}, you have {energy}. End the turn to refill.', zh: '{card} 需要 {cost} 费，你只有 {energy}。结束回合即可回满。' },
+    hintNoTarget: { en: 'No legal lane for {card} right now.', zh: '{card} 当前没有合法目标。' },
+    hintWait: { en: 'Resolving.', zh: '结算中。' },
+    hintEnemy: { en: 'The enemy is playing.', zh: '敌方正在出牌。' },
+    hintPaused: { en: 'Paused. Press P to resume.', zh: '已暂停。按 P 继续。' },
+    hintOver: { en: 'Game over. Press N or click New game.', zh: '本局结束。按 N 或点「新游戏」。' },
+
+    laneName: { en: 'Lane {n}', zh: '第 {n} 线' },
+
+    logStart: { en: 'New game (seed {seed}). Both bases at {hp}.', zh: '新开一局（种子 {seed}）。双方基地 {hp} 点生命。' },
+    logTurn: { en: 'Turn {n} - energy {e}.', zh: '第 {n} 回合 —— 能量 {e}。' },
+    logPlay: { en: 'You play {card} in lane {lane}.', zh: '你在第 {lane} 线打出 {card}。' },
+    logArcher: { en: '{card} opens fire for 1.', zh: '{card} 登场射击，造成 1 点伤害。' },
+    logFireUnit: { en: 'Fireball burns {card} for 3.', zh: '火球灼烧 {card}，造成 3 点伤害。' },
+    logFireBase: { en: 'Fireball hits the enemy base for 3.', zh: '火球命中敌方基地，造成 3 点伤害。' },
+    logMend: { en: 'Mend restores {n} HP to {card}.', zh: '治疗为 {card} 回复 {n} 点生命。' },
+    logRally: { en: 'Rally: {n} units gain +2 attack.', zh: '集结：{n} 个单位获得 +2 攻击。' },
+    logEnemyPlay: { en: 'Enemy plays {card} in lane {lane}.', zh: '敌方在第 {lane} 线打出 {card}。' },
+    logEnemyFireBase: { en: 'Enemy Fireball hits your base for 3.', zh: '敌方火球命中你的基地，造成 3 点伤害。' },
+    logEnemyFireUnit: { en: 'Enemy Fireball burns your {card} for 3.', zh: '敌方火球灼烧你的 {card}，造成 3 点伤害。' },
+    logEnemyMend: { en: 'Enemy Mend restores {n} HP to {card}.', zh: '敌方治疗为 {card} 回复 {n} 点生命。' },
+    logEnemyRally: { en: 'Enemy Rally: {n} units gain +2 attack.', zh: '敌方集结：{n} 个单位获得 +2 攻击。' },
+    logCombat: { en: 'Combat resolved.', zh: '战斗结算完成。' },
+    logTrade: { en: 'Lane {lane}: {a} and {b} destroy each other.', zh: '第 {lane} 线：{a} 与 {b} 同归于尽。' },
+    logKill: { en: 'Lane {lane}: {a} kills {b} and survives.', zh: '第 {lane} 线：{a} 击杀 {b} 并存活。' },
+    logBreak: { en: 'Lane {lane}: {card} hits the enemy base for {n}.', zh: '第 {lane} 线：{card} 对敌方基地造成 {n} 点伤害。' },
+    logLeak: { en: 'Lane {lane}: enemy {card} hits your base for {n}.', zh: '第 {lane} 线：敌方 {card} 对你的基地造成 {n} 点伤害。' },
+    logBlocked: { en: 'Lane {lane}: a wall holds with no damage either way.', zh: '第 {lane} 线：盾墙对峙，双方均无伤害。' },
+    logReshuffle: { en: 'Deck empty - discard reshuffled.', zh: '牌库已空 —— 弃牌堆重新洗入。' },
+    logBurned: { en: 'Hand full - {card} is burned.', zh: '手牌已满 —— {card} 被弃掉。' },
+    logWin: { en: 'Enemy base destroyed on turn {n}.', zh: '第 {n} 回合击破敌方基地。' },
+    logLose: { en: 'Your base fell on turn {n}.', zh: '你的基地在第 {n} 回合倒下。' },
+    logPause: { en: 'Paused.', zh: '已暂停。' },
+    logResume: { en: 'Resumed.', zh: '已继续。' },
+    logNoSelection: { en: 'Pick a card first.', zh: '请先选一张手牌。' },
+    logIllegal: { en: 'That lane is not a legal target for {card}.', zh: '{card} 不能打到那条线。' },
+    logNoEnergy: { en: 'Not enough energy for {card}.', zh: '能量不足以打出 {card}。' },
+    logWaiting: { en: 'You can only play during your own turn.', zh: '只能在自己的回合出牌。' }
+  };
+
+  /* Card names and rules text live in CARDS; mirror them into the dictionary so
+   * there is exactly one source of truth for each string. */
+  (function () {
+    var guard = 0;
+    for (var i = 0; i < CARDS.length && guard++ < 64; i++) {
+      var c = CARDS[i];
+      DICT['name_' + c.id] = { en: c.en, zh: c.zh };
+      DICT['text_' + c.id] = c.text;
+    }
+  })();
+
+  /* Short tags for the spell cards - the full rules line does not fit on a
+   * 1/5-width card face, so the hand shows the effect at a glance. */
+  DICT.tag_fireball = { en: '3 DMG', zh: '3 点伤害' };
+  DICT.tag_mend = { en: '+4 HP', zh: '回复 4' };
+  DICT.tag_rally = { en: '+2 ATK', zh: '+2 攻击' };
+
+  var T = LiteI18N.create(DICT);
+
+  /* ======================================================================
+   * 3. Pure helpers - seeded randomness and the energy curve
+   * ==================================================================== */
+
+  /* mulberry32. The seed IS the whole state, so a (seed, number-of-calls) pair
+   * reproduces the stream exactly; the harness leans on that. */
+  function mulberry32(seed) {
+    var a = (seed >>> 0) || 0;
+    return function () {
+      a = (a + 0x6D2B79F5) >>> 0;
+      var t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  /* Fisher-Yates. Pure: the input array is never touched and the result is
+   * always a permutation of it (asserted for 200 seeds in the README proof). */
+  function shuffle(list, rng) {
+    var out = [];
+    var guard = 0;
+    for (var i = 0; i < list.length && guard++ < 4096; i++) out.push(list[i]);
+    for (var j = out.length - 1; j > 0 && guard++ < 4096; j--) {
+      var k = Math.floor(rng() * (j + 1));
+      if (k > j) k = j;
+      if (k < 0) k = 0;
+      var tmp = out[j]; out[j] = out[k]; out[k] = tmp;
+    }
+    return out;
+  }
+
+  /* Turn 1 pays 2, and the curve climbs by one per turn to a hard cap of 10. */
+  function energyFor(turn) {
+    var t = turn | 0;
+    if (t < 1) t = 1;
+    return Math.min(MAX_ENERGY, 1 + t);
+  }
+
+  function cloneUnit(u) {
+    if (!u) return null;
+    return { cardId: u.cardId, atk: u.atk | 0, hp: u.hp | 0, maxHp: u.maxHp | 0 };
+  }
+
+  function emptyBoard() { return { player: [null, null, null], enemy: [null, null, null] }; }
+
+  /* ======================================================================
+   * 4. Pure rules - combat, legality, and the enemy's brain
+   *
+   * Every function in this section is a pure function of its arguments. They
+   * allocate fresh values, never read module state and never touch the DOM:
+   * that is what lets the README's proofs be statements about the shipped code
+   * rather than about a simulation of it.
+   * ==================================================================== */
+
+  /* Is `cardId` allowed to land on `lane` for `side`? Units need an empty slot
+   * on their own side (the two sides are independent); Mend needs a friendly
+   * body; Fireball and Rally always accept the lane, and Rally ignores it. */
+  function playLegality(board, cardId, side, lane) {
+    var c = CARD_BY_ID[cardId];
+    if (!c) return false;
+    var l = lane | 0;
+    if (l < 0 || l >= LANES) return false;
+    var mine = (side === 'enemy') ? board.enemy : board.player;
+    var occupancy = mine ? mine[l] : null;
+    if (c.kind === 'unit') return !occupancy;
+    if (cardId === 'mend') return !!occupancy;
+    return true;
+  }
+
+  /* Can the player play hand[handIndex] on `lane` right now? Used by the UI,
+   * by the harness and by the greedy bot - one definition, no drift. */
+  function canPlay(state, handIndex, lane) {
+    if (!state || state.phase !== 'player') return false;
+    var hand = state.hand || [];
+    var i = handIndex | 0;
+    if (i < 0 || i >= hand.length) return false;
+    var c = CARD_BY_ID[hand[i]];
+    if (!c) return false;
+    if ((state.energy | 0) < c.cost) return false;
+    return playLegality(state.board || emptyBoard(), c.id, 'player', lane);
+  }
+
+  /* Resolve one combat step. Both sides strike SIMULTANEOUSLY: damage is
+   * accumulated for the whole lane first and only then are the dead removed,
+   * so a 3/3 and a 4/2 wipe each other out instead of the faster one surviving.
+   * A lone unit deals its attack to the opposing BASE; a Bulwark deals 0 and
+   * merely blocks. Base HP floors at 0.
+   *
+   * Returns a NEW board; the argument is never mutated. */
+  function resolveCombat(board) {
+    var src = board || emptyBoard();
+    var sp = src.player || [null, null, null];
+    var se = src.enemy || [null, null, null];
+    var php = typeof src.playerHp === 'number' ? (src.playerHp | 0) : START_HP;
+    var ehp = typeof src.enemyHp === 'number' ? (src.enemyHp | 0) : START_HP;
+
+    var out = { player: [null, null, null], enemy: [null, null, null], playerHp: php, enemyHp: ehp };
+
+    for (var l = 0; l < LANES; l++) {
+      var p = cloneUnit(sp[l]);
+      var e = cloneUnit(se[l]);
+
+      if (p && e) {
+        var pAfter = p.hp - e.atk;         // read both attacks before either lands
+        var eAfter = e.hp - p.atk;
+        p.hp = pAfter;
+        e.hp = eAfter;
+        if (p.hp <= 0) p = null;
+        if (e.hp <= 0) e = null;
+      } else if (p) {
+        out.enemyHp -= p.atk;              // the lane is open: straight to the base
+      } else if (e) {
+        out.playerHp -= e.atk;
+      }
+
+      out.player[l] = p;
+      out.enemy[l] = e;
+    }
+
+    if (out.playerHp < 0) out.playerHp = 0;
+    if (out.enemyHp < 0) out.enemyHp = 0;
+    return out;
+  }
+
+  /* The enemy AI. Deterministic and random-free: the same (board, hand, energy)
+   * always produces the same action, which is what the harness asserts.
+   *
+   * Priorities, in order:
+   *   1. Fireball a player unit it can actually kill (lowest lane).
+   *   2. Rally once two or more of its own units are standing.
+   *   3. Mend the unit that has lost the most HP, if it lost at least 3.
+   *   4. Contest a lane the player holds alone, with the priciest body.
+   *   5. Push the hardest hitter into a lane nobody holds.
+   *   6. Otherwise dump the priciest affordable card on its lowest legal lane. */
+  function enemyChooseAction(board, hand, energy) {
+    var b = board || emptyBoard();
+    var h = hand || [];
+    var en = energy | 0;
+    var mine = b.enemy || [null, null, null];
+    var theirs = b.player || [null, null, null];
+
+    function indexOf(id) {
+      var guard = 0;
+      for (var i = 0; i < h.length && guard++ < 256; i++) if (h[i] === id) return i;
+      return -1;
+    }
+    function afford(id) {
+      var c = CARD_BY_ID[id];
+      /* Both halves matter: an unaffordable card cannot be played, and neither
+       * can one that is merely affordable but not in hand. */
+      return !!c && en >= c.cost && indexOf(id) >= 0;
+    }
+
+    /* 1 - removal. */
+    if (afford('fireball')) {
+      for (var a = 0; a < LANES; a++) {
+        if (theirs[a] && theirs[a].hp <= 3) return { kind: 'play', handIndex: indexOf('fireball'), lane: a };
+      }
+    }
+
+    /* 2 - rally. */
+    if (afford('rally')) {
+      var bodies = 0;
+      for (var n = 0; n < LANES; n++) if (mine[n]) bodies++;
+      if (bodies >= 2) return { kind: 'play', handIndex: indexOf('rally'), lane: 0 };
+    }
+
+    /* 3 - mend. */
+    if (afford('mend')) {
+      var mendLane = -1, worst = 0;
+      for (var m = 0; m < LANES; m++) {
+        var u = mine[m];
+        if (!u) continue;
+        var loss = (u.maxHp | 0) - (u.hp | 0);
+        if (loss >= 3 && loss > worst) { worst = loss; mendLane = m; }
+      }
+      if (mendLane >= 0) return { kind: 'play', handIndex: indexOf('mend'), lane: mendLane };
+    }
+
+    /* Affordable unit bodies, in hand order. */
+    var bodiesInHand = [];
+    var guard = 0;
+    for (var i = 0; i < h.length && guard++ < 256; i++) {
+      var c = CARD_BY_ID[h[i]];
+      if (c && c.kind === 'unit' && en >= c.cost) bodiesInHand.push({ i: i, c: c });
+    }
+    function bestUnit(cmp) {
+      var best = null;
+      var g = 0;
+      for (var k = 0; k < bodiesInHand.length && g++ < 64; k++) {
+        if (!best || cmp(bodiesInHand[k], best) > 0) best = bodiesInHand[k];
+      }
+      return best;
+    }
+
+    /* 4 - contest a lane only the player holds. */
+    var contest = -1;
+    for (var l1 = 0; l1 < LANES; l1++) if (theirs[l1] && !mine[l1]) { contest = l1; break; }
+    if (contest >= 0 && bodiesInHand.length) {
+      var p4 = bestUnit(function (x, y) {
+        if (x.c.cost !== y.c.cost) return x.c.cost - y.c.cost;
+        if (x.c.atk !== y.c.atk) return x.c.atk - y.c.atk;
+        return y.i - x.i;
+      });
+      return { kind: 'play', handIndex: p4.i, lane: contest };
+    }
+
+    /* 5 - take an empty lane. */
+    var vacant = -1;
+    for (var l2 = 0; l2 < LANES; l2++) if (!theirs[l2] && !mine[l2]) { vacant = l2; break; }
+    if (vacant >= 0 && bodiesInHand.length) {
+      var p5 = bestUnit(function (x, y) {
+        if (x.c.atk !== y.c.atk) return x.c.atk - y.c.atk;
+        if (x.c.cost !== y.c.cost) return x.c.cost - y.c.cost;
+        return y.i - x.i;
+      });
+      return { kind: 'play', handIndex: p5.i, lane: vacant };
+    }
+
+    /* 6 - otherwise spend it, priciest first, on the lowest legal lane. */
+    var spend = [];
+    var g2 = 0;
+    for (var i2 = 0; i2 < h.length && g2++ < 256; i2++) {
+      var c2 = CARD_BY_ID[h[i2]];
+      if (c2 && en >= c2.cost) spend.push({ i: i2, c: c2 });
+    }
+    spend.sort(function (x, y) {
+      if (x.c.cost !== y.c.cost) return y.c.cost - x.c.cost;
+      return x.i - y.i;
+    });
+    /* spend[] is built from the hand, so it cannot outgrow HAND_MAX - the guard
+     * is there so the scan stays bounded even if that ever stops being true. */
+    var g3 = 0;
+    for (var s = 0; s < spend.length && g3++ < 64; s++) {
+      for (var l3 = 0; l3 < LANES && g3++ < 64; l3++) {
+        if (playLegality(b, spend[s].c.id, 'enemy', l3)) {
+          return { kind: 'play', handIndex: spend[s].i, lane: l3 };
+        }
+      }
+    }
+
+    return { kind: 'end' };
+  }
+
+  /* ======================================================================
+   * 5. The live model - one game object, one phase machine
+   *
+   * The phase machine is the whole clock: `player` waits for input, `resolve`
+   * and `enemy` are countdowns advanced by update(dt), and `ready` / `win` /
+   * `lose` / `paused` simply do not advance. There is no browser timer
+   * anywhere, so tick(seconds) and the rAF loop are the same code path.
+   * ==================================================================== */
+
+  var G = null;      // the current game; never read before newGame() runs
+  var H = null;      // DOM handles, filled by init()
+
+  function snapUnit(u) { return u ? { cardId: u.cardId, atk: u.atk, hp: u.hp, maxHp: u.maxHp } : null; }
+  function snapRow(row) {
+    var out = [null, null, null];
+    var guard = 0;
+    for (var l = 0; l < LANES && guard++ < 16; l++) out[l] = snapUnit(row[l]);
+    return out;
+  }
+
+  /* A counting wrapper around mulberry32: the counter is the stream position,
+   * which getState().rng exposes so a test can rewind a shuffle by replaying
+   * exactly `calls` numbers. */
+  function makeRng(seed) {
+    var raw = mulberry32(seed);
+    var state = { seed: seed, calls: 0 };
+    var api = {
+      seed: seed,
+      get calls() { return state.calls; },
+      next: function () { state.calls++; return raw(); }
+    };
+    return api;
+  }
+
+  function logLine(key, vars) {
+    if (!G) return;
+    G.log.push({ key: key, vars: vars || null });
+    if (G.log.length > LOG_MAX) G.log.splice(0, G.log.length - LOG_MAX);
+  }
+
+  function loadBest() {
+    try {
+      var raw = localStorage.getItem(BEST_KEY);
+      if (raw !== null) {
+        var n = parseInt(raw, 10);
+        if (isFinite(n) && n > 0) return n;
+      }
+    } catch (e) { /* private mode, file:// quirks - a missing record is fine */ }
+    return 0;
+  }
+
+  function saveBest(n) {
+    try { localStorage.setItem(BEST_KEY, String(n)); } catch (e) { /* best-effort */ }
+  }
+
+  function newGame(opts) {
+    var seed = 1;
+    if (opts && typeof opts.seed === 'number' && isFinite(opts.seed)) seed = Math.floor(opts.seed);
+    else if (opts && typeof opts.seed === 'number') seed = 1;
+
+    var rng = makeRng(seed);
+    /* Both sides shuffle the SAME 20-card list, back to back off one stream -
+     * one seed, two fair decks, fully reproducible. */
+    var playerDeck = shuffle(deck(), rng.next);
+    var enemyDeck = shuffle(deck(), rng.next);
+    var playerHand = [], enemyHand = [];
+    var guard = 0;
+    for (var i = 0; i < START_HAND && guard++ < 64; i++) {
+      playerHand.push(playerDeck.shift());
+      enemyHand.push(enemyDeck.shift());
+    }
+
+    G = {
+      phase: 'ready',
+      resumePhase: null,
+      turn: 1,
+      energy: 0,
+      enemyEnergy: 0,
+      playerHp: START_HP,
+      enemyHp: START_HP,
+      board: emptyBoard(),
+      piles: {
+        player: { deck: playerDeck, hand: playerHand, discard: [] },
+        enemy: { deck: enemyDeck, hand: enemyHand, discard: [] }
+      },
+      seed: seed,
+      rng: rng,
+      drawCount: 0,
+      phaseT: 0,
+      enemyAt: 0,
+      enemyIdle: true,
+      enemyPlays: 0,
+      winner: null,
+      selected: null,
+      best: loadBest(),
+      log: []
+    };
+
+    logLine('logStart', { seed: seed, hp: START_HP });
+    resetHudCache();
+    updateHud();
+    return getState();
+  }
+
+  function getState() {
+    return {
+      phase: G.phase,
+      turn: G.turn,
+      energy: G.energy,
+      playerHp: G.playerHp,
+      enemyHp: G.enemyHp,
+      hand: G.piles.player.hand.slice(),
+      board: { player: snapRow(G.board.player), enemy: snapRow(G.board.enemy) },
+      deckLeft: G.piles.player.deck.length,
+      discardLeft: G.piles.player.discard.length,
+      seed: G.seed,
+      rng: { seed: G.seed, calls: G.rng.calls },
+      rngDraws: G.rng.calls,
+      winner: G.winner,
+      /* extras, all documented in the README bridge list */
+      enemyHand: G.piles.enemy.hand.slice(),
+      enemyEnergy: G.enemyEnergy,
+      enemyDeckLeft: G.piles.enemy.deck.length,
+      enemyDiscardLeft: G.piles.enemy.discard.length,
+      draws: G.drawCount,
+      handMax: HAND_MAX,
+      deckSize: DECK_SIZE,
+      maxEnergy: MAX_ENERGY,
+      selected: G.selected,
+      resumePhase: G.resumePhase,
+      best: G.best,
+      over: (G.phase === 'win' || G.phase === 'lose'),
+      log: G.log.slice()
+    };
+  }
+
+  /* Snapshot of the board alone - the shape enemyChooseAction() and
+   * resolveCombat() consume. */
+  function board() {
+    return { player: snapRow(G.board.player), enemy: snapRow(G.board.enemy) };
+  }
+  function hand() { return G.piles.player.hand.slice(); }
+  function unitAt(lane, side) {
+    var row = G.board[side === 'enemy' ? 'enemy' : 'player'];
+    if (!row) return null;
+    return snapUnit(row[lane | 0]);
+  }
+
+  function setPhase(p) {
+    G.phase = p;
+    G.phaseT = 0;
+  }
+
+  function drawCard(side) {
+    var pile = G.piles[side];
+    if (!pile.deck.length) {
+      if (!pile.discard.length) return null;      // all 20 are in hand or on the board
+      pile.deck = shuffle(pile.discard, G.rng.next);
+      pile.discard = [];
+      logLine('logReshuffle', {});
+    }
+    var id = pile.deck.shift();
+    if (pile.hand.length >= HAND_MAX) {
+      /* The hand cap burns the card rather than stalling the deck. */
+      pile.discard.push(id);
+      logLine('logBurned', { card: cardName(id) });
+      return id;
+    }
+    pile.hand.push(id);
+    G.drawCount++;
+    return id;
+  }
+
+  function beginPlayerTurn() {
+    G.energy = energyFor(G.turn);
+    drawCard('player');
+    logLine('logTurn', { n: G.turn, e: G.energy });
+  }
+
+  function beginEnemyPhase() {
+    G.enemyEnergy = energyFor(G.turn);
+    drawCard('enemy');
+    G.enemyAt = ENEMY_STEP;      // one beat before the first play, so it reads as a turn
+    G.enemyIdle = false;
+    G.enemyPlays = 0;
+  }
+
+  function start() {
+    if (!G) return getState();
+    if (G.phase === 'ready') {
+      beginPlayerTurn();
+      setPhase('player');
+    } else if (G.phase === 'paused') {
+      togglePause();
+    }
+    updateHud();
+    return getState();
+  }
+
+  function togglePause() {
+    if (!G) return getState();
+    if (G.phase === 'paused') {
+      G.phase = G.resumePhase || 'player';
+      G.resumePhase = null;
+      logLine('logResume', {});
+    } else if (G.phase === 'player' || G.phase === 'resolve' || G.phase === 'enemy') {
+      G.resumePhase = G.phase;
+      G.phase = 'paused';
+      logLine('logPause', {});
+    }
+    updateHud();
+    return getState();
+  }
+  function pause() { return togglePause(); }
+
+  function checkEnd() {
+    if (G.phase === 'win' || G.phase === 'lose') return true;
+    if (G.enemyHp <= 0 && G.playerHp > 0) {
+      G.phase = 'win';
+      G.phaseT = 0;
+      G.winner = 'player';
+      logLine('logWin', { n: G.turn });
+      if (!G.best || G.turn < G.best) { G.best = G.turn; saveBest(G.turn); }
+      return true;
+    }
+    /* A mutual wipe still counts as a loss for the player: the challenger's
+     * base falling is the failure the rules describe. */
+    if (G.playerHp <= 0) {
+      G.phase = 'lose';
+      G.phaseT = 0;
+      G.winner = 'enemy';
+      logLine('logLose', { n: G.turn });
+      return true;
+    }
+    return false;
+  }
+
+  /* Put one card on the board. Shared by the player, the enemy and the
+   * harness, so a card can never behave differently depending on who casts it
+   * (only the log lines are side-aware). */
+  function applyCard(side, id, lane) {
+    var c = CARD_BY_ID[id];
+    if (!c) return;
+    var l = lane | 0;
+    var isMine = (side === 'player');
+    var mine = isMine ? G.board.player : G.board.enemy;
+    var foe = isMine ? G.board.enemy : G.board.player;
+
+    if (c.kind === 'unit') {
+      mine[l] = { cardId: id, atk: c.atk, hp: c.hp, maxHp: c.hp };
+      logLine(isMine ? 'logPlay' : 'logEnemyPlay', { card: cardName(id), lane: l + 1 });
+      if (id === 'archer' && foe[l]) {
+        foe[l].hp -= 1;                       // the archer's on-play shot
+        logLine('logArcher', { card: cardName(id) });
+        if (foe[l].hp <= 0) foe[l] = null;
+      }
+      return;
+    }
+
+    if (id === 'fireball') {
+      if (foe[l]) {
+        var victim = foe[l].cardId;
+        foe[l].hp -= 3;
+        logLine(isMine ? 'logFireUnit' : 'logEnemyFireUnit', { card: cardName(victim) });
+        if (foe[l].hp <= 0) foe[l] = null;
+      } else if (isMine) {
+        G.enemyHp = Math.max(0, G.enemyHp - 3);
+        logLine('logFireBase', {});
+      } else {
+        G.playerHp = Math.max(0, G.playerHp - 3);
+        logLine('logEnemyFireBase', {});
+      }
+      return;
+    }
+
+    if (id === 'mend') {
+      var u = mine[l];
+      if (u) {
+        var before = u.hp;
+        u.hp = Math.min(u.maxHp, u.hp + 4);
+        logLine(isMine ? 'logMend' : 'logEnemyMend', { n: u.hp - before, card: cardName(u.cardId) });
+      }
+      return;
+    }
+
+    if (id === 'rally') {
+      var n = 0;
+      for (var k = 0; k < LANES; k++) {
+        if (mine[k]) { mine[k].atk += 2; n++; }
+      }
+      logLine(isMine ? 'logRally' : 'logEnemyRally', { n: n });
+    }
+  }
+
+  function playCard(handIndex, lane) {
+    if (!G) return false;
+    if (!canPlay(getState(), handIndex, lane)) {
+      var pile = G.piles.player;
+      var i = handIndex | 0;
+      if (G.phase !== 'player') logLine('logWaiting', {});
+      else if (i < 0 || i >= pile.hand.length) logLine('logNoSelection', {});
+      else if (G.energy < CARD_BY_ID[pile.hand[i]].cost) logLine('logNoEnergy', { card: cardName(pile.hand[i]) });
+      else logLine('logIllegal', { card: cardName(pile.hand[i]) });
+      updateHud();
+      return false;
+    }
+    var idx = handIndex | 0;
+    var id = G.piles.player.hand[idx];
+    var c = CARD_BY_ID[id];
+    G.piles.player.hand.splice(idx, 1);
+    G.energy -= c.cost;
+    G.piles.player.discard.push(id);
+    G.selected = null;
+    applyCard('player', id, lane);
+    checkEnd();
+    updateHud();
+    return true;
+  }
+
+  function enemyPlay(act) {
+    var pile = G.piles.enemy;
+    var i = act.handIndex | 0;
+    if (i < 0 || i >= pile.hand.length) return false;
+    var id = pile.hand[i];
+    var c = CARD_BY_ID[id];
+    if (!c || G.enemyEnergy < c.cost) return false;
+    if (!playLegality(G.board, id, 'enemy', act.lane)) return false;
+    pile.hand.splice(i, 1);
+    G.enemyEnergy -= c.cost;
+    pile.discard.push(id);
+    applyCard('enemy', id, act.lane);
+    return true;
+  }
+
+  function endTurn() {
+    if (!G || G.phase !== 'player') return false;
+    G.selected = null;
+    setPhase('resolve');
+    updateHud();
+    return true;
+  }
+
+  /* Per-lane narration of a resolve, derived by diffing the two boards - so the
+   * log always describes what actually happened, never what was expected. */
+  function narrateCombat(before, after) {
+    for (var l = 0; l < LANES; l++) {
+      var p0 = before.player[l], e0 = before.enemy[l];
+      var p1 = after.player[l], e1 = after.enemy[l];
+      var lane = l + 1;
+      if (p0 && e0) {
+        if (!p1 && !e1) logLine('logTrade', { lane: lane, a: cardName(p0.cardId), b: cardName(e0.cardId) });
+        else if (p1 && !e1) logLine('logKill', { lane: lane, a: cardName(p1.cardId), b: cardName(e0.cardId) });
+        else if (!p1 && e1) logLine('logKill', { lane: lane, a: cardName(e1.cardId), b: cardName(p0.cardId) });
+        else if (p1.atk === 0 && e1.atk === 0) logLine('logBlocked', { lane: lane });
+      } else if (p0 && !e0) {
+        if (p0.atk > 0) logLine('logBreak', { lane: lane, card: cardName(p0.cardId), n: p0.atk });
+      } else if (e0 && !p0) {
+        if (e0.atk > 0) logLine('logLeak', { lane: lane, card: cardName(e0.cardId), n: e0.atk });
+      }
+    }
+  }
+
+  function runResolve() {
+    var before = { player: snapRow(G.board.player), enemy: snapRow(G.board.enemy) };
+    var after = resolveCombat({
+      player: G.board.player, enemy: G.board.enemy,
+      playerHp: G.playerHp, enemyHp: G.enemyHp
+    });
+    G.board.player = after.player;
+    G.board.enemy = after.enemy;
+    G.playerHp = after.playerHp;
+    G.enemyHp = after.enemyHp;
+
+    narrateCombat(before, after);
+    logLine('logCombat', {});
+    if (checkEnd()) return;
+
+    setPhase('enemy');
+    beginEnemyPhase();
+  }
+
+  function updateEnemy(dt) {
+    G.phaseT += dt;
+    var guard = 0;
+    while (!G.enemyIdle && G.phaseT >= G.enemyAt && guard++ < ENEMY_MAX_PLAYS) {
+      var act = enemyChooseAction(
+        { player: G.board.player, enemy: G.board.enemy },
+        G.piles.enemy.hand,
+        G.enemyEnergy
+      );
+      if (!act || act.kind !== 'play') { G.enemyIdle = true; break; }
+      if (!enemyPlay(act)) { G.enemyIdle = true; break; }
+      G.enemyPlays++;
+      G.enemyAt += ENEMY_STEP;
+      if (checkEnd()) { G.enemyIdle = true; return; }
+    }
+    if (G.enemyIdle && G.phaseT >= ENEMY_SEC) finishEnemyTurn();
+  }
+
+  function finishEnemyTurn() {
+    if (G.phase === 'win' || G.phase === 'lose' || G.phase === 'paused') return;
+    G.turn++;
+    beginPlayerTurn();
+    setPhase('player');
+  }
+
+  function update(dt) {
+    if (!G || !(dt > 0)) return;
+    if (G.phase === 'resolve') {
+      G.phaseT += dt;
+      if (G.phaseT >= RESOLVE_SEC) runResolve();
+    } else if (G.phase === 'enemy') {
+      updateEnemy(dt);
+    }
+    /* ready / player / paused / win / lose hold the model still. */
+  }
+
+  /* Deterministic, headless driver: no rAF, no wall clock. It splits `seconds`
+   * into `step`-sized sub-steps of the SAME update(dt) the loop calls, then
+   * refreshes the value-cached HUD once - so a headless run and the screen
+   * never disagree. */
+  function tick(seconds, step) {
+    var s = (typeof step === 'number' && step > 0) ? step : (1 / 60);
+    var remaining = (typeof seconds === 'number' && isFinite(seconds) && seconds > 0) ? seconds : 0;
+    var guard = 0;
+    while (remaining > 1e-9 && guard++ < 600000) {
+      var dt = remaining < s ? remaining : s;
+      update(dt);
+      remaining -= dt;
+    }
+    updateHud();
+    return getState();
+  }
+
+  /* ======================================================================
+   * 6. HUD / board paint - value-cached, refreshed from updateHud() ONLY.
+   *
+   * Every write to a game node lives inside updateHud(): event handlers and the
+   * model only mutate state and then let the frame paint it. The cache is a
+   * null sentinel, so a node is touched only when its value actually changed;
+   * resetHudCache() forces a full rewrite on newGame() and on a language switch.
+   *
+   * Everything is painted from getState(), which means the DOM is a rendering
+   * of the model rather than a second copy of it - the two cannot drift.
+   * ==================================================================== */
+
+  var hudCache = {
+    turn: null, energy: null, php: null, ehp: null, deckP: null, deckE: null,
+    banner: null, hint: null, log: null,
+    endDis: null, pauseTxt: null, pauseDis: null,
+    selKey: null, poorKey: null, targetKey: null,
+    startShow: null, overShow: null, ovTitle: null, ovSub: null, ovBtn: null,
+    e0: null, e1: null, e2: null, p0: null, p1: null, p2: null,
+    card0: null, card1: null, card2: null, card3: null, card4: null
+  };
+
+  function resetHudCache() {
+    for (var k in hudCache) {
+      if (Object.prototype.hasOwnProperty.call(hudCache, k)) hudCache[k] = null;
+    }
+  }
+
+  function unitBadge(u, side) {
+    if (!u) return '';
+    return '<span class="chip ' + (side === 'enemy' ? 'foe' : 'ally') + '">' +
+             '<span class="cname">' + T.t('name_' + u.cardId) + '</span>' +
+             '<span class="stats"><i>' + u.atk + '</i>/<b>' + u.hp + '</b></span>' +
+           '</span>';
+  }
+
+  function cardBadge(id) {
+    var c = CARD_BY_ID[id];
+    if (!c) return '';
+    var stat = (c.kind === 'unit')
+      ? '<span class="stats"><i>' + c.atk + '</i>/<b>' + c.hp + '</b></span>'
+      : '<span class="stats">' + T.t('tag_' + id) + '</span>';
+    return '<span class="cname">' + T.t('name_' + id) + '</span>' + stat +
+           '<span class="cost">' + c.cost + '</span>';
+  }
+
+  function logEntryText(entry) { return T.t(entry.key, entry.vars); }
+
+  function updateHud() {
+    if (!H || !G) return;
+    var c = hudCache;
+    var s = getState();
+    var guard = 0;
+
+    /* --- counters ----------------------------------------------------- */
+    var turnTxt = String(s.turn);
+    if (c.turn !== turnTxt) { H.turn.textContent = turnTxt; c.turn = turnTxt; }
+
+    var energyTxt = s.energy + '/' + energyFor(s.turn);
+    if (c.energy !== energyTxt) { H.energy.textContent = energyTxt; c.energy = energyTxt; }
+
+    var phpTxt = String(s.playerHp);
+    if (c.php !== phpTxt) { H.php.textContent = phpTxt; c.php = phpTxt; }
+
+    var ehpTxt = String(s.enemyHp);
+    if (c.ehp !== ehpTxt) { H.ehp.textContent = ehpTxt; c.ehp = ehpTxt; }
+
+    var deckPTxt = String(s.deckLeft);
+    if (c.deckP !== deckPTxt) { H.deckP.textContent = deckPTxt; c.deckP = deckPTxt; }
+
+    var deckETxt = String(s.enemyDeckLeft);
+    if (c.deckE !== deckETxt) { H.deckE.textContent = deckETxt; c.deckE = deckETxt; }
+
+    /* --- phase banner (sits in a sibling layer, never over a clickable node) */
+    var banner = '';
+    if (s.phase === 'ready') banner = T.t('bannerReady');
+    else if (s.phase === 'resolve') banner = T.t('bannerResolve');
+    else if (s.phase === 'enemy') banner = T.t('bannerEnemy');
+    else if (s.phase === 'paused') banner = T.t('bannerPaused');
+    else if (s.phase === 'win') banner = T.t('bannerWin');
+    else if (s.phase === 'lose') banner = T.t('bannerLose');
+    if (c.banner !== banner) {
+      H.fx.innerHTML = banner ? '<span>' + banner + '</span>' : '';
+      if (banner) H.fx.classList.add('on'); else H.fx.classList.remove('on');
+      c.banner = banner;
+    }
+
+    /* --- hint line ---------------------------------------------------- */
+    var hint;
+    if (s.phase === 'ready') hint = T.t('hintReady');
+    else if (s.phase === 'paused') hint = T.t('hintPaused');
+    else if (s.phase === 'resolve') hint = T.t('hintWait');
+    else if (s.phase === 'enemy') hint = T.t('hintEnemy');
+    else if (s.phase === 'win' || s.phase === 'lose') hint = T.t('hintOver');
+    else if (s.selected === null || s.selected === undefined || !s.hand[s.selected]) hint = T.t('hintPick');
+    else {
+      var selId = s.hand[s.selected];
+      var spec = CARD_BY_ID[selId];
+      if (s.energy < spec.cost) {
+        hint = T.t('hintPoor', { card: T.t('name_' + selId), cost: spec.cost, energy: s.energy });
+      } else {
+        var anyLane = false;
+        var g1 = 0;
+        for (var t = 0; t < LANES && g1++ < 16; t++) if (canPlay(s, s.selected, t)) anyLane = true;
+        hint = anyLane
+          ? T.t('hintSelected', { card: T.t('name_' + selId), cost: spec.cost })
+          : T.t('hintNoTarget', { card: T.t('name_' + selId) });
+      }
+    }
+    if (c.hint !== hint) { H.hint.textContent = hint; c.hint = hint; }
+
+    /* --- combat log (newest first; entries are {key, vars} so a language
+     *     switch re-renders them instead of freezing the old copy) ------- */
+    var shown = [];
+    var from = s.log.length - LOG_SHOW;
+    if (from < 0) from = 0;
+    var g2 = 0;
+    for (var i = s.log.length - 1; i >= from && g2++ < 64; i--) shown.push(logEntryText(s.log[i]));
+    var logKey = shown.join('\n');
+    if (c.log !== logKey) {
+      var html = '';
+      var g3 = 0;
+      for (var j = 0; j < shown.length && g3++ < 64; j++) html += '<li>' + shown[j] + '</li>';
+      H.log.innerHTML = html;
+      c.log = logKey;
+    }
+
+    /* --- hand --------------------------------------------------------- */
+    for (var h = 0; h < HAND_MAX && guard++ < 64; h++) {
+      var key = 'card' + h;
+      var id = s.hand[h];
+      var inner = id ? cardBadge(id) : '';
+      if (c[key] !== inner) {
+        H.cards[h].innerHTML = inner;
+        if (id) H.cards[h].classList.remove('empty'); else H.cards[h].classList.add('empty');
+        c[key] = inner;
+      }
+    }
+
+    var selKey = (s.selected === null || s.selected === undefined) ? '' : String(s.selected);
+    if (c.selKey !== selKey) {
+      var g4 = 0;
+      for (var sl = 0; sl < HAND_MAX && g4++ < 64; sl++) {
+        if (String(sl) === selKey) H.cards[sl].classList.add('sel');
+        else H.cards[sl].classList.remove('sel');
+      }
+      c.selKey = selKey;
+    }
+
+    var poorKey = '';
+    var g5 = 0;
+    for (var pa = 0; pa < HAND_MAX && g5++ < 64; pa++) {
+      var pid = s.hand[pa];
+      poorKey += (s.phase === 'player' && pid && CARD_BY_ID[pid].cost > s.energy) ? '1' : '0';
+    }
+    if (c.poorKey !== poorKey) {
+      var g6 = 0;
+      for (var pb = 0; pb < HAND_MAX && g6++ < 64; pb++) {
+        if (poorKey.charAt(pb) === '1') H.cards[pb].classList.add('poor');
+        else H.cards[pb].classList.remove('poor');
+      }
+      c.poorKey = poorKey;
+    }
+
+    /* --- lanes -------------------------------------------------------- */
+    var targetKey = '---';
+    if (s.phase === 'player' && s.selected !== null && s.selected !== undefined) {
+      targetKey = '';
+      var g7 = 0;
+      for (var tl = 0; tl < LANES && g7++ < 16; tl++) targetKey += canPlay(s, s.selected, tl) ? '1' : '0';
+    }
+    if (c.targetKey !== targetKey) {
+      var g8 = 0;
+      for (var ts = 0; ts < LANES && g8++ < 16; ts++) {
+        if (targetKey.charAt(ts) === '1') H.pSlots[ts].classList.add('target');
+        else H.pSlots[ts].classList.remove('target');
+      }
+      c.targetKey = targetKey;
+    }
+
+    var g9 = 0;
+    for (var lb = 0; lb < LANES && g9++ < 16; lb++) {
+      var eKey = 'e' + lb, pKey = 'p' + lb;
+      var eInner = unitBadge(s.board.enemy[lb], 'enemy');
+      if (c[eKey] !== eInner) { H.eSlots[lb].innerHTML = eInner; c[eKey] = eInner; }
+      var pInner = unitBadge(s.board.player[lb], 'player');
+      if (c[pKey] !== pInner) { H.pSlots[lb].innerHTML = pInner; c[pKey] = pInner; }
+    }
+
+    /* --- controls ----------------------------------------------------- */
+    var endDis = (s.phase !== 'player');
+    if (c.endDis !== endDis) { H.btnEnd.disabled = endDis; c.endDis = endDis; }
+
+    var pauseTxt = (s.phase === 'paused') ? T.t('resume') : T.t('pause');
+    if (c.pauseTxt !== pauseTxt) { H.btnPause.textContent = pauseTxt; c.pauseTxt = pauseTxt; }
+
+    var pauseDis = !(s.phase === 'player' || s.phase === 'resolve' || s.phase === 'enemy' || s.phase === 'paused');
+    if (c.pauseDis !== pauseDis) { H.btnPause.disabled = pauseDis; c.pauseDis = pauseDis; }
+
+    /* --- overlays are driven purely by phase -------------------------- */
+    var showStart = (s.phase === 'ready');
+    if (c.startShow !== showStart) {
+      if (showStart) H.startOverlay.classList.add('show'); else H.startOverlay.classList.remove('show');
+      c.startShow = showStart;
+    }
+
+    var showOver = (s.phase === 'win' || s.phase === 'lose');
+    if (c.overShow !== showOver) {
+      if (showOver) H.overlay.classList.add('show'); else H.overlay.classList.remove('show');
+      c.overShow = showOver;
+    }
+    if (showOver) {
+      var bestTxt = s.best ? String(s.best) : T.t('bestNone');
+      var title = (s.phase === 'win') ? T.t('winTitle') : T.t('loseTitle');
+      var sub = (s.phase === 'win')
+        ? T.t('winSub', { n: s.turn, best: bestTxt })
+        : T.t('loseSub', { n: s.turn, best: bestTxt });
+      var obtn = T.t('again');
+      if (c.ovTitle !== title) { H.ovTitle.textContent = title; c.ovTitle = title; }
+      if (c.ovSub !== sub) { H.ovSub.textContent = sub; c.ovSub = sub; }
+      if (c.ovBtn !== obtn) { H.ovBtn.textContent = obtn; c.ovBtn = obtn; }
+    }
+  }
+
+  function hudCacheCopy() {
+    var out = {};
+    for (var k in hudCache) {
+      if (Object.prototype.hasOwnProperty.call(hudCache, k)) out[k] = hudCache[k];
+    }
+    return out;
+  }
+
+  /* ======================================================================
+   * 7. Wiring - input handlers only mutate the model, never the DOM
+   * ==================================================================== */
+
+  function init() {
+    H = {
+      turn: document.getElementById('turn'),
+      energy: document.getElementById('energy'),
+      php: document.getElementById('php'),
+      ehp: document.getElementById('ehp'),
+      deckP: document.getElementById('deckP'),
+      deckE: document.getElementById('deckE'),
+      fx: document.getElementById('fx'),
+      hint: document.getElementById('hint'),
+      log: document.getElementById('log'),
+      eSlots: [
+        document.getElementById('eSlot0'),
+        document.getElementById('eSlot1'),
+        document.getElementById('eSlot2')
+      ],
+      pSlots: [
+        document.getElementById('pSlot0'),
+        document.getElementById('pSlot1'),
+        document.getElementById('pSlot2')
+      ],
+      cards: [
+        document.getElementById('card0'),
+        document.getElementById('card1'),
+        document.getElementById('card2'),
+        document.getElementById('card3'),
+        document.getElementById('card4')
+      ],
+      btnEnd: document.getElementById('btnEnd'),
+      btnPause: document.getElementById('btnPause'),
+      btnNew: document.getElementById('btnNew'),
+      startOverlay: document.getElementById('startOverlay'),
+      btnStart: document.getElementById('btnStart'),
+      overlay: document.getElementById('overlay'),
+      ovTitle: document.getElementById('ovTitle'),
+      ovSub: document.getElementById('ovSub'),
+      ovBtn: document.getElementById('ovBtn')
+    };
+
+    newGame({ seed: defaultSeed() });
+
+    H.btnStart.addEventListener('click', function () { start(); });
+    H.btnEnd.addEventListener('click', function () { endTurn(); });
+    H.btnPause.addEventListener('click', function () { togglePause(); });
+    H.btnNew.addEventListener('click', function () { restart(defaultSeed()); });
+    H.ovBtn.addEventListener('click', function () { restart(defaultSeed()); });
+
+    var g1 = 0;
+    for (var l = 0; l < LANES && g1++ < 16; l++) {
+      bindLane(l);
+    }
+    var g2 = 0;
+    for (var i = 0; i < HAND_MAX && g2++ < 64; i++) {
+      bindCardSlot(i);
+    }
+
+    document.addEventListener('keydown', onKeyDown);
+    updateHud();
+  }
+
+  function bindLane(lane) {
+    /* Both slots of a lane are the same target: the click is about the LANE,
+     * which is what spells and units alike are aimed at. */
+    H.pSlots[lane].addEventListener('click', function () { playAt(lane); });
+    H.eSlots[lane].addEventListener('click', function () { playAt(lane); });
+  }
+
+  function bindCardSlot(idx) {
+    H.cards[idx].addEventListener('click', function () { selectCard(idx); });
+  }
+
+  function defaultSeed() {
+    /* Only the buttons use a wall-clock seed. Every headless entry point passes
+     * an explicit seed, so CB.tick() runs stay reproducible. */
+    return 1 + (Date.now() % 2000000000);
+  }
+
+  function restart(seed) {
+    /* newGame() alone returns to 'ready'; the on-screen New / Play-again
+     * buttons deal and start in one click, like the rest of the collection. */
+    newGame({ seed: seed });
+    start();
+  }
+
+  function selectCard(idx) {
+    if (!G || G.phase !== 'player') return false;
+    var i = idx | 0;
+    if (i < 0 || i >= G.piles.player.hand.length) return false;
+    G.selected = (G.selected === i) ? null : i;
+    updateHud();
+    return true;
+  }
+
+  function playAt(lane) {
+    if (!G || G.phase !== 'player') return false;
+    if (G.selected === null || G.selected === undefined) {
+      logLine('logNoSelection', {});
+      updateHud();
+      return false;
+    }
+    return playCard(G.selected, lane);
+  }
+
+  function onKeyDown(e) {
+    if (!e || !G) return;
+    var k = e.key;
+    if (typeof k !== 'string') return;
+    var lower = (k.length === 1) ? k.toLowerCase() : k;
+    var stop = function () { if (e.preventDefault) e.preventDefault(); };
+
+    if (k >= '1' && k <= '5') { selectCard(parseInt(k, 10) - 1); stop(); return; }
+
+    var lanes = { q: 0, w: 1, e: 2, a: 0, s: 1, d: 2 };
+    if (Object.prototype.hasOwnProperty.call(lanes, lower)) { playAt(lanes[lower]); stop(); return; }
+
+    if (k === ' ' || k === 'Spacebar' || k === 'Enter') {
+      if (G.phase === 'ready') start();
+      else if (G.phase === 'player') endTurn();
+      else if (G.phase === 'paused') togglePause();
+      else if (G.phase === 'win' || G.phase === 'lose') restart(defaultSeed());
+      stop();
+      return;
+    }
+    if (lower === 'p') { togglePause(); return; }
+    if (lower === 'n') { restart(defaultSeed()); return; }
+    if (k === 'Escape' || k === 'Esc') { G.selected = null; updateHud(); }
+  }
+
+  /* ======================================================================
+   * 8. rAF clock - the only clock. No browser timer API is used anywhere.
+   * ==================================================================== */
+
+  var lastT = 0;
+
+  function loop(ts) {
+    var now = (typeof ts === 'number' && isFinite(ts)) ? ts : lastT;
+    var dt = (now - lastT) / 1000;
+    if (!isFinite(dt) || dt <= 0) dt = 0;
+    if (dt > 0.05) dt = 0.05;                 // clamp hitches and tab restores
+    lastT = now;
+    update(dt);
+    updateHud();                              // the single paint of this frame
+    requestAnimationFrame(loop);
+  }
+
+  /* ======================================================================
+   * 9. Test bridge (window.CB) + boot
+   * ==================================================================== */
+
+  window.CB = {
+    /* constants */
+    LANES: LANES, HAND_MAX: HAND_MAX, DECK_SIZE: DECK_SIZE,
+    START_HP: START_HP, MAX_ENERGY: MAX_ENERGY, START_HAND: START_HAND,
+    RESOLVE_SEC: RESOLVE_SEC, ENEMY_SEC: ENEMY_SEC, ENEMY_STEP: ENEMY_STEP,
+    LOG_SHOW: LOG_SHOW,
+
+    /* pure data: the catalogue (spells carry atk/hp = null) and the deck list */
+    cards: function () {
+      return CARDS.map(function (c) {
+        return {
+          id: c.id, en: c.en, zh: c.zh, cost: c.cost,
+          atk: c.kind === 'unit' ? c.atk : null,
+          hp: c.kind === 'unit' ? c.hp : null,
+          kind: c.kind, text: { en: c.text.en, zh: c.text.zh }
+        };
+      });
+    },
+    deckList: function () { return deckList(); },
+    deck: function () { return deck(); },
+
+    /* pure functions - no side effects, no module state, no randomness */
+    energyFor: function (turn) { return energyFor(turn); },
+    mulberry32: function (seed) { return mulberry32(seed); },
+    shuffle: function (list, rng) { return shuffle(list, rng); },
+    enemyChooseAction: function (b, h, en) { return enemyChooseAction(b, h, en); },
+    resolveCombat: function (b) { return resolveCombat(b); },
+    canPlay: function (state, handIndex, lane) { return canPlay(state, handIndex, lane); },
+
+    /* live queries */
+    getState: function () { return getState(); },
+    hudCache: function () { return hudCacheCopy(); },
+    log: function () { return G.log.slice(); },
+    board: function () { return board(); },
+    hand: function () { return hand(); },
+    unitAt: function (lane, side) { return unitAt(lane, side); },
+
+    /* Advances the LIVE stream and counts the call. For isolated randomness
+     * replay mulberry32(seed) instead - that one owns its own state. */
+    nextRandom: function () { return G ? G.rng.next() : null; },
+
+    /* lifecycle */
+    newGame: function (opts) { return newGame(opts); },
+    start: function () { return start(); },
+    pause: function () { return pause(); },
+    selectCard: function (idx) { return selectCard(idx); },
+    playCard: function (handIndex, lane) { return playCard(handIndex, lane); },
+    endTurn: function () { return endTurn(); },
+    tick: function (seconds, step) { return tick(seconds, step); }
+  };
+
+  init();
+
+  /* Build the DOM from the model on every frame and on every language change.
+   * Exactly ONE onChange callback is registered; without it the dynamic text
+   * (turn line, combat log, hand costs, result dialog) would freeze on the
+   * language it was written in. */
+  T.onChange(function () {
+    resetHudCache();
+    updateHud();
+  });
+
+  T.start();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

@@ -78,7 +78,7 @@ https://litegame-hub.github.io/wordguess-game/
 它需要 `jsdom`，装在隔离目录里（仓库本身保持零依赖）：
 
 ```
-NODE_PATH=/Users/dgt/.workbuddy/binaries/node/workspace/node_modules \
+NODE_PATH=<isolated-node-modules> \
   node tools/wordguess-dom.js
 ```
 
