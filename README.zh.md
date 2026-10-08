@@ -2,7 +2,7 @@
 
 **[简体中文](README.zh.md)** · [English](README.md)
 
-[![games](https://img.shields.io/badge/games-31-blue?style=flat-square)](#游戏列表)
+[![games](https://img.shields.io/badge/games-32-blue?style=flat-square)](#游戏列表)
 [![AI-generated](https://img.shields.io/badge/AI--generated-100%25-8b5cf6?style=flat-square)](#这个项目是怎么做出来的)
 [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen?style=flat-square)](#为什么是-litegame)
 [![vanilla JS](https://img.shields.io/badge/vanilla-JS-f7df1e?style=flat-square&logo=javascript&logoColor=black)](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript)
@@ -60,6 +60,7 @@
 | [platformer-game](platformer-game) | 横版闯关，十张单屏关卡，跑到终点门，踩怪躲刺捡金币 | `平台跳跃` `关卡` `键盘` |
 | [towerdefense-game](towerdefense-game) | 塔防，固定路径上的三塔十二波，建造升级出售，别让敌人抵达基地 | `塔防` `策略` `波次` |
 | [cardbattle-game](cardbattle-game) | 卡牌对战，三线双方同一副 20 张牌，单位换血法术烧灼，先破基地者胜 | `卡牌` `对战` `策略` |
+| [pinball-game](pinball-game) | 弹球台，定步长物理：发射杆、三个弹珠、一副挡板，全部常量公开，每次击球都能精确复现 | `动作` `物理` `街机` |
 
 ## 为什么是 litegame
 

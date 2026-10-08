@@ -4,7 +4,7 @@
 
   <url>
     <loc>https://litegame-hub.github.io/</loc>
-    <lastmod>2026-09-29</lastmod>
+    <lastmod>2026-10-08</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
@@ -222,6 +222,13 @@
   <url>
     <loc>https://litegame-hub.github.io/cardbattle-game/</loc>
     <lastmod>2026-09-29</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <url>
+    <loc>https://litegame-hub.github.io/pinball-game/</loc>
+    <lastmod>2026-10-08</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>

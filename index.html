@@ -55,7 +55,7 @@
   "mainEntity": {
     "@type": "ItemList",
     "name": "Games",
-    "numberOfItems": 31,
+    "numberOfItems": 32,
     "itemListElement": [
       { "@type": "ListItem", "position": 1,  "name": "Snake",           "url": "https://litegame-hub.github.io/snake-game/" },
       { "@type": "ListItem", "position": 2,  "name": "Gomoku",          "url": "https://litegame-hub.github.io/gomoku-game/" },
@@ -87,7 +87,8 @@
       { "@type": "ListItem", "position": 28, "name": "Space Invaders",  "url": "https://litegame-hub.github.io/invaders-game/" },
       { "@type": "ListItem", "position": 29, "name": "Platformer",      "url": "https://litegame-hub.github.io/platformer-game/" },
       { "@type": "ListItem", "position": 30, "name": "Tower Defense",   "url": "https://litegame-hub.github.io/towerdefense-game/" },
-      { "@type": "ListItem", "position": 31, "name": "Card Battle",     "url": "https://litegame-hub.github.io/cardbattle-game/" }
+      { "@type": "ListItem", "position": 31, "name": "Card Battle",     "url": "https://litegame-hub.github.io/cardbattle-game/" },
+      { "@type": "ListItem", "position": 32, "name": "Pinball",         "url": "https://litegame-hub.github.io/pinball-game/" }
     ]
   }
 }
@@ -792,6 +793,22 @@
       <p>
         <span data-lang="en" class="inline on">Three lanes, 20 HP a side and one 20-card deck shuffled the same way for both of you: pick a card, then pick a lane. Units hold a lane and trade, spells burn or mend, and whoever breaks the other base first wins. Fully deterministic, with a random-free enemy brain.</span>
         <span data-lang="zh" class="inline">三条兵线、双方各 20 点基地生命、同一副 20 张牌同法定洗：先点手牌，再点兵线。单位占线换血，法术负责烧灼与治疗，先击破对方基地者胜。整局完全确定性，敌方 AI 不含任何随机。</span>
+      </p>
+      <div class="go">
+        <span data-lang="en" class="inline on">Play →</span>
+        <span data-lang="zh" class="inline">开始游戏 →</span>
+      </div>
+    </a>
+
+    <a class="card" href="pinball-game/">
+      <div class="icon">🎱</div>
+      <h2>
+        <span data-lang="en" class="inline on">Pinball</span>
+        <span data-lang="zh" class="inline">弹球台</span>
+      </h2>
+      <p>
+        <span data-lang="en" class="inline on">A plunger, three bumpers and a pair of flippers, all driven by a fixed-step integrator whose every constant is published. Each shot replays exactly from its seed, and no ball can ever pass through a wall.</span>
+        <span data-lang="zh" class="inline">一根发射杆、三个弹珠和一副挡板，全部跑在定步长积分器上，每个常量都写在文档里。每一次击球都能由种子精确复现，球永远不会穿透挡墙。</span>
       </p>
       <div class="go">
         <span data-lang="en" class="inline on">Play →</span>
