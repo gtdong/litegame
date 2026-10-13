@@ -1,0 +1,1279 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Endless Runner · 无尽跑酷</title>
+<style>
+  :root {
+    --bg: #eef2fb;
+    --card: #ffffff;
+    --border: #d7deee;
+    --text: #1e2740;
+    --muted: #6b7592;
+    --accent: #6366f1;
+    --track: #0d1226;
+    --track2: #141b36;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    margin: 0;
+    padding: 20px 12px 48px;
+    background: radial-gradient(120% 120% at 50% 0%, #ffffff 0%, var(--bg) 62%);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+  }
+
+  h1 { margin: 0 0 4px; font-size: 27px; letter-spacing: -.02em; }
+  .tip { margin: 0 0 16px; font-size: 13px; color: var(--muted); text-align: center; max-width: 640px; line-height: 1.6; }
+
+  .panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 14px;
+    box-shadow: 0 10px 30px rgba(30,39,64,.10);
+    width: min(520px, 100%);
+  }
+
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    margin-bottom: 10px;
+  }
+  .bar:last-child { margin-bottom: 0; margin-top: 10px; }
+
+  .stat {
+    background: #f5f7fd;
+    color: #3a4668;
+    font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 5px 9px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .stat small { font-weight: 600; opacity: .72; }
+
+  button {
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    color: #2a3350;
+    background: #f1f4fc;
+    border: 1px solid var(--border);
+    border-radius: 11px;
+    padding: 8px 13px;
+    cursor: pointer;
+    transition: transform .06s ease, background .12s ease, opacity .12s ease;
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  button:hover { background: #e7ecfa; }
+  button:active { transform: translateY(1px); }
+  button:disabled { opacity: .45; cursor: default; }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  button.pad { min-width: 64px; }
+
+  .stage { position: relative; }
+
+  /* The track is a FIXED logical field of exactly VIEW_W x VIEW_H logical px.
+   * It owns --cell (= LANE_W) and nothing else changes on resize. Every child is
+   * positioned from the published constants - never read back out of the DOM. */
+  .track {
+    position: relative;
+    width: 288px;
+    height: 448px;
+    margin: 0 auto;
+    --cell: 96px;
+    background: linear-gradient(180deg, var(--track) 0%, var(--track2) 100%);
+    border-radius: 14px;
+    overflow: hidden;
+    touch-action: manipulation;
+    cursor: pointer;
+  }
+  /* Lane dividers + the ground line (decorative only). */
+  .track::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(90deg,
+      transparent 0 94px, rgba(255,255,255,.06) 94px 96px);
+    pointer-events: none;
+  }
+  .track::after {
+    content: '';
+    position: absolute;
+    left: 0; right: 0; top: 392px; height: 2px;
+    background: rgba(255,255,255,.25);
+    pointer-events: none;
+  }
+
+  #hazardLayer, #coinLayer { position: absolute; inset: 0; pointer-events: none; }
+
+  /* The player: --lane is a BARE integer, --y is a BARE number (px above ground).
+   * Both are repainted unconditionally every frame from the model. */
+  .player {
+    position: absolute;
+    left: 31px;                  /* LANE_W/2 - PLAYER_W/2 */
+    top: 336px;                  /* GROUND_Y - PLAYER_H */
+    width: 34px;                 /* PLAYER_W */
+    height: 56px;                /* PLAYER_H */
+    border-radius: 8px;
+    background: linear-gradient(#9fd0ff, #5b8def);
+    box-shadow: 0 0 12px rgba(120,170,255,.55);
+    transform: translate(calc(var(--lane) * var(--cell)), calc(var(--y) * -1px));
+  }
+  .player.is-sliding {
+    top: 364px;                  /* GROUND_Y - PLAYER_SLIM_H */
+    height: 28px;                /* PLAYER_SLIM_H */
+    border-radius: 6px;
+    background: linear-gradient(#ffe08a, #f0a93a);
+  }
+  .player.is-jumping { box-shadow: 0 0 18px rgba(150,200,255,.9); }
+  .player.is-dead { background: linear-gradient(#ffb0b0, #d35454); box-shadow: 0 0 16px rgba(255,120,120,.8); }
+
+  /* A hazard in lane `--lane`; --x is its horizontal screen x (bare px number). */
+  .hazard {
+    position: absolute;
+    top: 0;
+    left: calc(var(--x, 0) * 1px);
+    border-radius: 5px;
+  }
+  .hazard[data-kind="low"]  { background: linear-gradient(#ff9a9a, #e05353); }
+  .hazard[data-kind="high"] { background: linear-gradient(#c9a2ff, #8a5be0); }
+  .hazard[data-kind="full"] { background: linear-gradient(#98a1c4, #4c5478); }
+
+  .coin {
+    position: absolute;
+    top: 0;
+    left: calc(var(--x, 0) * 1px);
+    border-radius: 999px;
+    background: radial-gradient(circle at 35% 35%, #fff2b0, #e0a800);
+    box-shadow: 0 0 8px rgba(255,210,90,.7);
+  }
+
+  /* #fxLayer is a SIBLING of #track (never a child) so a decorative node can
+   * never intercept the track's clicks. */
+  #fxLayer { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+
+  .info {
+    font-size: 12px;
+    color: var(--muted);
+    text-align: center;
+    min-height: 18px;
+    margin: 8px 0 0;
+    line-height: 1.5;
+  }
+
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(5, 11, 26, .62);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 20;
+  }
+  .overlay.show { display: flex; }
+
+  .dialog {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 26px 28px 22px;
+    width: min(380px, 100%);
+    text-align: center;
+    box-shadow: 0 16px 50px rgba(20,27,48,.30);
+    animation: rise .2s ease-out;
+  }
+  @keyframes rise {
+    from { transform: translateY(12px); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+  }
+  .dialog h2 { margin: 0 0 10px; font-size: 22px; }
+  .dialog p  { color: var(--muted); font-size: 13px; line-height: 1.65; margin: 0 0 18px; }
+
+  @media (max-width: 520px) {
+    h1 { font-size: 22px; }
+    .panel { padding: 11px; }
+    .bar { gap: 5px; }
+    button { padding: 7px 10px; font-size: 12px; }
+    button.pad { min-width: 54px; }
+    .stat { padding: 4px 7px; font-size: 11px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="lang-switch" data-lang-switch></div>
+
+<h1 data-i18n="title"></h1>
+<p class="tip" data-i18n-html="tip"></p>
+
+<div class="panel">
+  <div class="bar">
+    <span class="stat"><small data-i18n="score"></small> <b id="score">0</b></span>
+    <span class="stat"><small data-i18n="best"></small> <b id="best">0</b></span>
+    <span class="stat"><small data-i18n="level"></small> <b id="level">0</b></span>
+    <span class="stat"><small data-i18n="distance"></small> <b id="distance">0</b></span>
+    <span class="stat"><small data-i18n="speed"></small> <b id="speed">0.00</b></span>
+    <span class="stat"><small data-i18n="coins"></small> <b id="coins">0</b></span>
+  </div>
+
+  <div class="stage">
+    <div id="track" class="track">
+      <div id="hazardLayer" class="layer"></div>
+      <div id="coinLayer" class="layer"></div>
+      <div id="player" class="player"></div>
+    </div>
+    <div id="fxLayer" class="fx"></div>
+  </div>
+
+  <p class="info" id="msg"></p>
+
+  <div class="bar">
+    <button id="btnLeft" class="pad" aria-label="left">&#9664;</button>
+    <button id="btnJump" class="primary pad" data-i18n="jump"></button>
+    <button id="btnSlide" class="pad" data-i18n="slide"></button>
+    <button id="btnRight" class="pad" aria-label="right">&#9654;</button>
+  </div>
+
+  <div class="bar">
+    <button id="btnPause" data-i18n="pause" disabled></button>
+    <button id="btnNew" data-i18n="newgame"></button>
+  </div>
+</div>
+
+<!-- Start overlay: the required entry point out of the ready state. -->
+<div id="startOverlay" class="overlay show">
+  <div class="dialog">
+    <h2 data-i18n="title"></h2>
+    <p data-i18n-html="readySub"></p>
+    <button id="btnStart" class="primary" data-i18n="start"></button>
+  </div>
+</div>
+
+<!-- Result overlay: shown after the single life is lost. -->
+<div id="overlay" class="overlay">
+  <div class="dialog">
+    <h2 id="ovTitle"></h2>
+    <p id="ovSub"></p>
+    <button id="ovBtn" class="primary"></button>
+  </div>
+</div>
+
+<script src="../assets/i18n.js"></script>
+<script>
+/* ============================================================================
+ * Endless Runner / 无尽跑酷 - a single-file, zero-dependency, DOM+CSS game.
+ *
+ * There is NO canvas anywhere: every visual is a <div> positioned from the
+ * published constants, so the whole game survives the repo's headless stub
+ * (whose 2D context is a Proxy that returns non-numeric values).
+ *
+ * The three pillars:
+ *
+ *   (a) THE WORLD IS A PURE FUNCTION OF DISTANCE.
+ *       ONE scalar `distance` (px, float) is the entire world clock. Speed is a
+ *       pure function of distance - speedAt(s) - so the whole obstacle field is
+ *       a pure function of distance. Nothing is accumulated frame by frame:
+ *       slot k lives at the FIXED absolute distance slotS(k) = SLOT0 + k*GAP,
+ *       and hazardAt(k) is a pure function of (seed, k).
+ *
+ *   (b) THE GAME IS PROVABLY NEVER IMPOSSIBLE (P1..P7, see the READMEs).
+ *       Slot spacing is constant in DISTANCE, so the time between slots shrinks
+ *       toward the floor SLOT_GAP / SPEED_MAX as speed rises. A generated
+ *       "corridor" lane c(k) - the guaranteed free lane - moves by at most one
+ *       lane per slot, so a route always exists and is always reachable.
+ *
+ *   (c) ALL GEOMETRY IS DOM+CSS FROM PUBLISHED CONSTANTS.
+ *       The renderer reads numbers only from the constants and from the pure
+ *       mappers (laneXOf, toPixel); it never reads a position back out of the
+ *       DOM (the stub's getPropertyValue always returns '').
+ *
+ * One requestAnimationFrame chain drives the same update(dt) that the public,
+ * deterministic tick(seconds, step) drives - no timers anywhere.
+ * ========================================================================== */
+(function () {
+  'use strict';
+
+  /* ======================================================================
+   * 1. Constants - geometry is OWNED here and never read back from the DOM.
+   * ==================================================================== */
+
+  var LANE_COUNT = 3;              // lanes per track
+  var LANE_W = 96;                 // lane width (px)
+  var VIEW_W = LANE_COUNT * LANE_W; // logical field width (px) = 288
+  var VIEW_H = 448;                // logical field height (px)
+  var GROUND_Y = 392;              // the line the player runs along (px, from top)
+  var PLAYER_W = 34;               // player hitbox width (px)
+  var PLAYER_H = 56;               // player standing hitbox height (px)
+  var PLAYER_SLIM_H = 28;          // player sliding hitbox height (px)
+
+  var SLOT0 = 640;                 // absolute distance of slot 0 (px)
+  var SLOT_GAP = 320;              // constant spacing between slots, in distance (px)
+  var LEVEL_SPAN = 2000;           // distance per difficulty level (px)
+  var LEVEL_MAX = 16;              // level is clamped to this
+  var SPEED_BASE = 200;            // world speed at level 0 (px/s)
+  var SPEED_RAMP = 20;             // speed added per level (px/s)
+  var SPEED_MAX = 520;             // hard speed cap (px/s) = BASE + RAMP*LEVEL_MAX
+  var MIN_REACT_S = 0.45;          // guaranteed minimum reaction budget (s)
+
+  var GRAVITY = 2200;              // jump gravity (px/s^2)
+  var JUMP_V = 900;                // initial jump velocity (px/s)
+  var SLIDE_S = 0.6;               // slide duration (s) - see the P5 note: the
+                                   // worst case is SPEED_BASE (coverage scales
+                                   // with speed, the overlap is a fixed length)
+  var LANE_CHANGE_S = 0.18;        // lane interpolation time (s)
+
+  var HAZARD_LOW_W = 60;           // low bar: depth along travel (px)
+  var HAZARD_LOW_H = 46;           // low bar: height off the ground (px)
+  var HAZARD_HIGH_W = 70;          // high bar: depth along travel (px)
+  var HAZARD_HIGH_H = 24;          // high bar: its own thickness (px)
+  var HAZARD_HIGH_CLEAR = 34;      // gap under the high bar (px)
+  var HAZARD_WALL_W = 40;          // wall: depth along travel (px)
+  var WALL_H = 120;                // wall: visual height (px)
+
+  var COIN_R = 10;                 // coin radius (px)
+  var COIN_POINTS = 25;            // points per collected coin
+  var SCORE_PER_UNIT = 10;         // 1 score point per 10 px of distance
+  var COIN_CHANCE = 0.4;           // seeded chance a slot also carries a coin
+  var EMPTY_CHANCE = 0.14;         // seeded chance a slot ends up empty
+  var SINGLE_CHANCE = 0.66;        // cumulative chance of a one-lane hazard
+  var PATTERN_LEN = 12;            // length of the corridor pattern (slots)
+  var DEFAULT_STEP = 1 / 60;       // s (default tick() sub-step)
+  var MAX_CHUNK = 0.25;            // s (largest span one tick() chunk covers)
+  var POOL_SIZE = 24;              // reused obstacle / coin DOM nodes per layer
+  var VIEW_AHEAD = GROUND_Y;       // hazards farther than this are off-screen
+  var STORE_KEY = 'litegame_runner_best';
+
+  /* ======================================================================
+   * 2. i18n (shared zero-dependency module: ../assets/i18n.js)
+   * ==================================================================== */
+
+  var T = LiteI18N.create({
+    title:    { en: 'Endless Runner', zh: '无尽跑酷' },
+    tip: {
+      en: 'Three lanes, an endless track. The world is a pure function of distance, so every slot always leaves a free lane. Switch lanes and jump or slide to dodge the hazards, grab coins for bonus points, and see how far you get before the speed catches you.',
+      zh: '三条跑道，无尽向前。整个世界是距离的纯函数，因此每个关位永远留下一条空跑道。变道、跳跃或下滑来躲避障碍，拾取金币拿奖励分，看你能在被速度追上之前跑多远。'
+    },
+    score:    { en: 'Score', zh: '得分' },
+    best:     { en: 'Best', zh: '最高' },
+    level:    { en: 'Level', zh: '关卡' },
+    distance: { en: 'Distance', zh: '距离' },
+    speed:    { en: 'Speed', zh: '速度' },
+    coins:    { en: 'Coins', zh: '金币' },
+    newgame:  { en: 'New game', zh: '新游戏' },
+    start:    { en: 'Start game', zh: '开始游戏' },
+    again:    { en: 'Play again', zh: '再来一局' },
+    pause:    { en: 'Pause', zh: '暂停' },
+    resume:   { en: 'Resume', zh: '继续' },
+    jump:     { en: 'Jump', zh: '跳跃' },
+    slide:    { en: 'Slide', zh: '下滑' },
+    readySub: {
+      en: 'Three lanes, one life. Dodge the bars and blocks, collect coins, and never stop running.',
+      zh: '三条跑道，一条命。躲开横杆与方块，收集金币，别停下脚步。'
+    },
+    readyInfo: { en: 'Press Start to run.', zh: '点击“开始游戏”开始奔跑。' },
+    msgPlaying: { en: 'Arrows / A D switch lanes. Up / W / Space jumps. Down / S slides.', zh: '方向键 / A D 变道。上 / W / 空格 跳跃。下 / S 下滑。' },
+    msgPaused: { en: 'Paused.', zh: '已暂停。' },
+    msgOver:   { en: 'Game over.', zh: '游戏结束。' },
+    overTitle: { en: 'Game over', zh: '游戏结束' },
+    overSub:   { en: 'Final score {n}. Best {b}.', zh: '最终得分 {n}。最高 {b}。' }
+  });
+
+  /* ======================================================================
+   * 3. DOM handles (every id below must exist in the markup)
+   * ==================================================================== */
+
+  var trackEl      = document.getElementById('track');
+  var playerEl     = document.getElementById('player');
+  var hazardLayer  = document.getElementById('hazardLayer');
+  var coinLayer    = document.getElementById('coinLayer');
+  var fxLayerEl    = document.getElementById('fxLayer');
+  var scoreEl      = document.getElementById('score');
+  var bestEl       = document.getElementById('best');
+  var levelEl      = document.getElementById('level');
+  var distanceEl   = document.getElementById('distance');
+  var speedEl      = document.getElementById('speed');
+  var coinsEl      = document.getElementById('coins');
+  var msgEl        = document.getElementById('msg');
+  var btnLeft      = document.getElementById('btnLeft');
+  var btnJump      = document.getElementById('btnJump');
+  var btnSlide     = document.getElementById('btnSlide');
+  var btnRight     = document.getElementById('btnRight');
+  var btnPause     = document.getElementById('btnPause');
+  var btnNew       = document.getElementById('btnNew');
+  var startOverlayEl = document.getElementById('startOverlay');
+  var btnStart     = document.getElementById('btnStart');
+  var overlayEl    = document.getElementById('overlay');
+  var ovTitleEl    = document.getElementById('ovTitle');
+  var ovSubEl      = document.getElementById('ovSub');
+  var ovBtnEl      = document.getElementById('ovBtn');
+
+  /* The track owns --cell (set ONCE from the constants; only this changes on a
+   * resize). Every child reads it in a calc(). */
+  trackEl.style.setProperty('--cell', LANE_W + 'px');
+
+  /* Reused obstacle / coin nodes, positioned every frame. */
+  var hazardPool = [];
+  var coinPool = [];
+  var usedHazards = 0;
+  var usedCoins = 0;
+  (function initPools() {
+    for (var i = 0; i < POOL_SIZE; i++) {
+      var h = document.createElement('div');
+      h.className = 'hazard';
+      hazardLayer.appendChild(h);
+      hazardPool.push(h);
+    }
+    for (var j = 0; j < POOL_SIZE; j++) {
+      var c = document.createElement('div');
+      c.className = 'coin';
+      coinLayer.appendChild(c);
+      coinPool.push(c);
+    }
+  })();
+
+  /* ======================================================================
+   * 4. Pure math (side-effect free, deterministic, NaN-safe)
+   * ==================================================================== */
+
+  function num(v, d) {
+    if (typeof v === 'number' && isFinite(v)) return v;
+    return (typeof d === 'number' && isFinite(d)) ? d : 0;
+  }
+
+  function clamp(v, lo, hi) {
+    if (!isFinite(v)) return lo;
+    return v < lo ? lo : (v > hi ? hi : v);
+  }
+
+  function clampLane(i) {
+    var n = Math.floor(num(i, 0));
+    if (n < 0) n = 0;
+    if (n > LANE_COUNT - 1) n = LANE_COUNT - 1;
+    return n;
+  }
+
+  /* Lane centre x from a lane index (the ONLY lane->x mapping). */
+  function laneXOf(i) { return LANE_W * (clampLane(i) + 0.5); }
+
+  /* Seeded generator factory (mulberry32). Pure: no external state. */
+  function mulberry32(seed) {
+    var a = (seed >>> 0) || 1;
+    return function () {
+      a = (a + 0x6D2B79F5) | 0;
+      var t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  /* Fold (seed, k, salt) into one 32-bit seed for a per-slot generator. */
+  function mixSeed(seedIn, k, salt) {
+    var h = (num(seedIn, 0) >>> 0) ^ Math.imul((num(k, 0) >>> 0) + 0x9E3779B9, 0x85EBCA6B);
+    h = Math.imul(h ^ (h >>> 13), 0xC2B2AE35);
+    h = (h ^ Math.imul((num(salt, 0) >>> 0) + 0x165667B1, 0x27D4EB2F)) >>> 0;
+    return h >>> 0;
+  }
+
+  /* ======================================================================
+   * 5. The world model - pure functions of distance
+   * ==================================================================== */
+
+  function levelAt(s) {
+    var l = Math.floor(num(s, 0) / LEVEL_SPAN);
+    if (!isFinite(l)) l = 0;
+    if (l < 0) l = 0;
+    if (l > LEVEL_MAX) l = LEVEL_MAX;
+    return l;
+  }
+
+  function speedAt(s) {
+    var v = SPEED_BASE + SPEED_RAMP * levelAt(s);
+    return v > SPEED_MAX ? SPEED_MAX : v;
+  }
+
+  /* Absolute distance of slot k (linear in k; spacing is constant in distance). */
+  function slotS(k) { return SLOT0 + num(k, 0) * SLOT_GAP; }
+
+  /* Number of slots at or before distance s. */
+  function slotCount(s) {
+    var v = num(s, 0);
+    if (v < SLOT0) return 0;
+    return Math.floor((v - SLOT0) / SLOT_GAP) + 1;
+  }
+
+  /* EXACT time to travel from s0 to s1 (s). Closed form: the speed is piecewise
+   * constant in distance, so the integral of 1/speed is a finite sum of
+   * (segment length) / (that segment's speed). NEVER numerically integrated. */
+  function timeBetween(s0, s1) {
+    var a = num(s0, 0), b = num(s1, 0);
+    if (b === a) return 0;
+    if (b < a) return -timeBetween(b, a);
+    var t = 0, x = a, guard = 0;
+    while (x < b - 1e-12 && guard < 1000000) {
+      var L = levelAt(x);
+      var segEnd = (L >= LEVEL_MAX) ? b : Math.min(b, (L + 1) * LEVEL_SPAN);
+      t += (segEnd - x) / speedAt(x);
+      x = segEnd;
+      guard += 1;
+    }
+    return t;
+  }
+
+  /* Seconds available to react between slot k-1 and slot k. */
+  function reactionBudget(k) {
+    var kk = Math.floor(num(k, 0));
+    var s1 = slotS(kk);
+    var s0 = (kk > 0) ? slotS(kk - 1) : 0;
+    return timeBetween(s0, s1);
+  }
+
+  /* --- the corridor: a guaranteed free lane per slot ----------------------
+   * pattern is rebuilt once per seed. Pattern[0] is the middle lane and the
+   * walk only ever steps by -1/0/+1 inside [0, 2], so BOTH every internal step
+   * and the periodic wrap satisfy |c(k+1) - c(k)| <= 1 - which is exactly the
+   * connectedness property P2. */
+  var pattern = [];
+  function buildPattern() {
+    var r = mulberry32(mixSeed(seed, 0, 0xBEEF));
+    pattern = [];
+    var c = 1;
+    for (var i = 0; i < PATTERN_LEN; i++) {
+      pattern.push(c);
+      var step = Math.floor(r() * 3) - 1;   // -1, 0 or +1
+      c = clamp(c + step, 0, LANE_COUNT - 1);
+    }
+  }
+  function corridorLane(k) {
+    var m = ((Math.floor(num(k, 0)) % PATTERN_LEN) + PATTERN_LEN) % PATTERN_LEN;
+    return pattern[m];
+  }
+
+  function lanesExcept(c) {
+    var out = [];
+    for (var i = 0; i < LANE_COUNT; i++) if (i !== c) out.push(i);
+    return out;
+  }
+  function complement(blocked) {
+    var out = [];
+    for (var i = 0; i < LANE_COUNT; i++) if (blocked.indexOf(i) < 0) out.push(i);
+    return out;
+  }
+
+  /* Pure slot descriptor for slot k (keyed on the game seed and k). Returns
+   * null only when k is out of range (k < 0 or not a number); a valid slot
+   * always returns an object, an empty one with kind 'empty' and blocked []. */
+  function hazardAt(k) {
+    var kk = Math.floor(num(k, -1));
+    if (!isFinite(kk) || kk < 0) return null;
+
+    var c = corridorLane(kk);
+    var r = mulberry32(mixSeed(seed, kk, 0x1F2E3D4C));
+    var r0 = r(), r1 = r(), r2 = r(), r3 = r(), r4 = r();
+
+    var blocked, free, kind, lane, w, h;
+
+    if (r0 < EMPTY_CHANCE) {
+      blocked = []; free = [0, 1, 2]; kind = 'empty'; lane = -1; w = 0; h = 0;
+    } else if (r0 < SINGLE_CHANCE) {
+      var others = lanesExcept(c);
+      var pick = (r1 < 0.5) ? others[0] : others[1];
+      blocked = [pick];
+      free = complement(blocked);
+      lane = pick;
+      if (r2 < 0.40) { kind = 'low'; w = HAZARD_LOW_W; h = HAZARD_LOW_H; }
+      else if (r2 < 0.80) { kind = 'high'; w = HAZARD_HIGH_W; h = HAZARD_HIGH_H; }
+      else { kind = 'wall'; w = HAZARD_WALL_W; h = WALL_H; }
+    } else {
+      /* Two blocked lanes - NEVER all three: the corridor lane stays free. */
+      blocked = lanesExcept(c);
+      free = [c];
+      kind = 'wall'; lane = blocked[0]; w = HAZARD_WALL_W; h = WALL_H;
+    }
+
+    var coin = null;
+    if (r3 < COIN_CHANCE && free.length > 0) {
+      var ci = Math.floor(r4 * free.length);
+      if (ci < 0) ci = 0;
+      if (ci >= free.length) ci = free.length - 1;
+      coin = { lane: free[ci] };      // P7: a coin is never in a blocked lane
+    }
+
+    return { k: kk, lane: lane, kind: kind, s: slotS(kk), w: w, h: h,
+             blocked: blocked, free: free, coin: coin };
+  }
+
+  /* Every slot descriptor whose slot distance lies inside [s0, s1] (inclusive
+   * on both ends; slotS(kStart) >= a and slotS(kEnd) <= b). */
+  function hazardsBetween(s0, s1) {
+    var a = num(s0, 0), b = num(s1, 0);
+    if (b < a) { var t = a; a = b; b = t; }
+    var out = [];
+    if (b < SLOT0) return out;
+    var kStart = Math.ceil((a - SLOT0) / SLOT_GAP);
+    if (!isFinite(kStart) || kStart < 0) kStart = 0;
+    var kEnd = Math.floor((b - SLOT0) / SLOT_GAP);
+    for (var k = kStart; k <= kEnd; k++) {
+      var hz = hazardAt(k);
+      if (hz) out.push(hz);
+    }
+    return out;
+  }
+
+  /* --- pure kinematics of the player actions ---------------------------- */
+
+  function jumpApex() { return (JUMP_V * JUMP_V) / (2 * GRAVITY); }
+  function jumpAirtime() { return (2 * JUMP_V) / GRAVITY; }
+  function slideDuration() { return SLIDE_S; }
+  function laneChangeTime() { return LANE_CHANGE_S; }
+
+  /* Pure lane + forward-distance -> screen pixel mapping the renderer uses.
+   * s is the FORWARD gap ahead of the player (the renderer passes s - distance),
+   * so larger s is higher up the field. Lane centres come from laneXOf. */
+  function toPixel(lane, s) {
+    return { x: laneXOf(lane), y: GROUND_Y - num(s, 0) };
+  }
+
+  /* A fresh, plain snapshot of the fixed field geometry. */
+  function world() {
+    return {
+      laneCount: LANE_COUNT,
+      laneX: [laneXOf(0), laneXOf(1), laneXOf(2)],
+      laneW: LANE_W,
+      viewW: VIEW_W,
+      viewH: VIEW_H,
+      groundY: GROUND_Y,
+      playerW: PLAYER_W,
+      playerH: PLAYER_H,
+      playerSlimH: PLAYER_SLIM_H,
+      slotGap: SLOT_GAP,
+      slot0: SLOT0
+    };
+  }
+
+  /* ======================================================================
+   * 6. Live state
+   * ==================================================================== */
+
+  var phase = 'ready';       // 'ready' | 'playing' | 'paused' | 'over'
+  var distance = 0;          // THE world clock (px)
+  var score = 0;
+  var best = 0;
+  var coinCount = 0;
+  var lane = 1;              // hitbox lane (flips at the midpoint of a change)
+  var targetLane = 1;        // destination lane
+  var laneFrom = 1;          // lane the interpolation started from
+  var laneT = 1;             // interpolation progress in [0, 1]
+  var y = 0;                 // jump height above the ground line (px)
+  var vy = 0;                // vertical velocity (px/s, positive = up)
+  var onGround = true;
+  var sliding = false;
+  var slideT = 0;            // remaining slide time (s)
+  var alive = true;
+  var over = false;
+  var seed = 1;
+  var ticks = 0;
+  var taken = {};            // slot indices whose coin was collected
+  var eventLog = [];
+  var rngCalls = 0;
+
+  function setSeed(s) {
+    var v = (typeof s === 'number' && isFinite(s)) ? (s | 0) : 1;
+    if (v === 0) v = 1;
+    seed = v >>> 0;
+    rngCalls = 0;
+    buildPattern();
+  }
+
+  function log(type, extra) {
+    var entry = { t: Math.round(distance * 1000) / 1000, type: type };
+    if (extra) {
+      for (var k in extra) {
+        if (Object.prototype.hasOwnProperty.call(extra, k)) entry[k] = extra[k];
+      }
+    }
+    eventLog.push(entry);
+    if (eventLog.length > 60) eventLog.shift();
+    return entry;
+  }
+
+  function logSnapshot() {
+    var out = [];
+    for (var i = 0; i < eventLog.length; i++) {
+      var e = eventLog[i], c = {};
+      for (var k in e) if (Object.prototype.hasOwnProperty.call(e, k)) c[k] = e[k];
+      out.push(c);
+    }
+    return out;
+  }
+
+  /* ======================================================================
+   * 7. Best score (localStorage, always wrapped in try/catch)
+   * ==================================================================== */
+
+  function bestLoad() {
+    try {
+      var v = localStorage.getItem(STORE_KEY);
+      var n = v === null ? 0 : parseInt(v, 10);
+      return isNaN(n) ? 0 : n;
+    } catch (e) { return 0; }
+  }
+
+  /* Authoritative writer: folds the current score into `best` and ALWAYS
+   * persists it (no `if (score > best)` guard, which would make the write
+   * unreachable once `best` was advanced live). */
+  function bestSave() {
+    best = Math.max(best, score);
+    try { localStorage.setItem(STORE_KEY, String(best)); } catch (e) { /* keep running */ }
+  }
+
+  /* ======================================================================
+   * 8. update(dt) - the ONE model step shared by the rAF loop and tick()
+   * ==================================================================== */
+
+  function update(dt) {
+    if (!(dt > 0) || !isFinite(dt)) return;
+    if (phase !== 'playing' || !alive) return;
+    var d = dt;
+    ticks += 1;
+
+    /* Lane interpolation; the hitbox lane flips at the MIDPOINT. */
+    if (laneT < 1) {
+      laneT += d / LANE_CHANGE_S;
+      if (laneT >= 0.5) lane = targetLane;
+      if (laneT >= 1) { laneT = 1; lane = targetLane; }
+    }
+
+    /* Jump physics. */
+    if (!onGround) {
+      vy -= GRAVITY * d;
+      y += vy * d;
+      if (y <= 0) { y = 0; vy = 0; onGround = true; }
+    }
+
+    /* Slide timer. */
+    if (sliding) {
+      slideT -= d;
+      if (slideT <= 0) { sliding = false; slideT = 0; }
+    }
+
+    /* Advance the world clock (speed is a pure function of distance). d0 is the
+     * span start so the collision test can be swept over the whole sub-step. */
+    var d0 = distance;
+    distance += speedAt(distance) * d;
+    score = Math.floor(distance / SCORE_PER_UNIT) + coinCount * COIN_POINTS;
+    if (score > best) best = score;    // live display; bestSave() persists
+
+    checkCollisions(d0);
+  }
+
+  /* Test the player against the nearby slots.
+   *
+   * The travel test is SWEPT over the whole sub-step span [d0, distance] rather
+   * than sampled at the endpoint. A hazard's collision window is a fixed length
+   * along the track - [h.s - halfW, h.s + halfW] with halfW = h.w/2 + PLAYER_W/2 -
+   * and a stride can exceed it (e.g. tick() fed a coarse `step` at high speed:
+   * MAX_CHUNK * SPEED_MAX = 130 px > HAZARD_WALL_W + PLAYER_W = 74 px). The old
+   * endpoint sample then stepped straight over the window and the hazard was
+   * invisible; because the sub-steps tile [d0, distance] contiguously, swept
+   * interval overlap detects the window regardless of the step size. */
+  function checkCollisions(d0) {
+    var b = distance;
+    var a = (typeof d0 === 'number' && isFinite(d0)) ? d0 : b;
+    if (a > b) { var t = a; a = b; b = t; }
+
+    var kA = Math.floor((a - SLOT0) / SLOT_GAP) - 1;
+    if (kA < 0) kA = 0;
+    var kB = Math.floor((b - SLOT0) / SLOT_GAP) + 1;
+    for (var k = kA; k <= kB; k++) {
+      var h = hazardAt(k);
+      if (!h) continue;
+
+      /* Coin pickup (only in the currently occupied hitbox lane), swept too. */
+      if (h.coin && !taken[k] && h.coin.lane === lane) {
+        var halfCoin = h.w / 2 + PLAYER_W / 2 + COIN_R;
+        if (h.s - halfCoin <= b && h.s + halfCoin >= a) {
+          taken[k] = true;
+          coinCount += 1;
+          log('coin', { k: k, lane: h.coin.lane });
+        }
+      }
+
+      if (h.kind === 'empty') continue;
+      if (h.blocked.indexOf(lane) < 0) continue;             // not in this lane
+      var halfW = h.w / 2 + PLAYER_W / 2;
+      if (h.s - halfW > b || h.s + halfW < a) continue;      // no swept overlap
+
+      if (h.kind === 'low') {
+        if (y < HAZARD_LOW_H) { die('low', h); return; }
+      } else if (h.kind === 'high') {
+        if (!(sliding && PLAYER_SLIM_H <= HAZARD_HIGH_CLEAR)) { die('high', h); return; }
+      } else {
+        die('wall', h); return;
+      }
+    }
+  }
+
+  function die(kind, h) {
+    alive = false;
+    over = true;
+    phase = 'over';
+    log('hit', { kind: kind, lane: lane, s: Math.round(distance) });
+    bestSave();
+    updateHud();
+  }
+
+  /* ======================================================================
+   * 9. Actions (all gated by phase and by `alive`)
+   * ==================================================================== */
+
+  function moveLane(dir) {
+    if (phase !== 'playing' || !alive) return getState();
+    var d = dir > 0 ? 1 : (dir < 0 ? -1 : 0);
+    if (d === 0) return getState();
+    if (laneT < 1) return getState();        // one change at a time
+    var nl = clamp(lane + d, 0, LANE_COUNT - 1);
+    if (nl === lane) return getState();
+    laneFrom = lane;
+    targetLane = nl;
+    laneT = 0;
+    log('move', { from: lane, to: nl });
+    return getState();
+  }
+
+  function jump() {
+    if (phase !== 'playing' || !alive) return getState();
+    if (!onGround || sliding) return getState();
+    vy = JUMP_V;
+    onGround = false;
+    log('jump');
+    return getState();
+  }
+
+  function slide() {
+    if (phase !== 'playing' || !alive) return getState();
+    if (!onGround || sliding) return getState();
+    sliding = true;
+    slideT = SLIDE_S;
+    log('slide');
+    return getState();
+  }
+
+  /* ======================================================================
+   * 10. Lifecycle
+   * ==================================================================== */
+
+  /* opts.seed is the ONLY recognised key; the starting lane is always 1. */
+  function newGame(opts) {
+    opts = opts || {};
+    setSeed(opts.seed === undefined || opts.seed === null ? 1 : opts.seed);
+    phase = 'ready';
+    distance = 0;
+    score = 0;
+    coinCount = 0;
+    lane = 1; targetLane = 1; laneFrom = 1; laneT = 1;
+    y = 0; vy = 0; onGround = true;
+    sliding = false; slideT = 0;
+    alive = true; over = false;
+    ticks = 0;
+    taken = {};
+    eventLog = [];
+    best = bestLoad();
+    resetHudCache();
+    updateHud();
+    return getState();
+  }
+
+  function start() {
+    if (phase === 'over') newGame({ seed: seed });
+    phase = 'playing';
+    log('start');
+    updateHud();
+    return getState();
+  }
+
+  function pause() { if (phase === 'playing') { phase = 'paused'; updateHud(); } return getState(); }
+  function resume() { if (phase === 'paused') { phase = 'playing'; updateHud(); } return getState(); }
+  function togglePause() {
+    if (phase === 'playing') phase = 'paused';
+    else if (phase === 'paused') phase = 'playing';
+    updateHud();
+    return getState();
+  }
+
+  function proceed() {
+    if (phase === 'ready') start();
+    else if (phase === 'paused') resume();
+    else if (phase === 'over') { newGame({ seed: seed }); start(); }
+  }
+
+  /* Deterministic advance for the test bridge: no rAF, no wall clock. `seconds`
+   * is split into chunks of at most MAX_CHUNK, each sub-stepped at h <= step;
+   * the value-cached HUD is refreshed exactly once at the end. */
+  function tick(seconds, step) {
+    var real = (typeof seconds === 'number' && isFinite(seconds)) ? seconds : 0;
+    var s = (typeof step === 'number' && isFinite(step) && step > 0) ? step : DEFAULT_STEP;
+    var left = real;
+    while (left > 1e-9) {
+      var c = left > MAX_CHUNK ? MAX_CHUNK : left;
+      var n = Math.ceil(c / s);
+      if (!(n >= 1)) n = 1;
+      var h = c / n;
+      for (var i = 0; i < n; i++) update(h);
+      left -= c;
+    }
+    updateHud();
+    return getState();
+  }
+
+  /* ======================================================================
+   * 11. State snapshot + copies
+   * ==================================================================== */
+
+  function getState() {
+    return {
+      phase: phase,
+      distance: distance,
+      score: score,
+      best: best,
+      level: levelAt(distance),
+      speed: speedAt(distance),
+      lane: lane,
+      targetLane: targetLane,
+      y: y,
+      vy: vy,
+      onGround: onGround,
+      sliding: sliding,
+      alive: alive,
+      coinCount: coinCount,
+      over: over,
+      seed: seed,
+      rng: { seed: seed, calls: rngCalls },
+      ticks: ticks,
+      log: logSnapshot()
+    };
+  }
+
+  /* ======================================================================
+   * 12. HUD - value-cached; updateHud() is the ONLY writer of these nodes.
+   * ==================================================================== */
+
+  var hudCache = {
+    score: null, best: null, level: null, distance: null, speed: null,
+    coins: null, msg: null, pauseTxt: null, newTxt: null, startLbl: null,
+    pauseDis: null, padsDis: null, showStart: null, showRes: null,
+    ovTitle: null, ovSub: null, ovBtn: null
+  };
+
+  function resetHudCache() {
+    for (var k in hudCache) {
+      if (Object.prototype.hasOwnProperty.call(hudCache, k)) hudCache[k] = null;
+    }
+  }
+
+  function updateHud() {
+    var c = hudCache;
+
+    if (c.score !== score) { scoreEl.textContent = String(score); c.score = score; }
+
+    var shownBest = Math.max(best, score);
+    if (c.best !== shownBest) { bestEl.textContent = String(shownBest); c.best = shownBest; }
+
+    var lvl = levelAt(distance);
+    if (c.level !== lvl) { levelEl.textContent = String(lvl); c.level = lvl; }
+
+    var dist = Math.floor(distance);
+    if (c.distance !== dist) { distanceEl.textContent = String(dist); c.distance = dist; }
+
+    var spTxt = speedAt(distance).toFixed(2);
+    if (c.speed !== spTxt) { speedEl.textContent = spTxt; c.speed = spTxt; }
+
+    if (c.coins !== coinCount) { coinsEl.textContent = String(coinCount); c.coins = coinCount; }
+
+    var msg;
+    if (phase === 'ready') msg = T.t('readyInfo');
+    else if (phase === 'paused') msg = T.t('msgPaused');
+    else if (phase === 'over') msg = T.t('msgOver');
+    else msg = T.t('msgPlaying');
+    if (c.msg !== msg) { msgEl.textContent = msg; c.msg = msg; }
+
+    var pauseTxt = (phase === 'paused') ? T.t('resume') : T.t('pause');
+    if (c.pauseTxt !== pauseTxt) { btnPause.textContent = pauseTxt; c.pauseTxt = pauseTxt; }
+    var newTxt = T.t('newgame');
+    if (c.newTxt !== newTxt) { btnNew.textContent = newTxt; c.newTxt = newTxt; }
+    var startLbl = T.t('start');
+    if (c.startLbl !== startLbl) { btnStart.textContent = startLbl; c.startLbl = startLbl; }
+
+    /* #btnPause is disabled while `ready`, enabled once running. */
+    var pauseDis = (phase === 'ready');
+    if (c.pauseDis !== pauseDis) { btnPause.disabled = pauseDis; c.pauseDis = pauseDis; }
+
+    /* The four movement pads are disabled while `ready` and live once running.
+     * A synthetic click during `ready` is safe either way: in a real browser a
+     * disabled control does not dispatch, and in the headless stub (which ignores
+     * `disabled`) the handlers are phase-gated, so the state cannot change. */
+    var padsDis = (phase === 'ready');
+    if (c.padsDis !== padsDis) {
+      btnLeft.disabled = padsDis; btnRight.disabled = padsDis;
+      btnJump.disabled = padsDis; btnSlide.disabled = padsDis;
+      c.padsDis = padsDis;
+    }
+
+    var showStart = (phase === 'ready');
+    if (c.showStart !== showStart) {
+      if (showStart) startOverlayEl.classList.add('show'); else startOverlayEl.classList.remove('show');
+      c.showStart = showStart;
+    }
+    var showRes = (phase === 'over');
+    if (c.showRes !== showRes) {
+      if (showRes) overlayEl.classList.add('show'); else overlayEl.classList.remove('show');
+      c.showRes = showRes;
+    }
+    if (showRes) {
+      var ot = T.t('overTitle');
+      var os = T.t('overSub', { n: score, b: best });
+      var ob = T.t('again');
+      if (c.ovTitle !== ot) { ovTitleEl.textContent = ot; c.ovTitle = ot; }
+      if (c.ovSub !== os) { ovSubEl.textContent = os; c.ovSub = os; }
+      if (c.ovBtn !== ob) { ovBtnEl.textContent = ob; c.ovBtn = ob; }
+    }
+  }
+
+  /* ======================================================================
+   * 13. Rendering (DOM + CSS only; positions come from constants + mappers)
+   * ==================================================================== */
+
+  function setVar(el, name, value) { el.style.setProperty(name, String(value)); }
+  function show(el, on) { el.style.display = on ? 'block' : 'none'; }
+
+  function render() {
+    /* The player's two custom properties are repainted UNCONDITIONALLY every
+     * frame, straight from the model - never read back from the DOM. --lane is
+     * the bare hitbox lane; --y is the bare jump height (0 on the ground). */
+    setVar(playerEl, '--lane', lane);
+    setVar(playerEl, '--y', y);
+    playerEl.className = 'player' +
+      (sliding ? ' is-sliding' : '') +
+      (onGround ? '' : ' is-jumping') +
+      (alive ? '' : ' is-dead');
+
+    usedHazards = 0;
+    usedCoins = 0;
+
+    var kStart = Math.max(0, Math.floor((distance - SLOT0) / SLOT_GAP) - 1);
+    var kEnd = Math.floor((distance + VIEW_AHEAD - SLOT0) / SLOT_GAP) + 2;
+
+    for (var k = kStart; k <= kEnd; k++) {
+      var h = hazardAt(k);
+      if (!h) continue;
+      var gap = h.s - distance;
+      if (gap < -100 || gap > VIEW_AHEAD + 60) continue;
+      var base = toPixel(0, gap).y;    // GROUND_Y - gap
+
+      if (h.kind !== 'empty') {
+        for (var bi = 0; bi < h.blocked.length; bi++) {
+          if (usedHazards >= hazardPool.length) break;
+          var el = hazardPool[usedHazards++];
+          var bl = h.blocked[bi];
+          var w, hh, top;
+          if (h.kind === 'high') {
+            w = HAZARD_HIGH_W; hh = HAZARD_HIGH_H;
+            top = base - HAZARD_HIGH_CLEAR - HAZARD_HIGH_H;
+          } else {
+            w = h.w; hh = h.h; top = base - h.h;
+          }
+          var domKind = (h.kind === 'wall') ? 'full' : h.kind;
+          el.setAttribute('data-kind', domKind);
+          el.dataset.kind = domKind;
+          setVar(el, '--lane', bl);
+          setVar(el, '--x', laneXOf(bl) - w / 2);
+          el.style.top = top + 'px';
+          el.style.width = w + 'px';
+          el.style.height = hh + 'px';
+          show(el, true);
+        }
+      }
+
+      if (h.coin && !taken[k] && usedCoins < coinPool.length) {
+        var el2 = coinPool[usedCoins++];
+        setVar(el2, '--lane', h.coin.lane);
+        setVar(el2, '--x', laneXOf(h.coin.lane) - COIN_R);
+        el2.style.top = (base - COIN_R) + 'px';
+        el2.style.width = (COIN_R * 2) + 'px';
+        el2.style.height = (COIN_R * 2) + 'px';
+        show(el2, true);
+      }
+    }
+
+    for (var hi = usedHazards; hi < hazardPool.length; hi++) show(hazardPool[hi], false);
+    for (var ci = usedCoins; ci < coinPool.length; ci++) show(coinPool[ci], false);
+  }
+
+  /* ======================================================================
+   * 14. Input (keyboard on BOTH document and window; pointer on the buttons)
+   * ==================================================================== */
+
+  /* One event object is dispatched at both document and window, so a marker
+   * dedupes the two registrations. */
+  function onKeyDown(ev) {
+    if (ev && ev.__rnSeen) return;
+    if (ev) ev.__rnSeen = true;
+    var k = ev && ev.key;
+    if (k === 'ArrowLeft' || k === 'a' || k === 'A') { moveLane(-1); return; }
+    if (k === 'ArrowRight' || k === 'd' || k === 'D') { moveLane(1); return; }
+    if (k === 'ArrowUp' || k === 'w' || k === 'W' || k === ' ' || k === 'Spacebar') {
+      if (ev && ev.preventDefault) ev.preventDefault();
+      jump();
+      return;
+    }
+    if (k === 'ArrowDown' || k === 's' || k === 'S') { slide(); return; }
+    if (k === 'Enter') { proceed(); return; }
+    if (k === 'p' || k === 'P') { togglePause(); return; }
+    if (k === 'r' || k === 'R') { newGame({ seed: seed }); start(); return; }
+  }
+
+  document.addEventListener('keydown', onKeyDown);
+  window.addEventListener('keydown', onKeyDown);
+
+  function tap(fn) {
+    return function (ev) { if (ev && ev.preventDefault) ev.preventDefault(); fn(); };
+  }
+  btnLeft.addEventListener('click', tap(function () { moveLane(-1); }));
+  btnRight.addEventListener('click', tap(function () { moveLane(1); }));
+  btnJump.addEventListener('click', tap(jump));
+  btnSlide.addEventListener('click', tap(slide));
+  btnPause.addEventListener('click', tap(togglePause));
+  btnNew.addEventListener('click', tap(function () { newGame({ seed: seed }); start(); }));
+  btnStart.addEventListener('click', tap(start));
+  ovBtnEl.addEventListener('click', tap(function () { newGame({ seed: seed }); start(); }));
+  trackEl.addEventListener('click', function () { if (phase === 'ready') start(); });
+
+  /* ======================================================================
+   * 15. rAF loop (single clock - no browser timer API is used anywhere)
+   * ==================================================================== */
+
+  var running = true;
+  var lastT = 0;
+
+  function loop(ts) {
+    if (!running) return;
+    var dt;
+    if (typeof ts === 'number' && ts > 0 && lastT > 0) dt = (ts - lastT) / 1000;
+    else dt = DEFAULT_STEP;
+    if (typeof ts === 'number' && ts > 0) lastT = ts;
+    if (!isFinite(dt) || dt <= 0) dt = DEFAULT_STEP;
+    if (dt > 0.05) dt = 0.05;              // clamp big hitches / tab restores
+    update(dt);
+    updateHud();                            // value-cached DOM refresh every frame
+    render();
+    requestAnimationFrame(loop);
+  }
+
+  /* ======================================================================
+   * 16. Test bridge (window.RN) + boot
+   * ==================================================================== */
+
+  window.RN = {
+    /* every tuning constant, by its exact source name */
+    constants: {
+      LANE_COUNT: LANE_COUNT, LANE_W: LANE_W, VIEW_W: VIEW_W, VIEW_H: VIEW_H,
+      GROUND_Y: GROUND_Y, PLAYER_W: PLAYER_W, PLAYER_H: PLAYER_H, PLAYER_SLIM_H: PLAYER_SLIM_H,
+      SLOT0: SLOT0, SLOT_GAP: SLOT_GAP, LEVEL_SPAN: LEVEL_SPAN, LEVEL_MAX: LEVEL_MAX,
+      SPEED_BASE: SPEED_BASE, SPEED_RAMP: SPEED_RAMP, SPEED_MAX: SPEED_MAX,
+      MIN_REACT_S: MIN_REACT_S, GRAVITY: GRAVITY, JUMP_V: JUMP_V, SLIDE_S: SLIDE_S,
+      LANE_CHANGE_S: LANE_CHANGE_S,
+      HAZARD_LOW_W: HAZARD_LOW_W, HAZARD_LOW_H: HAZARD_LOW_H,
+      HAZARD_HIGH_W: HAZARD_HIGH_W, HAZARD_HIGH_H: HAZARD_HIGH_H, HAZARD_HIGH_CLEAR: HAZARD_HIGH_CLEAR,
+      HAZARD_WALL_W: HAZARD_WALL_W, WALL_H: WALL_H,
+      COIN_R: COIN_R, COIN_POINTS: COIN_POINTS, SCORE_PER_UNIT: SCORE_PER_UNIT,
+      COIN_CHANCE: COIN_CHANCE, EMPTY_CHANCE: EMPTY_CHANCE, SINGLE_CHANCE: SINGLE_CHANCE,
+      PATTERN_LEN: PATTERN_LEN, DEFAULT_STEP: DEFAULT_STEP, MAX_CHUNK: MAX_CHUNK,
+      POOL_SIZE: POOL_SIZE
+    },
+
+    /* fixed field geometry */
+    world: function () { return world(); },
+
+    /* deterministic randomness */
+    mulberry32: function (s) { return mulberry32(s); },
+
+    /* pure model */
+    levelAt: function (s) { return levelAt(s); },
+    speedAt: function (s) { return speedAt(s); },
+    slotS: function (k) { return slotS(k); },
+    slotCount: function (s) { return slotCount(s); },
+    hazardAt: function (k) { return hazardAt(k); },
+    hazardsBetween: function (s0, s1) { return hazardsBetween(s0, s1); },
+    timeBetween: function (s0, s1) { return timeBetween(s0, s1); },
+    reactionBudget: function (k) { return reactionBudget(k); },
+
+    /* pure kinematics */
+    jumpApex: function () { return jumpApex(); },
+    jumpAirtime: function () { return jumpAirtime(); },
+    slideDuration: function () { return slideDuration(); },
+    laneChangeTime: function () { return laneChangeTime(); },
+
+    /* pure mapping the renderer uses */
+    toPixel: function (lane, s) { return toPixel(lane, s); },
+
+    /* queries (copies) */
+    getState: function () { return getState(); },
+    hudCache: function () {
+      var out = {};
+      for (var k in hudCache) {
+        if (Object.prototype.hasOwnProperty.call(hudCache, k)) out[k] = hudCache[k];
+      }
+      return out;
+    },
+    log: function () { return logSnapshot(); },
+
+    /* lifecycle */
+    newGame: function (opts) { return newGame(opts); },
+    start: function () { return start(); },
+    pause: function () { return pause(); },
+    resume: function () { return resume(); },
+    togglePause: function () { return togglePause(); },
+
+    /* input */
+    moveLane: function (dir) { return moveLane(dir); },
+    jump: function () { return jump(); },
+    slide: function () { return slide(); },
+
+    /* deterministic advance */
+    tick: function (seconds, step) { return tick(seconds, step); }
+  };
+
+  /* Re-localise dynamic text (HUD + overlays) on language change. Exactly ONE
+   * onChange callback is registered. */
+  T.onChange(function () {
+    resetHudCache();
+    updateHud();
+  });
+
+  /* Startup order: initialize the game FIRST, T.start() LAST. */
+  newGame({ seed: 1 });
+  requestAnimationFrame(loop);
+  T.start();
+
+})();
+</script>
+</body>
+</html>

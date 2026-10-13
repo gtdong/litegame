@@ -2,7 +2,7 @@
 
 [简体中文](README.zh.md) · **[English](README.md)**
 
-[![games](https://img.shields.io/badge/games-32-blue?style=flat-square)](#games)
+[![games](https://img.shields.io/badge/games-33-blue?style=flat-square)](#games)
 [![AI-generated](https://img.shields.io/badge/AI--generated-100%25-8b5cf6?style=flat-square)](#how-this-was-made)
 [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen?style=flat-square)](#why-litegame)
 [![vanilla JS](https://img.shields.io/badge/vanilla-JS-f7df1e?style=flat-square&logo=javascript&logoColor=black)](https://developer.mozilla.org/docs/Web/JavaScript)
@@ -61,6 +61,7 @@ Each game lives in its own folder and is a single self-contained `index.html`. T
 | [towerdefense-game](towerdefense-game) | Three towers, twelve waves, one fixed path: build, upgrade, sell and keep every enemy off the base | `towerdefense` `strategy` `waves` |
 | [cardbattle-game](cardbattle-game) | A three-lane card duel: one 20-card deck for both sides, units trade, spells burn, first base to fall loses | `card` `duel` `strategy` |
 | [pinball-game](pinball-game) | A fixed-step pinball table: plunger, three bumpers, two flippers, every constant published so each shot replays exactly | `action` `physics` `arcade` |
+| [runner-game](runner-game) | An endless three-lane runner whose world is a pure function of distance: jump, slide and change lanes past a provably never-impossible obstacle field | `action` `endless` `reflex` |
 
 ## Why litegame
 
