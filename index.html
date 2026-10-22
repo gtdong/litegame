@@ -7,7 +7,7 @@
 
 <!-- Search / social metadata. Keeps the page findable and the shared link pretty. -->
 <meta name="description" content="100% AI-generated, zero-dependency HTML5 mini games in plain vanilla JavaScript — Snake, Tetris, Sokoban, Sudoku, Solitaire, Chinese Chess and more. No build, no framework, no lines of hand-written code. 纯 AI 生成的零依赖 HTML5 小游戏，零手写代码，点开即玩。">
-<meta name="keywords" content="html5 games, javascript games, browser games, mini games, vanilla javascript, zero dependencies, ai generated games, ai generated code, vibe coding, ai coding, free online games, tetris, sokoban, sudoku, minesweeper, snake, 2048, gomoku, chinese chess, solitaire, reversi, othello, klotski, pong, bubble shooter, typing test, maze, canvas games, endless runner, 小游戏, 网页游戏, 在线游戏, 免费游戏, 开源游戏, AI 生成, 纯 AI 制作, 零手写代码, 俄罗斯方块, 推箱子, 数独, 扫雷, 贪吃蛇, 五子棋, 中国象棋, 纸牌接龙, 黑白棋, 华容道, 乒乓球, 泡泡龙, 打字, 迷宫, 无尽跑酷">
+<meta name="keywords" content="html5 games, javascript games, browser games, mini games, vanilla javascript, zero dependencies, ai generated games, ai generated code, vibe coding, ai coding, free online games, tetris, sokoban, sudoku, minesweeper, snake, 2048, gomoku, chinese chess, solitaire, reversi, othello, klotski, pong, bubble shooter, typing test, maze, canvas games, endless runner, billiards, pool, 8-ball, 小游戏, 网页游戏, 在线游戏, 免费游戏, 开源游戏, AI 生成, 纯 AI 制作, 零手写代码, 俄罗斯方块, 推箱子, 数独, 扫雷, 贪吃蛇, 五子棋, 中国象棋, 纸牌接龙, 黑白棋, 华容道, 乒乓球, 泡泡龙, 打字, 迷宫, 无尽跑酷, 台球, 8 球">
 <meta name="author" content="gtdong">
 <meta name="robots" content="index, follow, max-image-preview:large">
 <meta name="theme-color" content="#f7f8fa">
@@ -47,7 +47,7 @@
   "alternateName": "litegame — HTML5 mini games",
   "url": "https://litegame-hub.github.io/",
   "description": "Zero-dependency HTML5 mini games written in plain vanilla JavaScript. 100% AI-generated, zero lines of hand-written code.",
-  "keywords": "html5 games, javascript games, vanilla javascript, zero dependencies, ai generated code, vibe coding, tetris, sokoban, sudoku, minesweeper, snake, 2048, gomoku, chinese chess, solitaire, reversi, klotski, pong, bubble shooter, typing test, maze, match 3, match-3, lianliankan, link match, tile matching, frogger, space invaders, platformer, tower defense, card battle, lane battle, endless runner",
+  "keywords": "html5 games, javascript games, vanilla javascript, zero dependencies, ai generated code, vibe coding, tetris, sokoban, sudoku, minesweeper, snake, 2048, gomoku, chinese chess, solitaire, reversi, klotski, pong, bubble shooter, typing test, maze, match 3, match-3, lianliankan, link match, tile matching, frogger, space invaders, platformer, tower defense, card battle, lane battle, endless runner, billiards, pool, 8-ball",
   "inLanguage": ["en", "zh-CN"],
   "isAccessibleForFree": true,
   "license": "https://opensource.org/licenses/MIT",
@@ -55,7 +55,7 @@
   "mainEntity": {
     "@type": "ItemList",
     "name": "Games",
-    "numberOfItems": 33,
+    "numberOfItems": 34,
     "itemListElement": [
       { "@type": "ListItem", "position": 1,  "name": "Snake",           "url": "https://litegame-hub.github.io/snake-game/" },
       { "@type": "ListItem", "position": 2,  "name": "Gomoku",          "url": "https://litegame-hub.github.io/gomoku-game/" },
@@ -89,7 +89,8 @@
       { "@type": "ListItem", "position": 30, "name": "Tower Defense",   "url": "https://litegame-hub.github.io/towerdefense-game/" },
       { "@type": "ListItem", "position": 31, "name": "Card Battle",     "url": "https://litegame-hub.github.io/cardbattle-game/" },
       { "@type": "ListItem", "position": 32, "name": "Pinball",         "url": "https://litegame-hub.github.io/pinball-game/" },
-      { "@type": "ListItem", "position": 33, "name": "Endless Runner",  "url": "https://litegame-hub.github.io/runner-game/" }
+      { "@type": "ListItem", "position": 33, "name": "Endless Runner",  "url": "https://litegame-hub.github.io/runner-game/" },
+      { "@type": "ListItem", "position": 34, "name": "8-Ball Pool",  "url": "https://litegame-hub.github.io/pool-game/" }
     ]
   }
 }
@@ -826,6 +827,22 @@
       <p>
         <span data-lang="en" class="inline on">Three lanes, no finish line. The whole world is a pure function of one number — distance — so the speed, the obstacle field and the safe corridor are all derived from published constants, and the run is provably never impossible. You only lose by mistiming a jump, a slide or a lane change.</span>
         <span data-lang="zh" class="inline">三条跑道，没有终点。整个世界都是「距离」这一个数的纯函数：速度、障碍分布与必然存在的安全走廊全部由公开常量推导，因此这一局可证明地永远不会无解——你只会死在跳跃、下滑或变道的时机上。</span>
+      </p>
+      <div class="go">
+        <span data-lang="en" class="inline on">Play →</span>
+        <span data-lang="zh" class="inline">开始游戏 →</span>
+      </div>
+    </a>
+
+    <a class="card" href="pool-game/">
+      <div class="icon">🎱</div>
+      <h2>
+        <span data-lang="en" class="inline on">8-Ball Pool</span>
+        <span data-lang="zh" class="inline">台球厅 · 8 球</span>
+      </h2>
+      <p>
+        <span data-lang="en" class="inline on">One cue ball, fifteen object balls and a fixed 1/240 s physics grid: equal-mass collisions, cushions that reflect, and a rack that is provably legal. Clear the table in as few shots as you can — the 8 ball only counts if it goes in last.</span>
+        <span data-lang="zh" class="inline">一颗母球、十五颗目标球，加上一个固定的 1/240 秒物理网格：等质量碰撞、会反弹的库边、可证明合法的球堆。用尽量少的杆数清台——8 号球只有在最后落袋才算数。</span>
       </p>
       <div class="go">
         <span data-lang="en" class="inline on">Play →</span>

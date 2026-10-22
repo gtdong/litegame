@@ -1,0 +1,1641 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title data-i18n="title"></title>
+<style>
+  :root {
+    --bg: #0b1220;
+    --card: #121b2e;
+    --border: #26324c;
+    --text: #e9eefb;
+    --muted: #8d9bbd;
+    --accent: #22c55e;
+    --felt: #0e6244;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body { max-width: 100%; }
+
+  body {
+    margin: 0;
+    padding: 18px 12px 44px;
+    overflow-x: hidden;
+    background: radial-gradient(115% 90% at 50% 0%, #1a2540 0%, var(--bg) 60%);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+  }
+
+  .lang-switch { align-self: flex-start; margin-left: max(0px, calc(50% - 400px)); }
+
+  /* ---------- HUD ---------- */
+  .hud {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 7px;
+    margin-bottom: 12px;
+    width: min(820px, 100%);
+  }
+  .stat {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: #1b2440;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 5px 10px;
+    font-size: 12px;
+    font-weight: 700;
+    font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+    color: #c9d4f5;
+  }
+  .stat small {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .stat b { color: #fff; }
+  #fouls { color: #ff8a8a; }
+  #remain { color: #7ee2a8; }
+
+  /* ---------- table ---------- */
+  .stage {
+    position: relative;
+    width: 100%;
+    max-width: 800px;
+    height: 400px;
+    margin: 6px auto 26px;
+  }
+
+  .table {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 800px;
+    height: 400px;
+    transform-origin: top left;
+    background:
+      radial-gradient(120% 150% at 50% -10%, #17855d 0%, #0f6847 52%, #0a4b33 100%);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow:
+      inset 0 0 60px rgba(0, 0, 0, .38),
+      0 0 0 12px #6d4a2c,
+      0 0 0 14px #3b2616,
+      0 18px 44px rgba(0, 0, 0, .5);
+    touch-action: none;
+    cursor: crosshair;
+  }
+  /* faint cloth weave + centre spot */
+  .table::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255, 255, 255, .028) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, .028) 1px, transparent 1px);
+    background-size: 8px 8px;
+    pointer-events: none;
+  }
+
+  .layer {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 800px;
+    height: 400px;
+    pointer-events: none;
+  }
+
+  .fx {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 800px;
+    height: 400px;
+    transform-origin: top left;
+    pointer-events: none;
+    z-index: 6;
+  }
+
+  .pocket {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 50% 38%, #04070b 52%, #0d131c 100%);
+    box-shadow: inset 0 3px 8px rgba(0, 0, 0, .85), 0 0 0 2px rgba(0, 0, 0, .35);
+    pointer-events: none;
+  }
+
+  .ball {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    overflow: hidden;
+    pointer-events: none;
+    box-shadow:
+      inset -2px -3px 5px rgba(0, 0, 0, .42),
+      inset 2px 2px 3px rgba(255, 255, 255, .35),
+      0 1px 2px rgba(0, 0, 0, .45);
+    will-change: transform;
+  }
+  .ball .band {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 5px;
+    height: 10px;
+  }
+  .ball .num {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font: 700 9px/1 "SFMono-Regular", Menlo, Consolas, monospace;
+    letter-spacing: -.02em;
+  }
+  .ball.cue { box-shadow: inset -2px -3px 5px rgba(0, 0, 0, .3), inset 2px 2px 4px rgba(255, 255, 255, .9), 0 1px 2px rgba(0, 0, 0, .45); }
+  .ball.potted { opacity: 0; }
+
+  .aim-line {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100px;
+    height: 2px;
+    border-radius: 2px;
+    transform-origin: left center;
+    background: linear-gradient(90deg, rgba(255, 255, 255, .92), rgba(160, 255, 210, .18));
+    box-shadow: 0 0 6px rgba(120, 255, 190, .5);
+    pointer-events: none;
+  }
+
+  .flash {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 46px;
+    height: 46px;
+    margin: -23px 0 0 -23px;
+    border-radius: 50%;
+    border: 2px solid rgba(180, 255, 220, .85);
+    pointer-events: none;
+  }
+
+  /* ---------- info + controls ---------- */
+  .info {
+    font-size: 12.5px;
+    color: var(--muted);
+    text-align: center;
+    margin: 0 0 6px;
+    min-height: 18px;
+    line-height: 1.5;
+    max-width: 760px;
+  }
+  .info#status {
+    font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 12px;
+    color: #9fb2da;
+    margin-bottom: 14px;
+  }
+
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  button {
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    color: #dbe5ff;
+    background: #1b2440;
+    border: 1px solid var(--border);
+    border-radius: 11px;
+    padding: 8px 14px;
+    cursor: pointer;
+    transition: transform .06s ease, background .12s ease;
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  button:hover { background: #24304f; }
+  button:active { transform: translateY(1px); }
+  button:disabled { opacity: .4; cursor: default; }
+  button.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #04210f;
+  }
+  button.primary:hover { background: #34d46d; }
+  button.pad { min-width: 52px; font-size: 15px; padding: 8px 12px; }
+
+  /* ---------- overlays ---------- */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(6, 10, 20, .68);
+    backdrop-filter: blur(3px);
+    z-index: 40;
+  }
+  .overlay.show { display: flex; }
+  .overlay .panel {
+    width: min(420px, 100%);
+    background: linear-gradient(#17203a, #121a2e);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 22px 20px;
+    text-align: center;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, .6);
+  }
+  .overlay h2 { margin: 0 0 8px; font-size: 21px; letter-spacing: -.01em; }
+  .overlay p { margin: 0 0 16px; font-size: 13px; color: var(--muted); line-height: 1.65; }
+</style>
+</head>
+<body>
+
+<div class="lang-switch" data-lang-switch></div>
+
+<header class="hud">
+  <span class="stat"><small data-i18n="score"></small> <b id="score">0</b></span>
+  <span class="stat"><small data-i18n="best"></small> <b id="best">0</b></span>
+  <span class="stat"><small data-i18n="shots"></small> <b id="shots">0</b></span>
+  <span class="stat"><small data-i18n="potted"></small> <b id="potted">0</b></span>
+  <span class="stat"><small data-i18n="fouls"></small> <b id="fouls">0</b></span>
+  <span class="stat"><small data-i18n="remain"></small> <b id="remain">15</b></span>
+</header>
+
+<div class="stage">
+  <div id="table" class="table">
+    <div id="pocketLayer" class="layer"></div>
+    <div id="ballLayer" class="layer"></div>
+    <div id="aimLayer" class="layer"></div>
+  </div>
+  <div id="fxLayer" class="fx"></div>
+</div>
+
+<p class="info" id="msg"></p>
+<p class="info" id="status"></p>
+
+<div class="controls">
+  <button id="btnLeft"  class="pad" aria-label="aim left">&#9664;</button>
+  <button id="btnRight" class="pad" aria-label="aim right">&#9654;</button>
+  <button id="btnPowerDown" class="pad">&#8722;</button>
+  <button id="btnPowerUp"   class="pad">&#43;</button>
+  <button id="btnShoot" class="primary" data-i18n="shoot"></button>
+</div>
+<div class="controls">
+  <button id="btnPause" data-i18n="pause" disabled></button>
+  <button id="btnNew"   data-i18n="newgame"></button>
+</div>
+
+<div id="startOverlay" class="overlay show">
+  <div class="panel">
+    <h2 data-i18n="title"></h2>
+    <p data-i18n="subtitle"></p>
+    <button id="btnStart" class="primary" data-i18n="start"></button>
+  </div>
+</div>
+
+<div id="overlay" class="overlay">
+  <div class="panel">
+    <h2 id="ovTitle"></h2>
+    <p id="ovSub"></p>
+    <button id="ovBtn" class="primary"></button>
+  </div>
+</div>
+
+<script src="../assets/i18n.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  /* ======================================================================
+   * 1. Frozen constants (mirrored 1:1 by the table in README.md)
+   * ==================================================================== */
+
+  var TABLE_W = 800;              // px, playfield width
+  var TABLE_H = 400;              // px, playfield height
+  var BALL_R = 10;                // px, ball radius
+  var POCKET_R = 20;              // px, pocket mouth radius
+  var BALL_COUNT = 16;            // cue + 15 object balls
+  var PHYS_H = 1 / 240;           // s, fixed physics grid
+  var MAX_CHUNK = 0.25;           // s, largest single advance() chunk
+  var MAX_SPEED = 1400;           // px/s, full-power cue speed
+  var MIN_SPEED = 200;            // px/s, softest cue speed
+  var FRICTION = 260;             // px/s^2, Coulomb (constant) deceleration
+  var STOP_SPEED = 6;             // px/s, below this a ball is parked
+  var WALL_RESTITUTION = 0.86;    // cushion bounce factor
+  var BALL_RESTITUTION = 0.96;    // ball-ball bounce factor
+  var CUE_START_X = 200;          // px, cue ball head spot
+  var CUE_START_Y = 200;          // px
+  var RACK_APEX_X = 560;          // px, apex of the triangle
+  var RACK_APEX_Y = 200;          // px
+  var RACK_GAP = 20.2;            // px, spacing inside one row
+  var RACK_DX = RACK_GAP * Math.sqrt(3) / 2;  // px, row spacing (17.4937...)
+  var AIM_STEP = 0.02;            // rad per key press
+  var POWER_STEP = 40;            // px/s per key press
+  var BALL_POINTS = 100;          // points per potted object ball
+  var SHOT_PENALTY = 15;          // points lost per shot
+  var FOUL_PENALTY = 50;          // points lost per foul
+  var LOG_SIZE = 64;              // event log ring size
+
+  var STORE_KEY = 'litegame_pool_best';
+  var DEFAULT_POWER = 700;        // px/s, starting cue power
+  var AIM_BASE_LEN = 100;         // px, aim-line element width before scaleX
+  var OBJECT_BALLS = 15;
+
+  /* ======================================================================
+   * 2. i18n (shared module: ../assets/i18n.js)
+   * ==================================================================== */
+
+  var T = LiteI18N.create({
+    title:    { en: 'Pool', zh: '台球厅' },
+    subtitle: {
+      en: 'Rack fifteen balls and clear the table in as few shots as you can. The 8-ball must go down last.',
+      zh: '摆好十五颗球，用尽量少的杆数清台。8 号球必须最后落袋。'
+    },
+    start:    { en: 'Start', zh: '开始' },
+    again:    { en: 'Play again', zh: '再来一局' },
+    shoot:    { en: 'Shoot', zh: '击球' },
+    pause:    { en: 'Pause', zh: '暂停' },
+    resume:   { en: 'Resume', zh: '继续' },
+    newgame:  { en: 'New game', zh: '新游戏' },
+
+    score:    { en: 'Score', zh: '得分' },
+    best:     { en: 'Best', zh: '最高' },
+    shots:    { en: 'Shots', zh: '杆数' },
+    potted:   { en: 'Potted', zh: '落袋' },
+    fouls:    { en: 'Fouls', zh: '犯规' },
+    remain:   { en: 'Remain', zh: '剩余' },
+
+    stReady:   { en: 'Press Start to break.', zh: '点击“开始”开球。' },
+    stAim:     { en: 'Aiming {a}° · power {p} px/s', zh: '瞄准 {a}° · 力度 {p} px/s' },
+    stRolling: { en: 'Balls rolling…', zh: '球在滚动…' },
+    stPaused:  { en: 'Paused.', zh: '已暂停。' },
+    stOver:    { en: 'Cleared in {n} shots.', zh: '共用 {n} 杆清台。' },
+
+    msgReady: {
+      en: 'Aim with the pointer or ←/→, set power with W/S, then shoot.',
+      zh: '用指针或 ←/→ 瞄准，W/S 调整力度，然后击球。'
+    },
+    msgPot:      { en: 'Ball {n} potted.', zh: '{n} 号球落袋。' },
+    msgScratch:  { en: 'Foul: cue ball potted — re-spotted.', zh: '犯规：母球落袋，已重新摆放。' },
+    msgEight:    { en: '8-ball down early.', zh: '8 号球提前落袋。' },
+    msgEightFoul:{ en: 'Foul: 8-ball potted early — re-spotted.', zh: '犯规：8 号球提前落袋，已重新摆放。' },
+    msgOver:     { en: 'Table cleared.', zh: '清台完成。' },
+
+    overTitle: { en: 'Table cleared!', zh: '清台完成！' },
+    /* {sp} / {fp} carry the English plural 's' and are empty at n = 1; the zh
+     * string has no such placeholder, so interpolation leaves it alone. */
+    overSub:   { en: '{s} shot{sp} · {f} foul{fp} · score {sc} · best {b}', zh: '{s} 杆 · {f} 次犯规 · 得分 {sc} · 最高 {b}' }
+  });
+
+  /* ======================================================================
+   * 3. DOM handles (every id below exists in the markup above)
+   * ==================================================================== */
+
+  var scoreEl = document.getElementById('score');
+  var bestEl = document.getElementById('best');
+  var shotsEl = document.getElementById('shots');
+  var pottedEl = document.getElementById('potted');
+  var foulsEl = document.getElementById('fouls');
+  var remainEl = document.getElementById('remain');
+
+  var tableEl = document.getElementById('table');
+  var pocketLayerEl = document.getElementById('pocketLayer');
+  var ballLayerEl = document.getElementById('ballLayer');
+  var aimLayerEl = document.getElementById('aimLayer');
+  var fxLayerEl = document.getElementById('fxLayer');
+
+  var msgEl = document.getElementById('msg');
+  var statusEl = document.getElementById('status');
+
+  var btnLeft = document.getElementById('btnLeft');
+  var btnRight = document.getElementById('btnRight');
+  var btnPowerDown = document.getElementById('btnPowerDown');
+  var btnPowerUp = document.getElementById('btnPowerUp');
+  var btnShoot = document.getElementById('btnShoot');
+  var btnPause = document.getElementById('btnPause');
+  var btnNew = document.getElementById('btnNew');
+
+  var startOverlayEl = document.getElementById('startOverlay');
+  var btnStart = document.getElementById('btnStart');
+  var overlayEl = document.getElementById('overlay');
+  var ovTitleEl = document.getElementById('ovTitle');
+  var ovSubEl = document.getElementById('ovSub');
+  var ovBtnEl = document.getElementById('ovBtn');
+
+  var stageEl = tableEl.parentNode;
+  var aimLineEl = document.createElement('div');
+  aimLineEl.className = 'aim-line';
+  aimLineEl.style.display = 'none';
+  aimLayerEl.appendChild(aimLineEl);
+
+  /* ======================================================================
+   * 4. Small pure helpers
+   * ==================================================================== */
+
+  function num(v, fallback) {
+    return (typeof v === 'number' && isFinite(v)) ? v : (fallback === undefined ? 0 : fallback);
+  }
+
+  function clamp(v, lo, hi) {
+    v = num(v, lo);
+    return v < lo ? lo : (v > hi ? hi : v);
+  }
+
+  function round2(v) {
+    return Math.round(num(v) * 100) / 100;
+  }
+
+  /* mulberry32: 32-bit seeded PRNG. Dependency-free and identical everywhere. */
+  function mulberry32(seed) {
+    var a = (num(seed) | 0) >>> 0;
+    return function () {
+      a = (a + 0x6D2B79F5) >>> 0;
+      var t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  /* Six pockets: three along the top cushion, three along the bottom one. */
+  function buildPockets() {
+    var out = [];
+    for (var i = 0; i < 3; i++) {
+      out.push({ x: i * TABLE_W / 2, y: 0, r: POCKET_R });
+      out.push({ x: i * TABLE_W / 2, y: TABLE_H, r: POCKET_R });
+    }
+    return out;
+  }
+  var POCKETS = buildPockets();
+
+  function pockets() {
+    var out = [];
+    for (var i = 0; i < POCKETS.length; i++) {
+      out.push({ x: POCKETS[i].x, y: POCKETS[i].y, r: POCKETS[i].r });
+    }
+    return out;
+  }
+
+  function kindOf(id) {
+    if (id === 0) return 'cue';
+    if (id === 8) return 'eight';
+    return id < 8 ? 'solid' : 'stripe';
+  }
+
+  function makeBall(id, x, y, vx, vy) {
+    return {
+      id: id,
+      x: num(x),
+      y: num(y),
+      vx: num(vx),
+      vy: num(vy),
+      r: BALL_R,
+      kind: kindOf(id),
+      value: id
+    };
+  }
+
+  /* ======================================================================
+   * 5. rack(seed) - pure setup
+   * ==================================================================== */
+
+  function rack(seed) {
+    var rng = mulberry32(seed);
+    var spots = [];
+    var eightIndex = -1;
+    var row, i;
+
+    for (row = 0; row < 5; row++) {
+      var x = RACK_APEX_X + row * RACK_DX;
+      for (i = 0; i <= row; i++) {
+        var y = RACK_APEX_Y + (i - row / 2) * RACK_GAP;
+        if (row === 2 && i === 1) eightIndex = spots.length;   // third row, centre
+        spots.push({ x: x, y: y });
+      }
+    }
+
+    /* Fisher-Yates on the 14 non-eight ids, driven by the seeded stream. */
+    var ids = [1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15];
+    for (var k = ids.length - 1; k > 0; k--) {
+      var j = Math.floor(rng() * (k + 1));
+      var tmp = ids[k];
+      ids[k] = ids[j];
+      ids[j] = tmp;
+    }
+
+    var balls = [makeBall(0, CUE_START_X, CUE_START_Y, 0, 0)];
+    var next = 0;
+    for (var s = 0; s < spots.length; s++) {
+      var v = (s === eightIndex) ? 8 : ids[next++];
+      balls.push(makeBall(v, spots[s].x, spots[s].y, 0, 0));
+    }
+    return balls;
+  }
+
+  /* ======================================================================
+   * 6. advance(balls, h) - the whole physics, pure and fixed-grid
+   *
+   * The submitted slice is cut into PHYS_H cells (plus one remainder cell),
+   * so any h that is an integer multiple of PHYS_H produces exactly the same
+   * sequence of cells no matter how the caller chops it up.
+   * ==================================================================== */
+
+  function substep(list, dt, tEnd, events) {
+    var i, j, b;
+
+    /* 1. straight-line travel */
+    for (i = 0; i < list.length; i++) {
+      b = list[i];
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+    }
+
+    /* 2. pockets (checked before the cushions, so a ball hugging a corner
+     *    drops instead of bouncing off the rail) */
+    var keep = [];
+    for (i = 0; i < list.length; i++) {
+      b = list[i];
+      var sunk = null;
+      for (j = 0; j < POCKETS.length; j++) {
+        var p = POCKETS[j];
+        var pdx = b.x - p.x;
+        var pdy = b.y - p.y;
+        if (pdx * pdx + pdy * pdy < p.r * p.r) { sunk = p; break; }
+      }
+      if (sunk) {
+        events.push({ t: tEnd, type: 'pot', a: b.id, b: null, x: sunk.x, y: sunk.y });
+      } else {
+        keep.push(b);
+      }
+    }
+    if (keep.length !== list.length) {
+      list.length = 0;
+      for (i = 0; i < keep.length; i++) list.push(keep[i]);
+    }
+
+    /* 3. cushions: clamp the centre back inside, flip an outgoing normal */
+    for (i = 0; i < list.length; i++) {
+      b = list[i];
+      var r = b.r;
+      if (b.x < r) {
+        b.x = r;
+        if (b.vx < 0) {
+          b.vx = -b.vx * WALL_RESTITUTION;
+          events.push({ t: tEnd, type: 'wall', a: b.id, b: null, x: b.x, y: b.y });
+        }
+      } else if (b.x > TABLE_W - r) {
+        b.x = TABLE_W - r;
+        if (b.vx > 0) {
+          b.vx = -b.vx * WALL_RESTITUTION;
+          events.push({ t: tEnd, type: 'wall', a: b.id, b: null, x: b.x, y: b.y });
+        }
+      }
+      if (b.y < r) {
+        b.y = r;
+        if (b.vy < 0) {
+          b.vy = -b.vy * WALL_RESTITUTION;
+          events.push({ t: tEnd, type: 'wall', a: b.id, b: null, x: b.x, y: b.y });
+        }
+      } else if (b.y > TABLE_H - r) {
+        b.y = TABLE_H - r;
+        if (b.vy > 0) {
+          b.vy = -b.vy * WALL_RESTITUTION;
+          events.push({ t: tEnd, type: 'wall', a: b.id, b: null, x: b.x, y: b.y });
+        }
+      }
+    }
+
+    /* 4. ball-ball: equal mass, normal impulse split in half, then de-overlap */
+    for (i = 0; i < list.length; i++) {
+      var a = list[i];
+      for (j = i + 1; j < list.length; j++) {
+        var c = list[j];
+        var dx = c.x - a.x;
+        var dy = c.y - a.y;
+        var lim = a.r + c.r;
+        var d2 = dx * dx + dy * dy;
+        if (d2 >= lim * lim) continue;
+
+        var d = Math.sqrt(d2);
+        var nx, ny;
+        if (d > 1e-9) {
+          nx = dx / d;
+          ny = dy / d;
+        } else {
+          nx = 1;
+          ny = 0;
+          d = 0;
+        }
+        var vn = (c.vx - a.vx) * nx + (c.vy - a.vy) * ny;
+        if (vn >= 0) continue;                       // already separating
+
+        var imp = -(1 + BALL_RESTITUTION) * vn / 2;   // equal mass: half each
+        a.vx -= imp * nx;
+        a.vy -= imp * ny;
+        c.vx += imp * nx;
+        c.vy += imp * ny;
+
+        var push = (lim - d) / 2;
+        a.x -= nx * push;
+        a.y -= ny * push;
+        c.x += nx * push;
+        c.y += ny * push;
+
+        events.push({
+          t: tEnd, type: 'ball', a: a.id, b: c.id,
+          x: (a.x + c.x) / 2, y: (a.y + c.y) / 2
+        });
+      }
+    }
+
+    /* 5. friction: constant deceleration, parked below STOP_SPEED */
+    for (i = 0; i < list.length; i++) {
+      b = list[i];
+      var sp = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+      if (sp > 0) {
+        var ns = sp - FRICTION * dt;
+        if (!(ns > STOP_SPEED)) {
+          b.vx = 0;
+          b.vy = 0;
+          events.push({ t: tEnd, type: 'stop', a: b.id, b: null, x: b.x, y: b.y });
+        } else {
+          var k = ns / sp;
+          b.vx *= k;
+          b.vy *= k;
+        }
+      }
+    }
+
+    /* 6. de-overlap can nudge a ball over a cushion by a fraction of a pixel;
+     *    this is a positional clamp only (no velocity change, no energy). */
+    for (i = 0; i < list.length; i++) {
+      b = list[i];
+      b.x = clamp(b.x, b.r, TABLE_W - b.r);
+      b.y = clamp(b.y, b.r, TABLE_H - b.r);
+    }
+  }
+
+  function advance(ballsIn, h) {
+    var src = ballsIn || [];
+    var list = [];
+    var i;
+    for (i = 0; i < src.length; i++) {
+      var b = src[i] || {};
+      list.push({
+        id: (b.id | 0),
+        x: num(b.x),
+        y: num(b.y),
+        vx: num(b.vx),
+        vy: num(b.vy),
+        r: num(b.r, BALL_R) || BALL_R,
+        kind: b.kind || kindOf(b.id | 0),
+        value: (typeof b.value === 'number') ? b.value : (b.id | 0)
+      });
+    }
+
+    var events = [];
+    var total = num(h);
+    if (!(total > 0)) return { balls: list, events: events };
+
+    var full = Math.round(total / PHYS_H);
+    if (Math.abs(total - full * PHYS_H) > 1e-9) full = Math.floor(total / PHYS_H);
+    if (full < 0) full = 0;
+
+    var t = 0;
+    for (i = 0; i < full; i++) {
+      t += PHYS_H;
+      substep(list, PHYS_H, t, events);
+    }
+    var rest = total - full * PHYS_H;
+    if (rest > 1e-12) {
+      t += rest;
+      substep(list, rest, t, events);
+    }
+    return { balls: list, events: events };
+  }
+
+  /* ======================================================================
+   * 7. Closed-form helpers exposed through the bridge
+   * ==================================================================== */
+
+  function scoreOf(stats) {
+    var s = stats || {};
+    var n = 0;
+    if (Object.prototype.toString.call(s.potted) === '[object Array]') n = s.potted.length;
+    else n = Math.max(0, Math.round(num(s.potted)));
+    var shots = Math.max(0, Math.round(num(s.shots)));
+    var fouls = Math.max(0, Math.round(num(s.fouls)));
+    var raw = n * BALL_POINTS - shots * SHOT_PENALTY - fouls * FOUL_PENALTY;
+    return raw > 0 ? raw : 0;
+  }
+
+  function stopDistance(v) {
+    var s = Math.abs(num(v));
+    return s * s / (2 * FRICTION);
+  }
+
+  function stopTime(v) {
+    return Math.abs(num(v)) / FRICTION;
+  }
+
+  function substepTravel() {
+    return MAX_SPEED * PHYS_H;
+  }
+
+  function energyRatio(e) {
+    var r = num(e);
+    return r * r;
+  }
+
+  function spotFree(x, y, list) {
+    if (x < BALL_R || x > TABLE_W - BALL_R) return false;
+    if (y < BALL_R || y > TABLE_H - BALL_R) return false;
+    var i;
+    for (i = 0; i < POCKETS.length; i++) {
+      var p = POCKETS[i];
+      var pdx = x - p.x;
+      var pdy = y - p.y;
+      if (pdx * pdx + pdy * pdy < (p.r + BALL_R) * (p.r + BALL_R)) return false;
+    }
+    var lim = 2 * BALL_R;
+    for (i = 0; i < list.length; i++) {
+      var b = list[i];
+      var dx = x - b.x;
+      var dy = y - b.y;
+      if (dx * dx + dy * dy < lim * lim) return false;
+    }
+    return true;
+  }
+
+  /* Deterministic ring search around the head spot: same table, same answer. */
+  function respotSpot(balls) {
+    var list = balls || [];
+    var step = 2 * BALL_R + 2;
+    for (var ring = 0; ring < 40; ring++) {
+      for (var ox = -ring; ox <= ring; ox++) {
+        for (var oy = -ring; oy <= ring; oy++) {
+          if (Math.max(Math.abs(ox), Math.abs(oy)) !== ring) continue;
+          var x = CUE_START_X + ox * step;
+          var y = CUE_START_Y + oy * step;
+          if (spotFree(x, y, list)) return { x: x, y: y };
+        }
+      }
+    }
+    return { x: CUE_START_X, y: CUE_START_Y };
+  }
+
+  /* ======================================================================
+   * 8. Live state
+   * ==================================================================== */
+
+  var balls = [];
+  var phase = 'ready';          // ready | aiming | rolling | over
+  var paused = false;
+  var seed = 1;
+  var shots = 0;
+  var fouls = 0;
+  var pottedIds = [];
+  var aim = 0;                  // rad
+  var power = DEFAULT_POWER;    // px/s
+  var elapsed = 0;              // simulated seconds
+  var best = null;
+  var eightDown = false;        // 8-ball dropped this shot
+  var cueDown = false;          // cue ball dropped this shot
+  var msgKey = 'msgReady';
+  var msgVars = null;
+  var overlayState = 'none';
+  var overStats = null;
+  var eventLog = [];
+  var hudCache = {};
+  var lastTs = null;
+
+  function resetHudCache() {
+    hudCache = {
+      score: null, best: null, shots: null, potted: null, fouls: null,
+      remain: null, msg: null, status: null, pauseLabel: null, pauseOff: null
+    };
+  }
+  resetHudCache();
+
+  function scoreNow() {
+    return scoreOf({ potted: pottedIds.length, shots: shots, fouls: fouls });
+  }
+
+  function remainNow() {
+    return OBJECT_BALLS - pottedIds.length;
+  }
+
+  function logEvent(entry) {
+    eventLog.push(entry);
+    while (eventLog.length > LOG_SIZE) eventLog.shift();
+  }
+
+  function snapshotBalls() {
+    var out = [];
+    for (var i = 0; i < balls.length; i++) {
+      var b = balls[i];
+      out.push({
+        id: b.id, x: b.x, y: b.y, vx: b.vx, vy: b.vy,
+        r: b.r, kind: b.kind, value: b.value
+      });
+    }
+    return out;
+  }
+
+  function getState() {
+    var out = {
+      phase: phase,
+      paused: paused,
+      seed: seed,
+      shots: shots,
+      fouls: fouls,
+      potted: pottedIds.slice(),
+      remain: remainNow(),
+      score: scoreNow(),
+      best: best,
+      aim: aim,
+      power: power,
+      elapsed: elapsed,
+      over: phase === 'over',
+      balls: snapshotBalls()
+    };
+    return out;
+  }
+
+  function loadBest() {
+    try {
+      var raw = localStorage.getItem(STORE_KEY);
+      if (raw === null || raw === undefined || raw === '') return null;
+      var n = parseInt(raw, 10);
+      if (!isFinite(n) || n <= 0) return null;
+      return n;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function saveBest(v) {
+    try { localStorage.setItem(STORE_KEY, String(v)); } catch (e) {}
+  }
+
+  /* ======================================================================
+   * 9. Rules
+   * ==================================================================== */
+
+  function allStopped() {
+    for (var i = 0; i < balls.length; i++) {
+      if (balls[i].vx !== 0 || balls[i].vy !== 0) return false;
+    }
+    return true;
+  }
+
+  function sortBalls() {
+    balls.sort(function (p, q) { return p.id - q.id; });
+  }
+
+  function settleShot() {
+    phase = 'aiming';
+
+    if (cueDown || !hasBall(0)) {
+      cueDown = false;
+      fouls++;
+      var cueSpot = respotSpot(balls);
+      balls.push(makeBall(0, cueSpot.x, cueSpot.y, 0, 0));
+      msgKey = 'msgScratch';
+      msgVars = null;
+    }
+
+    if (eightDown) {
+      eightDown = false;
+      /* Legal only when the 8 is the last object ball left: pottedIds never
+       * contains the 8, so "14 already down" means the table is otherwise
+       * clear. */
+      if (pottedIds.length < OBJECT_BALLS - 1) {
+        fouls++;
+        var eightSpot = respotSpot(balls);
+        balls.push(makeBall(8, eightSpot.x, eightSpot.y, 0, 0));
+        msgKey = 'msgEightFoul';
+        msgVars = null;
+      } else {
+        pottedIds.push(8);
+        msgKey = 'msgOver';
+        msgVars = null;
+      }
+    }
+
+    sortBalls();
+
+    if (pottedIds.length >= OBJECT_BALLS) {
+      phase = 'over';
+      finishGame();
+    }
+    refresh();
+  }
+
+  function hasBall(id) {
+    for (var i = 0; i < balls.length; i++) {
+      if (balls[i].id === id) return true;
+    }
+    return false;
+  }
+
+  function finishGame() {
+    overStats = { shots: shots, fouls: fouls, score: scoreNow() };
+    if (best === null || shots < best) {
+      best = shots;
+      saveBest(best);
+    }
+    overlayState = 'over';
+    renderOverlay();
+    overlayEl.classList.add('show');
+  }
+
+  function renderOverlay() {
+    if (overlayState !== 'over' || !overStats) return;
+    ovTitleEl.textContent = T.t('overTitle');
+    ovSubEl.textContent = T.t('overSub', {
+      s: overStats.shots,
+      sp: overStats.shots === 1 ? '' : 's',
+      f: overStats.fouls,
+      fp: overStats.fouls === 1 ? '' : 's',
+      sc: overStats.score,
+      b: (best === null ? '—' : best)
+    });
+    ovBtnEl.textContent = T.t('again');
+  }
+
+  function newGame(opts) {
+    var s = (opts && typeof opts.seed === 'number' && isFinite(opts.seed)) ? opts.seed : 1;
+    seed = s;
+    balls = rack(seed);
+    phase = 'ready';
+    paused = false;
+    shots = 0;
+    fouls = 0;
+    pottedIds = [];
+    aim = 0;
+    power = DEFAULT_POWER;
+    elapsed = 0;
+    eightDown = false;
+    cueDown = false;
+    msgKey = 'msgReady';
+    msgVars = null;
+    overlayState = 'none';
+    overStats = null;
+    eventLog = [];
+    lastTs = null;
+    best = loadBest();
+
+    overlayEl.classList.remove('show');
+    startOverlayEl.classList.add('show');
+
+    resetHudCache();
+    refresh();
+  }
+
+  function start() {
+    if (phase !== 'ready') return;
+    phase = 'aiming';
+    paused = false;
+    startOverlayEl.classList.remove('show');
+    msgKey = 'msgReady';
+    msgVars = null;
+    refresh();
+  }
+
+  function pause() {
+    if (phase !== 'aiming' && phase !== 'rolling') return;
+    paused = true;
+    refresh();
+  }
+
+  function resume() {
+    if (phase !== 'aiming' && phase !== 'rolling') return;
+    paused = false;
+    refresh();
+  }
+
+  function togglePause() {
+    if (phase !== 'aiming' && phase !== 'rolling') return;
+    paused = !paused;
+    refresh();
+  }
+
+  /* ======================================================================
+   * 10. Simulation
+   * ==================================================================== */
+
+  function handleEvents(events, base) {
+    for (var i = 0; i < events.length; i++) {
+      var ev = events[i];
+      if (!ev) continue;
+      logEvent({
+        t: base + num(ev.t),
+        type: ev.type,
+        a: ev.a,
+        b: ev.b === undefined ? null : ev.b,
+        x: num(ev.x),
+        y: num(ev.y)
+      });
+      if (ev.type !== 'pot') continue;
+
+      if (ev.a === 0) {
+        cueDown = true;
+        msgKey = 'msgScratch';
+        msgVars = null;
+      } else if (ev.a === 8) {
+        eightDown = true;
+        msgKey = 'msgEight';
+        msgVars = null;
+      } else {
+        if (pottedIds.indexOf(ev.a) < 0) pottedIds.push(ev.a);
+        msgKey = 'msgPot';
+        msgVars = { n: ev.a };
+      }
+      spawnFlash(ev.x, ev.y);
+    }
+  }
+
+  function simulate(dt) {
+    if (!(dt > 0)) return;
+    if (phase !== 'rolling' || paused) return;
+    if (balls.length === 0) return;
+
+    var res = advance(balls, dt);
+    var base = elapsed;
+    balls = res.balls;
+    elapsed += dt;
+    handleEvents(res.events, base);
+
+    if (allStopped()) settleShot();
+  }
+
+  /* ======================================================================
+   * 11. Aiming / shooting
+   * ==================================================================== */
+
+  function normAngle(a) {
+    a = num(a);
+    while (a > Math.PI) a -= Math.PI * 2;
+    while (a <= -Math.PI) a += Math.PI * 2;
+    return a;
+  }
+
+  function cueBall() {
+    for (var i = 0; i < balls.length; i++) {
+      if (balls[i].id === 0) return balls[i];
+    }
+    return null;
+  }
+
+  function aimAt(x, y) {
+    var cue = cueBall();
+    if (!cue) return;
+    var dx = num(x) - cue.x;
+    var dy = num(y) - cue.y;
+    if (Math.abs(dx) < 1e-9 && Math.abs(dy) < 1e-9) return;
+    aim = normAngle(Math.atan2(dy, dx));
+    refresh();
+  }
+
+  function rotateAim(d) {
+    aim = normAngle(aim + num(d));
+    refresh();
+  }
+
+  function setPower(p) {
+    power = clamp(num(p, MIN_SPEED), MIN_SPEED, MAX_SPEED);
+    refresh();
+  }
+
+  function shoot() {
+    if (phase !== 'aiming' || paused) return false;
+    var cue = cueBall();
+    if (!cue) return false;
+    cue.vx = Math.cos(aim) * power;
+    cue.vy = Math.sin(aim) * power;
+    shots++;
+    eightDown = false;
+    cueDown = false;
+    phase = 'rolling';
+    msgKey = null;
+    msgVars = null;
+    logEvent({ t: elapsed, type: 'shoot', a: 0, b: null, x: cue.x, y: cue.y });
+    refresh();
+    return true;
+  }
+
+  /* ======================================================================
+   * 12. Rendering (DOM nodes, never canvas)
+   * ==================================================================== */
+
+  var ballNodes = [];
+
+  function ballColor(id) {
+    if (id === 0) return '#f7fafc';
+    if (id === 8) return '#14181f';
+    var idx = id <= 7 ? id - 1 : id - 9;
+    var palette = ['#f2c014', '#1f6feb', '#e5484d', '#7c3aed', '#f97316', '#12a150', '#8b1e3f'];
+    return palette[idx % 7];
+  }
+
+  function buildNodes() {
+    var i;
+    for (i = 0; i < BALL_COUNT; i++) {
+      var id = i;
+      var el = document.createElement('div');
+      el.className = 'ball ' + kindOf(id);
+      el.setAttribute('data-ball', String(id));   // stable hook for DOM tests
+      var col = ballColor(id);
+      if (kindOf(id) === 'stripe') {
+        el.style.background = '#f8fbff';
+        var band = document.createElement('i');
+        band.className = 'band';
+        band.style.background = col;
+        el.appendChild(band);
+      } else {
+        el.style.background = col;
+      }
+      if (id > 0) {
+        var lab = document.createElement('span');
+        lab.className = 'num';
+        lab.textContent = String(id);
+        lab.style.color = (id === 8 || id === 1 || id === 4) ? '#14181f' : '#ffffff';
+        el.appendChild(lab);
+      }
+      ballLayerEl.appendChild(el);
+      ballNodes.push({ el: el, hidden: false });
+    }
+
+    for (i = 0; i < POCKETS.length; i++) {
+      var p = POCKETS[i];
+      var pk = document.createElement('div');
+      pk.className = 'pocket';
+      pk.style.transform = 'translate(' + (p.x - p.r) + 'px,' + (p.y - p.r) + 'px)';
+      pocketLayerEl.appendChild(pk);
+    }
+  }
+
+  var fxs = [];
+
+  function spawnFlash(x, y) {
+    var el = document.createElement('div');
+    el.className = 'flash';
+    el.style.transform = 'translate(' + round2(x) + 'px,' + round2(y) + 'px) scale(0.4)';
+    el.style.opacity = '0.95';
+    fxLayerEl.appendChild(el);
+    fxs.push({ el: el, life: 0.42, max: 0.42, x: num(x), y: num(y) });
+  }
+
+  function updateFx(dt) {
+    for (var i = fxs.length - 1; i >= 0; i--) {
+      var f = fxs[i];
+      f.life -= dt;
+      if (f.life <= 0) {
+        if (f.el.parentNode && f.el.parentNode.removeChild) f.el.parentNode.removeChild(f.el);
+        fxs.splice(i, 1);
+        continue;
+      }
+      var k = 1 - f.life / f.max;                    // 0 -> 1
+      f.el.style.opacity = String(Math.max(0, 1 - k));
+      f.el.style.transform = 'translate(' + round2(f.x) + 'px,' + round2(f.y) +
+        'px) scale(' + (0.4 + k * 1.5).toFixed(3) + ')';
+    }
+  }
+
+  function aimHitDistance(cue) {
+    var dx = Math.cos(aim);
+    var dy = Math.sin(aim);
+    var bestLen = 2000;
+    var i;
+
+    if (dx > 1e-9) bestLen = Math.min(bestLen, (TABLE_W - BALL_R - cue.x) / dx);
+    if (dx < -1e-9) bestLen = Math.min(bestLen, (BALL_R - cue.x) / dx);
+    if (dy > 1e-9) bestLen = Math.min(bestLen, (TABLE_H - BALL_R - cue.y) / dy);
+    if (dy < -1e-9) bestLen = Math.min(bestLen, (BALL_R - cue.y) / dy);
+
+    for (i = 0; i < balls.length; i++) {
+      var b = balls[i];
+      if (b.id === 0) continue;
+      var ox = b.x - cue.x;
+      var oy = b.y - cue.y;
+      var proj = ox * dx + oy * dy;
+      if (proj <= 0) continue;
+      var perp2 = ox * ox + oy * oy - proj * proj;
+      var rad = 2 * BALL_R;
+      if (perp2 >= rad * rad) continue;
+      var half = Math.sqrt(rad * rad - perp2);
+      var hit = proj - half;
+      if (hit > 0 && hit < bestLen) bestLen = hit;
+    }
+    return clamp(bestLen, 0, 2000);
+  }
+
+  function render() {
+    var i, byId = {};
+    for (i = 0; i < balls.length; i++) byId[balls[i].id] = balls[i];
+
+    for (i = 0; i < ballNodes.length; i++) {
+      var node = ballNodes[i];
+      var b = byId[i];
+      if (!b) {
+        if (!node.hidden) {
+          node.el.classList.add('potted');
+          node.el.style.display = 'none';
+          node.hidden = true;
+        }
+        continue;
+      }
+      if (node.hidden) {
+        node.el.classList.remove('potted');
+        node.el.style.display = '';
+        node.hidden = false;
+      }
+      node.el.style.transform = 'translate(' + round2(b.x - BALL_R) + 'px,' +
+        round2(b.y - BALL_R) + 'px)';
+    }
+
+    var cue = byId[0];
+    if (!cue || phase !== 'aiming') {
+      aimLineEl.style.display = 'none';
+      return;
+    }
+    aimLineEl.style.display = '';
+    var len = Math.max(12, aimHitDistance(cue));
+    var pw = (power - MIN_SPEED) / (MAX_SPEED - MIN_SPEED);
+    aimLineEl.style.opacity = String(0.35 + 0.55 * clamp(pw, 0, 1));
+    aimLineEl.style.transform = 'translate(' + round2(cue.x) + 'px,' + round2(cue.y) +
+      'px) rotate(' + aim.toFixed(4) + 'rad) scaleX(' + (len / AIM_BASE_LEN).toFixed(3) + ')';
+  }
+
+  /* ======================================================================
+   * 13. HUD (value-cached, refreshed every frame from loop()/tick())
+   * ==================================================================== */
+
+  function statusText() {
+    if (phase === 'ready') return T.t('stReady');
+    if (phase === 'over') return T.t('stOver', { n: shots });
+    if (paused) return T.t('stPaused');
+    if (phase === 'rolling') return T.t('stRolling');
+    return T.t('stAim', {
+      a: (aim * 180 / Math.PI).toFixed(1),
+      p: Math.round(power)
+    });
+  }
+
+  function messageText() {
+    if (!msgKey) return '';
+    return T.t(msgKey, msgVars || undefined);
+  }
+
+  function updateHud() {
+    var sc = String(scoreNow());
+    if (hudCache.score !== sc) { hudCache.score = sc; scoreEl.textContent = sc; }
+
+    var bv = (best === null) ? '—' : String(best);
+    if (hudCache.best !== bv) { hudCache.best = bv; bestEl.textContent = bv; }
+
+    var sh = String(shots);
+    if (hudCache.shots !== sh) { hudCache.shots = sh; shotsEl.textContent = sh; }
+
+    var po = String(pottedIds.length);
+    if (hudCache.potted !== po) { hudCache.potted = po; pottedEl.textContent = po; }
+
+    var fo = String(fouls);
+    if (hudCache.fouls !== fo) { hudCache.fouls = fo; foulsEl.textContent = fo; }
+
+    var re = String(remainNow());
+    if (hudCache.remain !== re) { hudCache.remain = re; remainEl.textContent = re; }
+
+    var mt = messageText();
+    if (hudCache.msg !== mt) { hudCache.msg = mt; msgEl.textContent = mt; }
+
+    var st = statusText();
+    if (hudCache.status !== st) { hudCache.status = st; statusEl.textContent = st; }
+
+    /* Pause and Shoot do nothing before the break and after the clear, so the
+     * buttons say so. #btnNew and #ovBtn stay live in every phase. */
+    var off = (phase === 'ready' || phase === 'over');
+    if (hudCache.pauseOff !== off) {
+      hudCache.pauseOff = off;
+      btnPause.disabled = off;
+      btnShoot.disabled = off;
+    }
+
+    var lab = T.t(paused ? 'resume' : 'pause');
+    if (hudCache.pauseLabel !== lab) { hudCache.pauseLabel = lab; btnPause.textContent = lab; }
+  }
+
+  /* Paint immediately after a state change: the rAF loop also refreshes every
+   * frame, but an input handler must not leave the HUD one frame stale. */
+  function refresh() {
+    updateHud();
+    render();
+  }
+
+  /* ======================================================================
+   * 14. Layout fit (the 800x400 logical table is scaled to the viewport)
+   * ==================================================================== */
+
+  function fit() {
+    var w = 0;
+    if (stageEl && typeof stageEl.clientWidth === 'number') w = stageEl.clientWidth;
+    if (!(w > 0)) w = TABLE_W;
+    var s = Math.min(1, w / TABLE_W);
+    if (!(s > 0)) s = 1;
+    s = Math.round(s * 10000) / 10000;
+    var t = 'scale(' + s + ')';
+    tableEl.style.transform = t;
+    fxLayerEl.style.transform = t;
+    if (stageEl) stageEl.style.height = round2(TABLE_H * s) + 'px';
+  }
+
+  /* ======================================================================
+   * 15. Pointer + keyboard + buttons
+   * ==================================================================== */
+
+  function toTable(clientX, clientY) {    var rect = (tableEl && tableEl.getBoundingClientRect) ? tableEl.getBoundingClientRect() : null;
+    var rw = rect ? num(rect.width) : 0;
+    var rh = rect ? num(rect.height) : 0;
+    var left = rect ? num(rect.left) : 0;
+    var top = rect ? num(rect.top) : 0;
+    var x, y;
+    if (rw > 0) x = (num(clientX) - left) * (TABLE_W / rw);
+    else x = num(clientX);
+    if (rh > 0) y = (num(clientY) - top) * (TABLE_H / rh);
+    else y = num(clientY);
+    return { x: clamp(x, 0, TABLE_W), y: clamp(y, 0, TABLE_H) };
+  }
+
+  function onPointerAim(ev) {
+    if (phase !== 'aiming' || paused) return;
+    var p = toTable(ev ? ev.clientX : 0, ev ? ev.clientY : 0);
+    aimAt(p.x, p.y);
+  }
+
+  tableEl.addEventListener('pointerdown', function (ev) {
+    if (ev && ev.preventDefault) ev.preventDefault();
+    onPointerAim(ev);
+  });
+  /* Hover aims too: the controls table in both READMEs promises "move over the
+   * table -> aim at the pointer", so this fires with or without a held button.
+   * onPointerAim() itself ignores the event unless the game is aiming and not
+   * paused, so hovering never disturbs a rolling table. */
+  tableEl.addEventListener('pointermove', function (ev) {
+    onPointerAim(ev);
+  });
+  tableEl.addEventListener('click', function (ev) {
+    if (ev && ev.preventDefault) ev.preventDefault();
+    onPointerAim(ev);
+  });
+
+  function onKey(ev) {
+    if (!ev) return;
+    var k = ev.key;
+    var handled = true;
+
+    if (k === 'ArrowLeft' || k === 'a' || k === 'A') {
+      rotateAim(-AIM_STEP);
+    } else if (k === 'ArrowRight' || k === 'd' || k === 'D') {
+      rotateAim(AIM_STEP);
+    } else if (k === 'ArrowUp' || k === 'w' || k === 'W') {
+      setPower(power + POWER_STEP);
+    } else if (k === 'ArrowDown' || k === 's' || k === 'S') {
+      setPower(power - POWER_STEP);
+    } else if (k === ' ') {
+      shoot();
+    } else if (k === 'Enter') {
+      if (phase === 'ready') start();
+      else if (phase === 'over') { newGame({ seed: seed + 1 }); start(); }
+      else shoot();
+    } else if (k === 'p' || k === 'P') {
+      togglePause();
+    } else if (k === 'r' || k === 'R') {
+      newGame({ seed: seed + 1 });
+      start();
+    } else {
+      handled = false;
+    }
+
+    if (handled && ev.preventDefault) ev.preventDefault();
+  }
+  document.addEventListener('keydown', onKey);
+
+  btnLeft.addEventListener('click', function (ev) {
+    if (ev && ev.preventDefault) ev.preventDefault();
+    rotateAim(-AIM_STEP);
+  });
+  btnRight.addEventListener('click', function (ev) {
+    if (ev && ev.preventDefault) ev.preventDefault();
+    rotateAim(AIM_STEP);
+  });
+  btnPowerDown.addEventListener('click', function (ev) {
+    if (ev && ev.preventDefault) ev.preventDefault();
+    setPower(power - POWER_STEP);
+  });
+  btnPowerUp.addEventListener('click', function (ev) {
+    if (ev && ev.preventDefault) ev.preventDefault();
+    setPower(power + POWER_STEP);
+  });
+  btnShoot.addEventListener('click', function (ev) {
+    if (ev && ev.preventDefault) ev.preventDefault();
+    shoot();
+  });
+  btnPause.addEventListener('click', function (ev) {
+    if (ev && ev.preventDefault) ev.preventDefault();
+    togglePause();
+  });
+  btnNew.addEventListener('click', function (ev) {
+    if (ev && ev.preventDefault) ev.preventDefault();
+    newGame({ seed: seed + 1 });
+    start();
+  });
+  btnStart.addEventListener('click', function (ev) {
+    if (ev && ev.preventDefault) ev.preventDefault();
+    start();
+  });
+  ovBtnEl.addEventListener('click', function (ev) {
+    if (ev && ev.preventDefault) ev.preventDefault();
+    newGame({ seed: seed + 1 });
+    start();
+  });
+
+  window.addEventListener('resize', function () { fit(); });
+
+  /* ======================================================================
+   * 16. rAF loop - the only clock in the page
+   * ==================================================================== */
+
+  function loop(ts) {
+    var dt;
+    if (typeof ts === 'number' && isFinite(ts) && ts > 0 && lastTs !== null) {
+      dt = (ts - lastTs) / 1000;
+      lastTs = ts;
+    } else if (typeof ts === 'number' && isFinite(ts) && ts > 0) {
+      lastTs = ts;
+      dt = 1 / 60;
+    } else {
+      dt = 1 / 60;
+    }
+    if (!(dt > 0)) dt = 0;
+    if (dt > MAX_CHUNK) dt = MAX_CHUNK;
+
+    simulate(dt);
+    updateFx(dt);
+    updateHud();
+    render();
+    requestAnimationFrame(loop);
+  }
+
+  /* ======================================================================
+   * 17. Deterministic driver used by the tests
+   * ==================================================================== */
+
+  function tick(seconds, step) {
+    var total = num(seconds);
+    var h = num(step);
+    if (!(h > 0)) h = PHYS_H;
+    if (h > MAX_CHUNK) h = MAX_CHUNK;
+    var left = total;
+    var guard = 0;
+    while (left > 1e-12 && guard < 2000000) {
+      var chunk = left < h ? left : h;
+      simulate(chunk);
+      left -= chunk;
+      guard++;
+    }
+    updateHud();
+    return getState();
+  }
+
+  /* ======================================================================
+   * 18. Test bridge
+   * ==================================================================== */
+
+  window.PL = {
+    constants: {
+      TABLE_W: TABLE_W,
+      TABLE_H: TABLE_H,
+      BALL_R: BALL_R,
+      POCKET_R: POCKET_R,
+      BALL_COUNT: BALL_COUNT,
+      PHYS_H: PHYS_H,
+      MAX_CHUNK: MAX_CHUNK,
+      MAX_SPEED: MAX_SPEED,
+      MIN_SPEED: MIN_SPEED,
+      FRICTION: FRICTION,
+      STOP_SPEED: STOP_SPEED,
+      WALL_RESTITUTION: WALL_RESTITUTION,
+      BALL_RESTITUTION: BALL_RESTITUTION,
+      CUE_START_X: CUE_START_X,
+      CUE_START_Y: CUE_START_Y,
+      RACK_APEX_X: RACK_APEX_X,
+      RACK_APEX_Y: RACK_APEX_Y,
+      RACK_GAP: RACK_GAP,
+      RACK_DX: RACK_DX,
+      AIM_STEP: AIM_STEP,
+      POWER_STEP: POWER_STEP,
+      BALL_POINTS: BALL_POINTS,
+      SHOT_PENALTY: SHOT_PENALTY,
+      FOUL_PENALTY: FOUL_PENALTY,
+      LOG_SIZE: LOG_SIZE
+    },
+
+    /* ---- pure functions ---- */
+    rack: function (seed) { return rack(seed); },
+    advance: function (list, h) { return advance(list, h); },
+    pockets: function () { return pockets(); },
+    scoreOf: function (stats) { return scoreOf(stats); },
+    stopDistance: function (v) { return stopDistance(v); },
+    stopTime: function (v) { return stopTime(v); },
+    substepTravel: function () { return substepTravel(); },
+    energyRatio: function (e) { return energyRatio(e); },
+    respotSpot: function (list) { return respotSpot(list); },
+
+    /* ---- queries ---- */
+    getState: function () { return getState(); },
+    hudCache: function () {
+      var out = {};
+      for (var k in hudCache) {
+        if (Object.prototype.hasOwnProperty.call(hudCache, k)) out[k] = hudCache[k];
+      }
+      return out;
+    },
+    log: function () {
+      var out = [];
+      for (var i = 0; i < eventLog.length; i++) {
+        var e = eventLog[i];
+        out.push({ t: e.t, type: e.type, a: e.a, b: e.b, x: e.x, y: e.y });
+      }
+      return out;
+    },
+
+    /* ---- lifecycle ---- */
+    newGame: function (opts) { newGame(opts); },
+    start: function () { start(); },
+    pause: function () { pause(); },
+    resume: function () { resume(); },
+    togglePause: function () { togglePause(); },
+
+    /* ---- input ---- */
+    aimAt: function (x, y) { aimAt(x, y); },
+    rotateAim: function (d) { rotateAim(d); },
+    setPower: function (p) { setPower(p); },
+    shoot: function () { return shoot(); },
+
+    /* ---- deterministic advance ---- */
+    tick: function (seconds, step) { return tick(seconds, step); }
+  };
+
+  /* Dynamic text must follow the language switcher. Exactly one listener. */
+  T.onChange(function () {
+    resetHudCache();
+    updateHud();
+    renderOverlay();
+  });
+
+  /* ======================================================================
+   * 19. Boot
+   * ==================================================================== */
+
+  buildNodes();
+  fit();
+  newGame({ seed: 1 });
+  requestAnimationFrame(loop);
+  T.start();
+
+})();
+</script>
+</body>
+</html>

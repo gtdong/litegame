@@ -2,7 +2,7 @@
 
 **[简体中文](README.zh.md)** · [English](README.md)
 
-[![games](https://img.shields.io/badge/games-33-blue?style=flat-square)](#游戏列表)
+[![games](https://img.shields.io/badge/games-34-blue?style=flat-square)](#游戏列表)
 [![AI-generated](https://img.shields.io/badge/AI--generated-100%25-8b5cf6?style=flat-square)](#这个项目是怎么做出来的)
 [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen?style=flat-square)](#为什么是-litegame)
 [![vanilla JS](https://img.shields.io/badge/vanilla-JS-f7df1e?style=flat-square&logo=javascript&logoColor=black)](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript)
@@ -62,6 +62,7 @@
 | [cardbattle-game](cardbattle-game) | 卡牌对战，三线双方同一副 20 张牌，单位换血法术烧灼，先破基地者胜 | `卡牌` `对战` `策略` |
 | [pinball-game](pinball-game) | 弹球台，定步长物理：发射杆、三个弹珠、一副挡板，全部常量公开，每次击球都能精确复现 | `动作` `物理` `街机` |
 | [runner-game](runner-game) | 无尽跑酷，三条跑道，整个世界都是「距离」的纯函数：跳跃、下滑、变道穿过可证明永远不会无解的障碍场 | `动作` `无尽` `反应` |
+| [pool-game](pool-game) | 台球厅 8 球，固定 1/240 秒物理网格：等质量碰撞、会反弹的库边、可证明合法的球堆，8 号球必须最后落袋 | `体育` `物理` `瞄准` |
 
 ## 为什么是 litegame
 
