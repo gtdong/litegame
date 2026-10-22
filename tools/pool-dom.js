@@ -46,7 +46,7 @@
  *   NODE_PATH=<isolated-node-modules> node tools/pool-dom.js http://127.0.0.1:<port>/pool-game/
  *   NODE_PATH=<isolated-node-modules> node tools/pool-dom.js --selftest
  *
- * `--selftest` reverse-validates THIS layer: seven deliberate rendering /
+ * `--selftest` reverse-validates THIS layer: eleven deliberate rendering /
  * wiring defects are spliced into an in-memory copy of the page (nothing on
  * disk is touched), served to jsdom, driven through the same scenario, and each
  * one must turn its own DOM-derived guard RED while the shipped page stays
