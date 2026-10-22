@@ -58,6 +58,7 @@
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
+const https = require('https');
 const crypto = require('crypto');
 
 let JSDOM, VirtualConsole;
@@ -138,6 +139,39 @@ async function startMemoryServer(html, i18nJs) {
     url: `http://127.0.0.1:${port}/pool-game/index.html`,
     close: () => new Promise(r => srv.close(r))
   };
+}
+
+/* A URL target has no file on disk, so the INITIAL markup - the thing several
+ * assertions compare the live HUD against - has to be read back over the wire.
+ * Redirects are followed (at most 5 hops) and the whole exchange is capped at
+ * 15 s; a source that cannot be fetched is a harness error, never an empty
+ * string (an empty string makes `markupText` return null and silently disarms
+ * four comparisons instead of failing them). */
+function fetchSource(url, hops) {
+  hops = hops || 0;
+  return new Promise((resolve, reject) => {
+    let u;
+    try { u = new URL(url); } catch (e) { reject(e); return; }
+    const mod = u.protocol === 'https:' ? https : http;
+    const req = mod.get(u, { timeout: 15000 }, res => {
+      const code = res.statusCode || 0;
+      if (code >= 300 && code < 400 && res.headers.location) {
+        res.resume();
+        if (hops >= 5) { reject(new Error(`more than 5 redirects, stopped at ${url}`)); return; }
+        let next;
+        try { next = new URL(res.headers.location, u).toString(); } catch (e) { reject(e); return; }
+        fetchSource(next, hops + 1).then(resolve, reject);
+        return;
+      }
+      if (code !== 200) { res.resume(); reject(new Error(`HTTP ${code} from ${url}`)); return; }
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+      res.on('error', reject);
+    });
+    req.on('timeout', () => { req.destroy(new Error(`timed out after 15 s at ${url}`)); });
+    req.on('error', reject);
+  });
 }
 
 /* ==========================================================================
@@ -801,6 +835,22 @@ async function selfTest() {
     }
     console.log(`HARNESS ERROR: could not load ${TARGET} (${msg})`);
     process.exit(1);
+  }
+
+  /* A URL target: the page loaded, but there is no local file to read the
+   * original markup from. Without it `markupText` returns null, which makes the
+   * "the HUD left its initial value" checks pass for the wrong reason. */
+  if (isHttp && !htmlForMarkup) {
+    try {
+      htmlForMarkup = await fetchSource(TARGET);
+    } catch (e) {
+      const msg = String((e && e.message) || e).split(ROOT).join('<repo-root>');
+      console.log(`HARNESS ERROR: the page at ${TARGET} loaded, but its source could not be read back (${msg})`);
+      try { window.close(); } catch (e2) {}
+      await cleanup();
+      process.exit(1);
+    }
+    note(`initial markup read back from the wire (${Buffer.byteLength(htmlForMarkup)} B)`);
   }
 
   const m = await measure(window, htmlForMarkup || '');
